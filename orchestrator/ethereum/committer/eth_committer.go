@@ -13,10 +13,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
+	"github.com/Helios-Chain-Labs/metrics"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/provider"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/util"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
 )
 
 // NewEthCommitter returns an instance of EVMCommitter, which

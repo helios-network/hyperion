@@ -11,12 +11,14 @@ import (
 	"github.com/xlab/closer"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/peggo/orchestrator"
-	"github.com/InjectiveLabs/peggo/orchestrator/cosmos"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum"
-	"github.com/InjectiveLabs/peggo/orchestrator/pricefeed"
-	"github.com/InjectiveLabs/peggo/orchestrator/version"
-	chaintypes "github.com/InjectiveLabs/sdk-go/chain/types"
+	// sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/Helios-Chain-Labs/peggo/orchestrator"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/pricefeed"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/version"
+	chaintypes "github.com/Helios-Chain-Labs/sdk-go/chain/types"
 )
 
 // startOrchestrator action runs an infinite loop,
@@ -27,6 +29,10 @@ func orchestratorCmd(cmd *cli.Cmd) {
 	cmd.Before = func() {
 		initMetrics(cmd)
 	}
+
+	// config := sdk.GetConfig()
+	// config.SetBech32PrefixForAccount("helios", "helios")
+	// config.Seal()
 
 	cmd.Action = func() {
 		// ensure a clean exit
@@ -68,13 +74,13 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"build_date": version.BuildDate,
 			"go_version": version.GoVersion,
 			"go_arch":    version.GoArch,
-		}).Infoln("Peggo - Peggy module companion binary for bridging assets between Injective and Ethereum")
+		}).Infoln("Peggo - Peggy module companion binary for bridging assets between Helios and Ethereum")
 
-		// 1. Connect to Injective network
+		// 1. Connect to Helios network
 
 		cosmosKeyring, err := cosmos.NewKeyring(cosmosKeyringCfg)
-		orShutdown(errors.Wrap(err, "failed to initialize Injective keyring"))
-		log.Infoln("initialized Injective keyring", cosmosKeyring.Addr.String())
+		orShutdown(errors.Wrap(err, "failed to initialize Helios keyring"))
+		log.Infoln("initialized Helios keyring", cosmosKeyring.Addr.String())
 
 		ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
 			uint64(*cfg.ethChainID),
@@ -90,21 +96,21 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		cosmosNetworkCfg.ValidatorAddress = cosmosKeyring.Addr.String()
 		cosmosNetwork, err := cosmos.NewNetwork(cosmosKeyring, personalSignFn, cosmosNetworkCfg)
 		orShutdown(err)
-		log.WithFields(log.Fields{"chain_id": *cfg.cosmosChainID, "gas_price": *cfg.cosmosGasPrices}).Infoln("connected to Injective network")
+		log.WithFields(log.Fields{"chain_id": *cfg.cosmosChainID, "gas_price": *cfg.cosmosGasPrices}).Infoln("connected to Helios network")
 
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
 		peggyParams, err := cosmosNetwork.PeggyParams(ctx)
-		orShutdown(errors.Wrap(err, "failed to query peggy params, is injectived running?"))
+		orShutdown(errors.Wrap(err, "failed to query peggy params, is heliades running?"))
 
 		var (
 			peggyContractAddr    = gethcommon.HexToAddress(peggyParams.BridgeEthereumAddress)
-			injTokenAddr         = gethcommon.HexToAddress(peggyParams.CosmosCoinErc20Contract)
-			erc20ContractMapping = map[gethcommon.Address]string{injTokenAddr: chaintypes.InjectiveCoin}
+			heliosTokenAddr         = gethcommon.HexToAddress(peggyParams.CosmosCoinErc20Contract)
+			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 
-		log.WithFields(log.Fields{"peggy_contract": peggyContractAddr.String(), "inj_token_contract": injTokenAddr.String()}).Debugln("loaded Peggy module params")
+		log.WithFields(log.Fields{"peggy_contract": peggyContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Peggy module params")
 
 		// 2. Connect to ethereum network
 

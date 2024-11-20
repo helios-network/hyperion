@@ -1,6 +1,6 @@
 specVersion: 0.0.2
-description: InjectiveLabs Peggo
-repository: https://github.com/InjectiveLabs/peggo
+description: HeliosLabs Peggo
+repository: https://github.com/Helios-Chain-Labs/peggo
 schema:
   file: ./schema.graphql
 dataSources:

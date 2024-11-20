@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/InjectiveLabs/metrics"
+	"github.com/Helios-Chain-Labs/metrics"
 )
 
 type EVMProvider interface {

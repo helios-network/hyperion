@@ -10,7 +10,7 @@ env:
   ECR_ENABLED: true
   ECR_REPO: public.ecr.aws/l9h3g6c6/peggo
   GHCR_ENABLED: false
-  GHCR_REPO: ghcr.io/InjectiveLabs/peggo
+  GHCR_REPO: ghcr.io/HeliosLabs/peggo
 
 jobs:
   docker-release:
@@ -20,7 +20,7 @@ jobs:
       - name: Checkout peggo
         uses: actions/checkout@master
         with:
-          repository: InjectiveLabs/peggo
+          repository: HeliosLabs/peggo
           fetch-depth: 0
           ref: ${{ github.ref_name }}
           token: ${{ secrets.GH_TOKEN }}

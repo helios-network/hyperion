@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
 )
 
 var emptyEthAddress = ethcmn.Address{}

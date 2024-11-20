@@ -11,8 +11,8 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	log "github.com/xlab/suplog"
 
-	peggyevents "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 type MockPriceFeed struct {
@@ -42,7 +42,7 @@ type MockCosmosNetwork struct {
 	SendRequestBatchFn                 func(ctx context.Context, denom string) error
 	SendToEthFn                        func(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendOldDepositClaimFn              func(ctx context.Context, deposit *peggyevents.PeggySendToCosmosEvent) error
-	SendDepositClaimFn                 func(ctx context.Context, deposit *peggyevents.PeggySendToInjectiveEvent) error
+	SendDepositClaimFn                 func(ctx context.Context, deposit *peggyevents.PeggySendToHeliosEvent) error
 	SendWithdrawalClaimFn              func(ctx context.Context, withdrawal *peggyevents.PeggyTransactionBatchExecutedEvent) error
 	SendValsetClaimFn                  func(ctx context.Context, vs *peggyevents.PeggyValsetUpdatedEvent) error
 	SendERC20DeployedClaimFn           func(ctx context.Context, erc20 *peggyevents.PeggyERC20DeployedEvent) error
@@ -122,7 +122,7 @@ func (n MockCosmosNetwork) SendOldDepositClaim(ctx context.Context, deposit *peg
 	return n.SendOldDepositClaimFn(ctx, deposit)
 }
 
-func (n MockCosmosNetwork) SendDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToInjectiveEvent) error {
+func (n MockCosmosNetwork) SendDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToHeliosEvent) error {
 	return n.SendDepositClaimFn(ctx, deposit)
 }
 
@@ -161,7 +161,7 @@ type MockEthereumNetwork struct {
 	GetHeaderByNumberFn                 func(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetPeggyIDFn                        func(ctx context.Context) (gethcommon.Hash, error)
 	GetSendToCosmosEventsFn             func(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToCosmosEvent, error)
-	GetSendToInjectiveEventsFn          func(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error)
+	GetSendToHeliosEventsFn          func(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error)
 	GetPeggyERC20DeployedEventsFn       func(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error)
 	GetValsetUpdatedEventsFn            func(startBlock, endBlock uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error)
 	GetTransactionBatchExecutedEventsFn func(startBlock, endBlock uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error)
@@ -188,8 +188,8 @@ func (n MockEthereumNetwork) GetSendToCosmosEvents(startBlock, endBlock uint64) 
 	return n.GetSendToCosmosEventsFn(startBlock, endBlock)
 }
 
-func (n MockEthereumNetwork) GetSendToInjectiveEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
-	return n.GetSendToInjectiveEventsFn(startBlock, endBlock)
+func (n MockEthereumNetwork) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
+	return n.GetSendToHeliosEventsFn(startBlock, endBlock)
 }
 
 func (n MockEthereumNetwork) GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {

@@ -1,6 +1,6 @@
-# Injective Peggo Subgraph 🤖 🚀
+# Helios Peggo Subgraph 🤖 🚀
 
-This is the Subgraph for the Injective Peggo.
+This is the Subgraph for the Helios Peggo.
 
 ---
 
@@ -24,11 +24,11 @@ See deploy script.
 
 ### 3. Run local Graph Node
 
-Follow the instructions here: https://github.com/InjectiveLabs/graph-node#quick-start. You might have to use an older IPFS version, see [here](https://github.com/graphprotocol/graph-node/issues/1799#issuecomment-661433084).
+Follow the instructions here: https://github.com/Helios-Chain-Labs/graph-node#quick-start. You might have to use an older IPFS version, see [here](https://github.com/graphprotocol/graph-node/issues/1799#issuecomment-661433084).
 
 ```bash
-$ cd $GOPATH/src/github.com/InjectiveLabs
-$ git clone https://github.com/InjectiveLabs/graph-node.git
+$ cd $GOPATH/src/github.com/Helios-Chain-Labs
+$ git clone https://github.com/Helios-Chain-Labs/graph-node.git
 $ cd graph-node
 # NOTE: if you do not already have the dependencies required installed (Rust, IPFS, Postgres), run this after completing 3a.
 $ cargo build
@@ -117,7 +117,7 @@ $ yarn create-local
 $ yarn deploy-local
 ```
 
-## Injective Subgraph deployment
+## Helios Subgraph deployment
 
 Optional: Deploy Peggy contracts if required. Make sure to update the hard-coded peggy state id inside `mapping.ts`.
 
@@ -132,8 +132,8 @@ $ yarn deploy:mainnet
 
 Reach out to us at one of the following places!
 
-- Website at <a href="https://injective.com" target="_blank">`injective.com`</a>
-- Twitter at <a href="https://twitter.com/InjectiveLabs" target="_blank">`@InjectiveLabs`</a>
+- Website at <a href="https://helios.com" target="_blank">`helios.com`</a>
+- Twitter at <a href="https://twitter.com/HeliosLabs" target="_blank">`@HeliosLabs`</a>
 
 ---
 

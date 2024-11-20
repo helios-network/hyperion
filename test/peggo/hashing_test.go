@@ -11,9 +11,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/InjectiveLabs/etherman/deployer"
-	"github.com/InjectiveLabs/etherman/sol"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/peggy"
+	"github.com/Helios-Chain-Labs/etherman/deployer"
+	"github.com/Helios-Chain-Labs/etherman/sol"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
 )
 
 var _ = Describe("Contract Tests", func() {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
-	"github.com/InjectiveLabs/metrics"
+	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"

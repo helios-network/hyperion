@@ -8,10 +8,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
-	"github.com/InjectiveLabs/peggo/orchestrator/loops"
-	peggyevents "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/metrics"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
+	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 const (
@@ -37,7 +37,7 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	oracle := oracle{
 		Orchestrator:            s,
 		lastObservedEthHeight:   lastObservedBlock,
-		lastResyncWithInjective: time.Now(),
+		lastResyncWithHelios: time.Now(),
 	}
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
@@ -49,7 +49,7 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 
 type oracle struct {
 	*Orchestrator
-	lastResyncWithInjective time.Time
+	lastResyncWithHelios time.Time
 	lastObservedEthHeight   uint64
 }
 
@@ -63,9 +63,9 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	defer doneFn()
 
 	// check if validator is in the active set since claims will fail otherwise
-	vs, err := l.injective.CurrentValset(ctx)
+	vs, err := l.helios.CurrentValset(ctx)
 	if err != nil {
-		l.logger.WithError(err).Warningln("failed to get active validator set on Injective")
+		l.logger.WithError(err).Warningln("failed to get active validator set on Helios")
 		return err
 	}
 
@@ -77,7 +77,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	}
 
 	if !bonded {
-		l.Log().WithFields(log.Fields{"latest_inj_block": vs.Height}).Warningln("validator not in active set, cannot make claims...")
+		l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height}).Warningln("validator not in active set, cannot make claims...")
 		return nil
 	}
 
@@ -135,10 +135,10 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return err
 	}
 
-	l.Log().WithFields(log.Fields{"claims": len(newEvents), "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("sent new event claims to Injective")
+	l.Log().WithFields(log.Fields{"claims": len(newEvents), "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("sent new event claims to Helios")
 	l.lastObservedEthHeight = latestHeight
 
-	if time.Since(l.lastResyncWithInjective) >= resyncInterval {
+	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
 		if err := l.autoResync(ctx); err != nil {
 			return err
 		}
@@ -157,9 +157,9 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get SendToCosmos events")
 		}
 
-		depositEvents, err := l.ethereum.GetSendToInjectiveEvents(startBlock, endBlock)
+		depositEvents, err := l.ethereum.GetSendToHeliosEvents(startBlock, endBlock)
 		if err != nil {
-			return errors.Wrap(err, "failed to get SendToInjective events")
+			return errors.Wrap(err, "failed to get SendToHelios events")
 		}
 
 		withdrawalEvents, err := l.ethereum.GetTransactionBatchExecutedEvents(startBlock, endBlock)
@@ -234,7 +234,7 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 func (l *oracle) getLastClaimEvent(ctx context.Context) (*peggytypes.LastClaimEvent, error) {
 	var claim *peggytypes.LastClaimEvent
 	fn := func() (err error) {
-		claim, err = l.injective.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
 		return
 	}
 
@@ -248,7 +248,7 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*peggytypes.LastClaimEv
 func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
-		lastClaim, err := l.injective.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 				return err
 			}
 
-			// Considering block time ~1s on Injective chain, adding Sleep to make sure new event is sent
+			// Considering block time ~1s on Helios chain, adding Sleep to make sure new event is sent
 			// only after previous event is executed successfully. Otherwise it will through `non contiguous event nonce` failing CheckTx.
 			time.Sleep(1100 * time.Millisecond)
 		}
@@ -281,7 +281,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 func (l *oracle) autoResync(ctx context.Context) error {
 	var height uint64
 	fn := func() (err error) {
-		height, err = l.getLastClaimBlockHeight(ctx, l.injective)
+		height, err = l.getLastClaimBlockHeight(ctx, l.helios)
 		return
 	}
 
@@ -289,10 +289,10 @@ func (l *oracle) autoResync(ctx context.Context) error {
 		return err
 	}
 
-	l.Log().WithFields(log.Fields{"last_resync": l.lastResyncWithInjective.String(), "last_claimed_eth_height": height}).Infoln("auto resyncing with last claimed event on Injective")
+	l.Log().WithFields(log.Fields{"last_resync": l.lastResyncWithHelios.String(), "last_claimed_eth_height": height}).Infoln("auto resyncing with last claimed event on Helios")
 
 	l.lastObservedEthHeight = height
-	l.lastResyncWithInjective = time.Now()
+	l.lastResyncWithHelios = time.Now()
 
 	return nil
 }
@@ -301,19 +301,19 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 	switch e := ev.(type) {
 	case *oldDeposit:
 		ev := peggyevents.PeggySendToCosmosEvent(*e)
-		return l.injective.SendOldDepositClaim(ctx, &ev)
+		return l.helios.SendOldDepositClaim(ctx, &ev)
 	case *deposit:
-		ev := peggyevents.PeggySendToInjectiveEvent(*e)
-		return l.injective.SendDepositClaim(ctx, &ev)
+		ev := peggyevents.PeggySendToHeliosEvent(*e)
+		return l.helios.SendDepositClaim(ctx, &ev)
 	case *valsetUpdate:
 		ev := peggyevents.PeggyValsetUpdatedEvent(*e)
-		return l.injective.SendValsetClaim(ctx, &ev)
+		return l.helios.SendValsetClaim(ctx, &ev)
 	case *withdrawal:
 		ev := peggyevents.PeggyTransactionBatchExecutedEvent(*e)
-		return l.injective.SendWithdrawalClaim(ctx, &ev)
+		return l.helios.SendWithdrawalClaim(ctx, &ev)
 	case *erc20Deployment:
 		ev := peggyevents.PeggyERC20DeployedEvent(*e)
-		return l.injective.SendERC20DeployedClaim(ctx, &ev)
+		return l.helios.SendERC20DeployedClaim(ctx, &ev)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}
@@ -321,7 +321,7 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 
 type (
 	oldDeposit      peggyevents.PeggySendToCosmosEvent
-	deposit         peggyevents.PeggySendToInjectiveEvent
+	deposit         peggyevents.PeggySendToHeliosEvent
 	valsetUpdate    peggyevents.PeggyValsetUpdatedEvent
 	withdrawal      peggyevents.PeggyTransactionBatchExecutedEvent
 	erc20Deployment peggyevents.PeggyERC20DeployedEvent

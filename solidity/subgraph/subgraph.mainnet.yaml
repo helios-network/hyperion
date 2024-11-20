@@ -1,6 +1,6 @@
 specVersion: 0.0.4
-description: InjectiveLabs Peggo
-repository: https://github.com/InjectiveLabs/peggo
+description: HeliosLabs Peggo
+repository: https://github.com/Helios-Chain-Labs/peggo
 schema:
   file: ./schema.graphql
 dataSources:
@@ -25,8 +25,8 @@ dataSources:
           handler: handleNewERC20Deployed
         - event: SendToCosmosEvent(indexed address,indexed address,indexed bytes32,uint256,uint256)
           handler: handleSendToCosmosEvent
-        - event: SendToInjectiveEvent(indexed address,indexed address,indexed bytes32,uint256,uint256,string)
-          handler: handleSendToInjectiveEvent
+        - event: SendToHeliosEvent(indexed address,indexed address,indexed bytes32,uint256,uint256,string)
+          handler: handleSendToHeliosEvent
         - event: ValsetUpdatedEvent(indexed uint256,uint256,uint256,address,address[],uint256[])
           handler: handleUpdateValset
         - event: TransactionBatchExecutedEvent(indexed uint256,indexed address,uint256)

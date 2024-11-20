@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/InjectiveLabs/etherman/deployer"
+	"github.com/Helios-Chain-Labs/etherman/deployer"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	log "github.com/xlab/suplog"

@@ -14,11 +14,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/committer"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/peggy"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/provider"
-	peggyevents "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/committer"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
+	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 type NetworkConfig struct {
@@ -35,7 +35,7 @@ type Network interface {
 	GetPeggyID(ctx context.Context) (gethcommon.Hash, error)
 
 	GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToCosmosEvent, error)
-	GetSendToInjectiveEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error)
+	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error)
 	GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error)
 	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error)
 	GetTransactionBatchExecutedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error)
@@ -173,13 +173,13 @@ func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyev
 	return sendToCosmosEvents, nil
 }
 
-func (n *network) GetSendToInjectiveEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
+func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
 	peggyFilterer, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
 	}
 
-	iter, err := peggyFilterer.FilterSendToInjectiveEvent(&bind.FilterOpts{
+	iter, err := peggyFilterer.FilterSendToHeliosEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
 	}, nil, nil, nil)
@@ -193,12 +193,12 @@ func (n *network) GetSendToInjectiveEvents(startBlock, endBlock uint64) ([]*pegg
 
 	defer iter.Close()
 
-	var sendToInjectiveEvents []*peggyevents.PeggySendToInjectiveEvent
+	var sendToHeliosEvents []*peggyevents.PeggySendToHeliosEvent
 	for iter.Next() {
-		sendToInjectiveEvents = append(sendToInjectiveEvents, iter.Event)
+		sendToHeliosEvents = append(sendToHeliosEvents, iter.Event)
 	}
 
-	return sendToInjectiveEvents, nil
+	return sendToHeliosEvents, nil
 }
 
 func (n *network) GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {

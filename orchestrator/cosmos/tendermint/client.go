@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/InjectiveLabs/metrics"
+	"github.com/Helios-Chain-Labs/metrics"
 	rpcclient "github.com/cometbft/cometbft/rpc/client"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	comettypes "github.com/cometbft/cometbft/rpc/core/types"

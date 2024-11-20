@@ -6,7 +6,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 
-	"github.com/InjectiveLabs/sdk-go/chain/codec"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/codec"
 )
 
 type EncodingConfig struct {

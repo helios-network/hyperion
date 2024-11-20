@@ -7,9 +7,9 @@ import (
 	"github.com/shopspring/decimal"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
-	"github.com/InjectiveLabs/peggo/orchestrator/loops"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/metrics"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
@@ -55,7 +55,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*peggytypes.BatchFees, error) {
 	var fees []*peggytypes.BatchFees
 	fn := func() (err error) {
-		fees, err = l.injective.UnbatchedTokensWithFees(ctx)
+		fees, err = l.helios.UnbatchedTokensWithFees(ctx)
 		return
 	}
 
@@ -80,9 +80,9 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *peggytypes.Ba
 		return
 	}
 
-	l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Injective")
+	l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
 
-	_ = l.injective.SendRequestBatch(ctx, tokenDenom)
+	_ = l.helios.SendRequestBatch(ctx, tokenDenom)
 }
 
 func (l *batchCreator) getTokenDenom(tokenAddr gethcommon.Address) string {

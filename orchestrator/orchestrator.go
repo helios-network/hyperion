@@ -9,10 +9,10 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
-	"github.com/InjectiveLabs/peggo/orchestrator/cosmos"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum"
-	"github.com/InjectiveLabs/peggo/orchestrator/loops"
+	"github.com/Helios-Chain-Labs/metrics"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
 )
 
 const (
@@ -42,13 +42,13 @@ type Orchestrator struct {
 	cfg         Config
 	maxAttempts uint
 
-	injective cosmos.Network
+	helios cosmos.Network
 	ethereum  ethereum.Network
 	priceFeed PriceFeed
 }
 
 func NewOrchestrator(
-	inj cosmos.Network,
+	helios cosmos.Network,
 	eth ethereum.Network,
 	priceFeed PriceFeed,
 	cfg Config,
@@ -56,7 +56,7 @@ func NewOrchestrator(
 	o := &Orchestrator{
 		logger:      log.DefaultLogger,
 		svcTags:     metrics.Tags{"svc": "peggy_orchestrator"},
-		injective:   inj,
+		helios:      helios,
 		ethereum:    eth,
 		priceFeed:   priceFeed,
 		cfg:         cfg,
@@ -68,24 +68,24 @@ func NewOrchestrator(
 
 // Run starts all major loops required to make
 // up the Orchestrator, all of these are async loops.
-func (s *Orchestrator) Run(ctx context.Context, inj cosmos.Network, eth ethereum.Network) error {
+func (s *Orchestrator) Run(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
 	if s.cfg.RelayerMode {
-		return s.startRelayerMode(ctx, inj, eth)
+		return s.startRelayerMode(ctx, helios, eth)
 	}
 
-	return s.startValidatorMode(ctx, inj, eth)
+	return s.startValidatorMode(ctx, helios, eth)
 }
 
 // startValidatorMode runs all orchestrator processes. This is called
-// when peggo is run alongside a validator injective node.
-func (s *Orchestrator) startValidatorMode(ctx context.Context, inj cosmos.Network, eth ethereum.Network) error {
+// when peggo is run alongside a validator helios node.
+func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
 	log.Infoln("running orchestrator in validator mode")
 
-	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, inj)
+	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
 	if lastObservedEthBlock == 0 {
-		peggyParams, err := inj.PeggyParams(ctx)
+		peggyParams, err := helios.PeggyParams(ctx)
 		if err != nil {
-			s.logger.WithError(err).Fatalln("unable to query peggy module params, is injectived running?")
+			s.logger.WithError(err).Fatalln("unable to query peggy module params, is heliades running?")
 		}
 
 		lastObservedEthBlock = peggyParams.BridgeContractStartHeight
@@ -109,8 +109,8 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, inj cosmos.Networ
 
 // startRelayerMode runs orchestrator processes that only relay specific
 // messages that do not require a validator's signature. This mode is run
-// alongside a non-validator injective node
-func (s *Orchestrator) startRelayerMode(ctx context.Context, inj cosmos.Network, eth ethereum.Network) error {
+// alongside a non-validator helios node
+func (s *Orchestrator) startRelayerMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
 	log.Infoln("running orchestrator in relayer mode")
 
 	var pg loops.ParanoidGroup
@@ -121,8 +121,8 @@ func (s *Orchestrator) startRelayerMode(ctx context.Context, inj cosmos.Network,
 	return pg.Wait()
 }
 
-func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, inj cosmos.Network) (uint64, error) {
-	claim, err := inj.LastClaimEventByAddr(ctx, s.cfg.CosmosAddr)
+func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmos.Network) (uint64, error) {
+	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.CosmosAddr)
 	if err != nil {
 		return 0, err
 	}

@@ -13,12 +13,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 
-	"github.com/InjectiveLabs/metrics"
-	"github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/metrics"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/committer"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/provider"
-	wrappers "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/committer"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
+	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
 )
 
 type PeggyContract interface {

@@ -22,8 +22,8 @@ RUN DOCKER=true make install
 #build main container
 FROM alpine:latest
 
-# Add the "injective" non-root user and group
-RUN addgroup -S injective && adduser -S -G injective injective
+# Add the "helios" non-root user and group
+RUN addgroup -S helios && adduser -S -G helios helios
 
 # Install dependencies
 RUN apk add --update --no-cache ca-certificates curl
@@ -32,12 +32,12 @@ RUN apk add --update --no-cache ca-certificates curl
 COPY --from=builder /go/bin/* /usr/local/bin/
 
 # Set ownership and permissions
-RUN chown -R injective:injective /usr/local/bin
+RUN chown -R helios:helios /usr/local/bin
 
 # Configure container
-USER injective
+USER helios
 VOLUME /apps/data
-WORKDIR /home/injective/.injectived/peggo
+WORKDIR /home/helios/.heliosd/peggo
 
 # Default command
 CMD peggo orchestrator

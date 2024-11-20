@@ -15,7 +15,7 @@ import (
 
 const (
 	// PeggyDenomPrefix indicates the prefix for all assests minted by this module
-	PeggyDenomPrefix = "inj"
+	PeggyDenomPrefix = "helios"
 
 	// PeggyDenomSeperator is the seperator for peggy denoms
 	PeggyDenomSeperator = "/"

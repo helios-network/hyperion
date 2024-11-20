@@ -13,12 +13,13 @@ import (
 	cosmoscdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cosmoscrypto "github.com/cosmos/cosmos-sdk/crypto"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	//"github.com/cosmos/cosmos-sdk/types/bech32"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pkg/errors"
 
-	"github.com/InjectiveLabs/sdk-go/chain/codec"
-	"github.com/InjectiveLabs/sdk-go/chain/crypto/ethsecp256k1"
-	"github.com/InjectiveLabs/sdk-go/chain/crypto/hd"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/codec"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/crypto/ethsecp256k1"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/crypto/hd"
 )
 
 const (
@@ -53,6 +54,36 @@ func NewKeyring(cfg KeyringConfig) (Keyring, error) {
 	return newKeyringFromDir(cfg)
 }
 
+// func GetFromBech32(bech32str, prefix string) (cosmostypes.AccAddress, error) {
+// 	if len(bech32str) == 0 {
+// 		return nil, errors.New("KKKK")
+// 	}
+
+// 	hrp, bz, err := bech32.DecodeAndConvert(bech32str)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if hrp == "" {
+// 		return nil, errors.New("invalid hrp")
+// 	}
+
+// 	// bstr, err := bech32.ConvertAndEncode(prefix, bz)
+
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
+
+// 	// hrp2, bz2, err := bech32.DecodeAndConvert(bstr)
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
+// 	// if hrp2 == "" {
+// 	// 	return nil, errors.New("invalid hrp")
+// 	// }
+
+// 	return cosmostypes.AccAddress(bz), nil
+// }
+
 func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 	if cfg.UseLedger {
 		return Keyring{}, errors.New("cannot use both private key and Ledger")
@@ -73,6 +104,12 @@ func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 		cosmosAddr = cosmostypes.AccAddress(cosmosPK.PubKey().Address())
 		keyName    = DefaultKeyName
 	)
+
+	// cosmosAddr, err := GetFromBech32(cfg.KeyFrom, "helios")
+	// // cosmosAddr, err := cosmostypes.AccAddressFromBech32(cfg.KeyFrom)
+	// if err != nil {
+	// 	return Keyring{}, errors.Wrap(err, "failed to import private key")
+	// }
 
 	if len(cfg.KeyFrom) > 0 {
 		from, err := cosmostypes.AccAddressFromBech32(cfg.KeyFrom)

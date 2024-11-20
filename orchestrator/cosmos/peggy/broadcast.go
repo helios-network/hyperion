@@ -10,13 +10,13 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
-	"github.com/InjectiveLabs/sdk-go/client/chain"
+	"github.com/Helios-Chain-Labs/metrics"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/keystore"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/peggy"
-	peggyevents "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
+	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
 )
 
 type BroadcastClient interface {
@@ -26,7 +26,7 @@ type BroadcastClient interface {
 	SendRequestBatch(ctx context.Context, denom string) error
 	SendToEth(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendOldDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToCosmosEvent) error
-	SendDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToInjectiveEvent) error
+	SendDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToHeliosEvent) error
 	SendWithdrawalClaim(ctx context.Context, withdrawal *peggyevents.PeggyTransactionBatchExecutedEvent) error
 	SendValsetClaim(ctx context.Context, vs *peggyevents.PeggyValsetUpdatedEvent) error
 	SendERC20DeployedClaim(ctx context.Context, erc20 *peggyevents.PeggyERC20DeployedEvent) error
@@ -258,7 +258,7 @@ func (c broadcastClient) SendOldDepositClaim(_ context.Context, deposit *peggyev
 	return nil
 }
 
-func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevents.PeggySendToInjectiveEvent) error {
+func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevents.PeggySendToHeliosEvent) error {
 	// EthereumBridgeDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
@@ -274,7 +274,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevent
 		"amount":         deposit.Amount.String(),
 		"data":           deposit.Data,
 		"token_contract": deposit.TokenContract.Hex(),
-	}).Debugln("observed SendToInjectiveEvent")
+	}).Debugln("observed SendToHeliosEvent")
 
 	msg := &peggytypes.MsgDepositClaim{
 		EventNonce:     deposit.EventNonce.Uint64(),

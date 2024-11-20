@@ -30,7 +30,7 @@ func init() {
 		os.Setenv("PEGGO_TEST_COVERAGE_MODE", "set")
 	}
 	if _, ok := os.LookupEnv("PEGGO_TEST_BECH32_PREFIX"); !ok {
-		os.Setenv("PEGGO_TEST_BECH32_PREFIX", "inj")
+		os.Setenv("PEGGO_TEST_BECH32_PREFIX", "helios")
 	}
 	if _, ok := os.LookupEnv("PEGGO_TEST_BIP44_COIN"); !ok {
 		os.Setenv("PEGGO_TEST_BIP44_COIN", "60")
@@ -45,7 +45,7 @@ func init() {
 	readEnv()
 
 	var (
-		// Bech32Prefix defines the Bech32 prefix used for EthAccounts on the Injective Chain
+		// Bech32Prefix defines the Bech32 prefix used for EthAccounts on the Helios Chain
 		Bech32Prefix = os.Getenv("PEGGO_TEST_BECH32_PREFIX")
 
 		// Bech32PrefixAccAddr defines the Bech32 prefix of an account's address

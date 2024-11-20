@@ -53,11 +53,11 @@ contract Peggy is
     bytes32 public state_peggyId;
     uint256 public state_powerThreshold;
 
-    mapping(address => bool) public isInjectiveNativeToken;
+    mapping(address => bool) public isHeliosNativeToken;
 
     uint256 private constant MAX_NONCE_JUMP_LIMIT = 10_000_000_000_000;
 
-    // TransactionBatchExecutedEvent and SendToInjectiveEvent both include the field _eventNonce.
+    // TransactionBatchExecutedEvent and SendToHeliosEvent both include the field _eventNonce.
     // This is incremented every time one of these events is emitted. It is checked by the
     // Cosmos module to ensure that all events are received in order, and that none are lost.
     //
@@ -68,7 +68,7 @@ contract Peggy is
         address indexed _token,
         uint256 _eventNonce
     );
-    event SendToInjectiveEvent(
+    event SendToHeliosEvent(
         address indexed _tokenContract,
         address indexed _sender,
         bytes32 indexed _destination,
@@ -453,7 +453,7 @@ contract Peggy is
                 // Send transaction amounts to destinations
                 uint256 totalFee;
                 for (uint256 i = 0; i < _amounts.length; i++) {
-                    if (isInjectiveNativeToken[_tokenContract]) {
+                    if (isHeliosNativeToken[_tokenContract]) {
                         CosmosERC20(_tokenContract).mint(
                             _destinations[i],
                             _amounts[i]
@@ -486,7 +486,7 @@ contract Peggy is
         }
     }
 
-    function sendToInjective(
+    function sendToHelios(
         address _tokenContract,
         bytes32 _destination,
         uint256 _amount,
@@ -494,7 +494,7 @@ contract Peggy is
     ) external whenNotPaused nonReentrant {
         uint256 transferAmount;
 
-        if (isInjectiveNativeToken[_tokenContract]) {
+        if (isHeliosNativeToken[_tokenContract]) {
             CosmosERC20(_tokenContract).burn(msg.sender, _amount);
 
             transferAmount = _amount;
@@ -517,7 +517,7 @@ contract Peggy is
 
         state_lastEventNonce = state_lastEventNonce + 1;
 
-        emit SendToInjectiveEvent(
+        emit SendToHeliosEvent(
             _tokenContract,
             msg.sender,
             _destination,
@@ -534,7 +534,7 @@ contract Peggy is
         uint8 _decimals
     ) external {
         CosmosERC20 erc20 = new CosmosERC20(_name, _symbol, _decimals);
-        isInjectiveNativeToken[address(erc20)] = true;
+        isHeliosNativeToken[address(erc20)] = true;
 
         // Fire an event to let the Cosmos module know
         state_lastEventNonce = state_lastEventNonce + 1;

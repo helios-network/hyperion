@@ -26,7 +26,7 @@ COPY --from=builder /go/bin/* /usr/local/bin/
 
 #configure container
 VOLUME /apps/data
-WORKDIR /root/.injectived/peggo
+WORKDIR /root/.helios/peggo
 
 #default command
 CMD peggo orchestrator

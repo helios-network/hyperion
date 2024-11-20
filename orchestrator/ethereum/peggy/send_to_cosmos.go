@@ -10,9 +10,9 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
+	"github.com/Helios-Chain-Labs/metrics"
 
-	wrappers "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
+	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
 )
 
 func (s *peggyContract) SendToCosmos(

@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/InjectiveLabs/etherman/deployer"
+	"github.com/Helios-Chain-Labs/etherman/deployer"
 	. "github.com/onsi/ginkgo"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"

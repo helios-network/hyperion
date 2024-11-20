@@ -13,12 +13,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/cosmos/peggy"
-	"github.com/InjectiveLabs/peggo/orchestrator/cosmos/tendermint"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/keystore"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
-	"github.com/InjectiveLabs/sdk-go/client/chain"
-	clientcommon "github.com/InjectiveLabs/sdk-go/client/common"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/peggy"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/tendermint"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
+	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 )
 
 type NetworkConfig struct {
@@ -38,28 +38,44 @@ type Network interface {
 func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg NetworkConfig) (Network, error) {
 	clientCfg := cfg.loadClientConfig()
 
+	log.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
+
 	clientCtx, err := chain.NewClientContext(clientCfg.ChainId, cfg.ValidatorAddress, k)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Infoln("Context OK")
+
+	log.Infoln("NodeURI", clientCfg.TmEndpoint)
+
 	clientCtx.WithNodeURI(clientCfg.TmEndpoint)
+
+	log.Infoln("Node URI OK")
 
 	tmRPC, err := comethttp.New(clientCfg.TmEndpoint, "/websocket")
 	if err != nil {
 		return nil, err
 	}
 
+	log.Infoln("RPC OK")
+
 	clientCtx = clientCtx.WithClient(tmRPC)
+
+	log.Infoln("WithClient OK")
 
 	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice))
 	if err != nil {
 		return nil, err
 	}
 
+	log.Infoln("NewChainClient OK")
+
 	time.Sleep(1 * time.Second)
 
 	conn := awaitConnection(chainClient, 1*time.Minute)
+
+	log.Infoln("CON OK")
 
 	net := struct {
 		peggy.QueryClient
@@ -70,6 +86,8 @@ func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg Networ
 		peggy.NewBroadcastClient(chainClient, ethSignFn),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 	}
+
+	log.Infoln("NET LOADED")
 
 	return net, nil
 }
@@ -99,12 +117,13 @@ func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.Clie
 
 func (cfg NetworkConfig) loadClientConfig() clientcommon.Network {
 	if custom := cfg.CosmosGRPC != "" && cfg.TendermintRPC != ""; custom {
-		log.WithFields(log.Fields{"cosmos_grpc": cfg.CosmosGRPC, "tendermint_rpc": cfg.TendermintRPC}).Debugln("using custom endpoints for Injective")
+		log.WithFields(log.Fields{"cosmos_grpc": cfg.CosmosGRPC, "tendermint_rpc": cfg.TendermintRPC}).Debugln("using custom endpoints for Helios")
 		return customEndpoints(cfg)
 	}
 
+	panic("KSKKSKS")
 	c := loadBalancedEndpoints(cfg)
-	log.WithFields(log.Fields{"cosmos_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Injective")
+	log.WithFields(log.Fields{"cosmos_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Helios")
 
 	return c
 }
@@ -113,7 +132,7 @@ func customEndpoints(cfg NetworkConfig) clientcommon.Network {
 	c := clientcommon.LoadNetwork("devnet", "")
 	c.Name = "custom"
 	c.ChainId = cfg.ChainID
-	c.FeeDenom = "inj"
+	c.FeeDenom = "helios"
 	c.TmEndpoint = cfg.TendermintRPC
 	c.ChainGrpcEndpoint = cfg.CosmosGRPC
 	c.ExplorerGrpcEndpoint = ""
@@ -126,11 +145,12 @@ func customEndpoints(cfg NetworkConfig) clientcommon.Network {
 func loadBalancedEndpoints(cfg NetworkConfig) clientcommon.Network {
 	var networkName string
 	switch cfg.ChainID {
-	case "injective-1":
+	case "helios-1":
+	case "4242":
 		networkName = "mainnet"
-	case "injective-777":
+	case "helios-777":
 		networkName = "devnet"
-	case "injective-888":
+	case "helios-888":
 		networkName = "testnet"
 	default:
 		panic(fmt.Errorf("no provider for chain id %s", cfg.ChainID))

@@ -1,4 +1,4 @@
-module github.com/InjectiveLabs/peggo
+module github.com/Helios-Chain-Labs/peggo
 
 go 1.22.2
 
@@ -6,12 +6,12 @@ toolchain go1.22.4
 
 require (
 	cosmossdk.io/math v1.3.0
-	github.com/InjectiveLabs/etherman v1.7.0
-	github.com/InjectiveLabs/metrics v0.0.10
-	github.com/InjectiveLabs/sdk-go v1.54.0
+	github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1
+	github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2
+	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-25
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cometbft/cometbft v0.38.10
-	github.com/cosmos/cosmos-sdk v0.50.7
+	github.com/cosmos/cosmos-sdk v0.50.8
 	github.com/ethereum/go-ethereum v1.11.5
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jawher/mow.cli v1.2.0
@@ -32,12 +32,12 @@ require (
 	cosmossdk.io/core v0.11.1 // indirect
 	cosmossdk.io/depinject v1.0.0 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
-	cosmossdk.io/log v1.3.1 // indirect
+	cosmossdk.io/log v1.4.0 // indirect
 	cosmossdk.io/store v1.1.0 // indirect
 	cosmossdk.io/x/evidence v0.1.1 // indirect
 	cosmossdk.io/x/feegrant v0.1.1 // indirect
 	cosmossdk.io/x/tx v0.13.4 // indirect
-	cosmossdk.io/x/upgrade v0.1.3 // indirect
+	cosmossdk.io/x/upgrade v0.1.4 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
@@ -50,9 +50,10 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.3.0 // indirect
 	github.com/DataDog/go-libddwaf/v2 v2.3.2 // indirect
 	github.com/DataDog/go-tuf v1.0.2-0.5.2 // indirect
+	github.com/DataDog/gostackparse v0.7.0 // indirect
 	github.com/DataDog/sketches-go v1.4.2 // indirect
 	github.com/DataDog/zstd v1.5.5 // indirect
-	github.com/InjectiveLabs/suplog v1.3.3 // indirect
+	github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexcesaro/statsd v2.0.0+incompatible // indirect
@@ -61,7 +62,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.1-0.20220910012023-760eaf8b6816 // indirect
 	github.com/btcsuite/btcd v0.23.4 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.3 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
 	github.com/bugsnag/bugsnag-go v2.1.2+incompatible // indirect
@@ -81,10 +82,10 @@ require (
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
-	github.com/cosmos/gogoproto v1.5.0 // indirect
+	github.com/cosmos/gogoproto v1.6.0 // indirect
 	github.com/cosmos/iavl v1.2.0 // indirect
-	github.com/cosmos/ibc-go/modules/capability v1.0.0 // indirect
-	github.com/cosmos/ibc-go/v8 v8.3.2 // indirect
+	github.com/cosmos/ibc-go/modules/capability v1.0.1 // indirect
+	github.com/cosmos/ibc-go/v8 v8.4.0 // indirect
 	github.com/cosmos/ics23/go v0.10.0 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.13.3 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
@@ -120,13 +121,14 @@ require (
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/pprof v0.0.0-20230817174616-7a8ec2ada47b // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-hclog v1.5.0 // indirect
@@ -159,6 +161,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/mixpanel/mixpanel-go v1.2.1 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
@@ -176,6 +179,7 @@ require (
 	github.com/prometheus/common v0.52.2 // indirect
 	github.com/prometheus/procfs v0.13.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
+	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/rs/cors v1.8.3 // indirect
@@ -188,9 +192,10 @@ require (
 	github.com/shirou/gopsutil v3.21.6+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
+	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
-	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/cobra v1.8.0 // indirect
+	github.com/spf13/cast v1.7.0 // indirect
+	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.19.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
@@ -240,10 +245,10 @@ require (
 )
 
 replace (
-	cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v0.50.6-inj-0
-	github.com/CosmWasm/wasmd => github.com/InjectiveLabs/wasmd v0.52.0-inj-0
-	github.com/bandprotocol/bandchain-packet => github.com/InjectiveLabs/bandchain-packet v0.0.4-0.20230327115226-35199d4659d5
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v0.38.11-inj-0
-	github.com/cosmos/cosmos-sdk => github.com/InjectiveLabs/cosmos-sdk v0.50.9-inj-2
+	cosmossdk.io/store => github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-2
+	github.com/CosmWasm/wasmd => github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-5
+	github.com/bandprotocol/bandchain-packet => github.com/Helios-Chain-Labs/bandchain-packet v0.50.10-helios-1
+	github.com/cometbft/cometbft => github.com/Helios-Chain-Labs/cometbft v0.50.10-helios-1
+	github.com/cosmos/cosmos-sdk => github.com/Helios-Chain-Labs/cosmos-sdk v0.50.10-helios-2
 	github.com/ethereum/go-ethereum => github.com/ethereum/go-ethereum v1.12.0
 )

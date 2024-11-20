@@ -73,7 +73,7 @@ func initCosmosOptions(
 		Name:   "cosmos-gas-prices",
 		Desc:   "Specify Cosmos chain transaction fees as DecCoins gas prices",
 		EnvVar: "PEGGO_COSMOS_GAS_PRICES",
-		Value:  "", // example: 500000000inj
+		Value:  "", // example: 500000000helios
 	})
 }
 
@@ -275,7 +275,7 @@ type Config struct {
 func initConfig(cmd *cli.Cmd) Config {
 	cfg := Config{}
 
-	/** Injective **/
+	/** Helios **/
 
 	cfg.cosmosChainID = cmd.String(cli.StringOpt{
 		Name:   "cosmos-chain-id",
@@ -300,7 +300,7 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "cosmos-gas-prices",
 		Desc:   "Specify Cosmos chain transaction fees as DecCoins gas prices",
 		EnvVar: "PEGGO_COSMOS_GAS_PRICES",
-		Value:  "", // example: 500000000inj
+		Value:  "", // example: 500000000helios
 	})
 
 	cfg.cosmosKeyringBackend = cmd.String(cli.StringOpt{

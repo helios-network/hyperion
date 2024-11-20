@@ -86,7 +86,7 @@ Running options can be set via ENV variables:
 This testsuite supports different Cosmos backends, basically any app that has `peggy` module built-in will do. We expect that the generic app is Cosmos-SDK compatible and has very similar CLI interface to `gaiad`. There is a script that would launch an isolated full 3-node network, running natively on the host machine. Just make sure to provide the target executable as an argument.
 
 ```
-$ CHAIN_ID=888 DENOM=inj ./test/cosmos/multinode.sh injectived
+$ CHAIN_ID=4242 DENOM=helios ./test/cosmos/multinode.sh helios
 $ CHAIN_ID=somm DENOM=samoleans STAKE_DENOM=stake SCALE_FACTOR=000000 ./test/cosmos/multinode.sh sommelier
 ```
 

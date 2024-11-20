@@ -1,6 +1,6 @@
-# Injective's Peggo [![Peggy.sol MythX](https://badgen.net/https/api.mythx.io/v1/projects/82ca9468-f86d-4550-a0ae-bc120eeb055f/badge/data?cache=300&icon=https://raw.githubusercontent.com/ConsenSys/mythx-github-badge/main/logo_white.svg)](https://docs.mythx.io/dashboard/github-badges)
+# Helios's Peggo [![Peggy.sol MythX](https://badgen.net/https/api.mythx.io/v1/projects/82ca9468-f86d-4550-a0ae-bc120eeb055f/badge/data?cache=300&icon=https://raw.githubusercontent.com/ConsenSys/mythx-github-badge/main/logo_white.svg)](https://docs.mythx.io/dashboard/github-badges)
 
-Peggo is a Go implementation of the Peggy Orchestrator for the Injective Chain.
+Peggo is a Go implementation of the Peggy Orchestrator for the Helios Chain.
 
 [Architecture Breakdown](./docs/ARCHITECTURE.md)
 
@@ -16,7 +16,7 @@ Important Commands:
 Get yourself `Go 1.22+` at <https://golang.org/dl/> first, then:
 
 ```
-go get github.com/InjectiveLabs/peggo/orchestrator/cmd/...
+go get github.com/Helios-Chain-Labs/peggo/orchestrator/cmd/...
 ```
 
 ## peggo

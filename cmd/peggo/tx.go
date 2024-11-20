@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/cosmos/peggy"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/peggy"
 
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/peggo/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
 )
 
 // txCmdSubset contains actions that can sign and send messages to Cosmos module
@@ -137,7 +137,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 		})
 
 		if err != nil {
-			log.Fatalln("failed to connect to Injective network")
+			log.Fatalln("failed to connect to Helios network")
 		}
 
 		broadcastCtx, cancelFn := context.WithTimeout(context.Background(), 15*time.Second)

@@ -1,6 +1,6 @@
-# Injective's Peggo [![Peggy.sol MythX](https://badgen.net/https/api.mythx.io/v1/projects/82ca9468-f86d-4550-a0ae-bc120eeb055f/badge/data?cache=300&icon=https://raw.githubusercontent.com/ConsenSys/mythx-github-badge/main/logo_white.svg)](https://docs.mythx.io/dashboard/github-badges)
+# Helios's Peggo [![Peggy.sol MythX](https://badgen.net/https/api.mythx.io/v1/projects/82ca9468-f86d-4550-a0ae-bc120eeb055f/badge/data?cache=300&icon=https://raw.githubusercontent.com/ConsenSys/mythx-github-badge/main/logo_white.svg)](https://docs.mythx.io/dashboard/github-badges)
 
-Peggo - це впровадження Peggy Orchestrator на мові програмування Go для Injective.
+Peggo - це впровадження Peggy Orchestrator на мові програмування Go для Helios.
 
 Важливі команди:
 
@@ -13,7 +13,7 @@ Peggo - це впровадження Peggy Orchestrator на мові прог�
 Спочатку завантажте собі `Go 1.15+` на https://golang.org/dl/ а потім:
 
 ```
-$ go get github.com/InjectiveLabs/peggo/orchestrator/cmd/...
+$ go get github.com/Helios-Chain-Labs/peggo/orchestrator/cmd/...
 ```
 
 ## peggo

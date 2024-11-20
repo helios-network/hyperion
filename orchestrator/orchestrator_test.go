@@ -14,9 +14,9 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/InjectiveLabs/metrics"
-	peggyevents "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/metrics"
+	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 const maxLoopRetries = 1
@@ -24,7 +24,7 @@ const maxLoopRetries = 1
 func Test_BatchCreator(t *testing.T) {
 	t.Parallel()
 
-	injTokenAddress := gethcommon.HexToAddress("0xe28b3B32B6c345A34Ff64674606124Dd5Aceca30")
+	heliosTokenAddress := gethcommon.HexToAddress("0xe28b3B32B6c345A34Ff64674606124Dd5Aceca30")
 
 	testTable := []struct {
 		name     string
@@ -37,7 +37,7 @@ func Test_BatchCreator(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*peggytypes.BatchFees, error) {
 						return nil, errors.New("oops")
 					},
@@ -51,7 +51,7 @@ func Test_BatchCreator(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					UnbatchedTokensWithFeesFn: func(context.Context) ([]*peggytypes.BatchFees, error) {
 						return nil, nil
 					},
@@ -67,16 +67,16 @@ func Test_BatchCreator(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				cfg: Config{
 					MinBatchFeeUSD:       51.0,
-					ERC20ContractMapping: map[gethcommon.Address]string{injTokenAddress: "injective"},
+					ERC20ContractMapping: map[gethcommon.Address]string{heliosTokenAddress: "helios"},
 				},
 				priceFeed: MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					SendRequestBatchFn: func(context.Context, string) error { return nil },
 					UnbatchedTokensWithFeesFn: func(context.Context) ([]*peggytypes.BatchFees, error) {
 						fees, _ := cosmostypes.NewIntFromString("50000000000000000000")
 						return []*peggytypes.BatchFees{
 							{
-								Token:     injTokenAddress.String(),
+								Token:     heliosTokenAddress.String(),
 								TotalFees: fees,
 							},
 						}, nil
@@ -99,14 +99,14 @@ func Test_BatchCreator(t *testing.T) {
 				priceFeed:   MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
 				cfg: Config{
 					MinBatchFeeUSD:       49.0,
-					ERC20ContractMapping: map[gethcommon.Address]string{injTokenAddress: "injective"},
+					ERC20ContractMapping: map[gethcommon.Address]string{heliosTokenAddress: "helios"},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					SendRequestBatchFn: func(context.Context, string) error { return nil },
 					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*peggytypes.BatchFees, error) {
 						fees, _ := cosmostypes.NewIntFromString("50000000000000000000")
 						return []*peggytypes.BatchFees{{
-							Token:     injTokenAddress.String(),
+							Token:     heliosTokenAddress.String(),
 							TotalFees: fees,
 						}}, nil
 					},
@@ -141,7 +141,7 @@ func Test_Oracle(t *testing.T) {
 		name                    string
 		expected                error
 		orch                    *Orchestrator
-		lastResyncWithInjective time.Time
+		lastResyncWithHelios time.Time
 		lastObservedEthHeight   uint64
 	}{
 		{
@@ -150,7 +150,7 @@ func Test_Oracle(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
@@ -165,7 +165,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr1},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -177,7 +177,7 @@ func Test_Oracle(t *testing.T) {
 					},
 				},
 			},
-			lastResyncWithInjective: time.Time{},
+			lastResyncWithHelios: time.Time{},
 			lastObservedEthHeight:   0,
 		},
 
@@ -188,7 +188,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -214,7 +214,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -241,7 +241,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -271,7 +271,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -301,7 +301,7 @@ func Test_Oracle(t *testing.T) {
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToInjectiveEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
 						return nil, nil
 					},
 					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
@@ -322,7 +322,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -354,7 +354,7 @@ func Test_Oracle(t *testing.T) {
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToInjectiveEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
 						return nil, nil
 					},
 					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
@@ -375,7 +375,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -408,7 +408,7 @@ func Test_Oracle(t *testing.T) {
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToInjectiveEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
 						return nil, nil
 					},
 					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
@@ -425,12 +425,12 @@ func Test_Oracle(t *testing.T) {
 			name:                    "sent new event claim",
 			expected:                nil,
 			lastObservedEthHeight:   100,
-			lastResyncWithInjective: time.Now(), // skip auto resync
+			lastResyncWithHelios: time.Now(), // skip auto resync
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -467,7 +467,7 @@ func Test_Oracle(t *testing.T) {
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToInjectiveEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
 						return nil, nil
 					},
 					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
@@ -488,7 +488,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
 						return &peggytypes.Valset{
 							Members: []*peggytypes.BridgeValidator{
@@ -525,7 +525,7 @@ func Test_Oracle(t *testing.T) {
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToInjectiveEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToInjectiveEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
 						return nil, nil
 					},
 					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
@@ -546,7 +546,7 @@ func Test_Oracle(t *testing.T) {
 
 			o := oracle{
 				Orchestrator:            tt.orch,
-				lastResyncWithInjective: tt.lastResyncWithInjective,
+				lastResyncWithHelios: tt.lastResyncWithHelios,
 				lastObservedEthHeight:   tt.lastObservedEthHeight,
 			}
 
@@ -574,7 +574,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 			orch: &Orchestrator{
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
@@ -588,7 +588,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 			orch: &Orchestrator{
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
 						return []*peggytypes.Valset{{}}, nil // non-empty will do
 					},
@@ -607,7 +607,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
 						return nil, nil
 					},
@@ -631,7 +631,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return nil, errors.New("oops")
 					},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
 						return []*peggytypes.Valset{{}}, nil // non-empty will do
 					},
@@ -655,7 +655,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return big.NewInt(101), nil
 					},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
 						return []*peggytypes.Valset{{}}, nil // non-empty will do
 					},
@@ -668,7 +668,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 		},
 
 		{
-			name:     "failed to get injective block",
+			name:     "failed to get helios block",
 			expected: nil,
 			orch: &Orchestrator{
 				logger:      DummyLog,
@@ -679,7 +679,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return big.NewInt(99), nil
 					},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
 						return nil, errors.New("oops")
 					},
@@ -708,7 +708,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return big.NewInt(99), nil
 					},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
 						return &cometrpc.ResultBlock{
 							Block: &comettypes.Block{
@@ -745,7 +745,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return nil, errors.New("oops")
 					},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
 						return &cometrpc.ResultBlock{
 							Block: &comettypes.Block{
@@ -782,7 +782,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return &gethcommon.Hash{}, nil
 					},
 				},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
 						return &cometrpc.ResultBlock{
 							Block: &comettypes.Block{
@@ -836,7 +836,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return nil, errors.New("oops")
 					},
@@ -851,7 +851,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{
 							BatchTimeout: 100,
@@ -877,7 +877,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return nil, nil
 					},
@@ -901,7 +901,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{}}, nil
 					},
@@ -928,7 +928,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{
 							BatchNonce: 100,
@@ -951,13 +951,13 @@ func Test_Relayer_Batches(t *testing.T) {
 		},
 
 		{
-			name:     "failed to get injective block",
+			name:     "failed to get helios block",
 			expected: nil,
 			orch: &Orchestrator{
 				maxAttempts: maxLoopRetries,
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{
 							BatchNonce: 101,
@@ -991,7 +991,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 10 * time.Second},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{
 							BatchNonce: 101,
@@ -1029,7 +1029,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 0},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{
 							BatchNonce: 101,
@@ -1072,7 +1072,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 0},
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
 						return []*peggytypes.OutgoingTxBatch{{
 							BatchNonce: 101,
@@ -1139,7 +1139,7 @@ func Test_Signer_Valsets(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
@@ -1153,7 +1153,7 @@ func Test_Signer_Valsets(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
 						return nil, nil
 					},
@@ -1167,7 +1167,7 @@ func Test_Signer_Valsets(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
 						return []*peggytypes.Valset{{}}, nil
 					},
@@ -1185,7 +1185,7 @@ func Test_Signer_Valsets(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
 						return []*peggytypes.Valset{{}}, nil
 					},
@@ -1229,7 +1229,7 @@ func Test_Signer_Batches(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
 						return nil, errors.New("ooops")
 					},
@@ -1243,7 +1243,7 @@ func Test_Signer_Batches(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
 						return &peggytypes.OutgoingTxBatch{}, nil
 					},
@@ -1261,7 +1261,7 @@ func Test_Signer_Batches(t *testing.T) {
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
-				injective: MockCosmosNetwork{
+				helios: MockCosmosNetwork{
 					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
 						return &peggytypes.OutgoingTxBatch{}, nil
 					},

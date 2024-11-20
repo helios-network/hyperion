@@ -7,8 +7,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/InjectiveLabs/metrics"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/metrics"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 var ErrNotFound = errors.New("not found")

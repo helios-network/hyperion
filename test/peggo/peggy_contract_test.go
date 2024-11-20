@@ -12,11 +12,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/InjectiveLabs/etherman/deployer"
+	"github.com/Helios-Chain-Labs/etherman/deployer"
 
-	"github.com/InjectiveLabs/etherman/sol"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/peggy"
-	wrappers "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
+	"github.com/Helios-Chain-Labs/etherman/sol"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
+	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
 )
 
 var _ = Describe("Contract Tests", func() {
@@ -530,7 +530,7 @@ var _ = Describe("Contract Tests", func() {
 					}
 
 					erc20DeployTxHash, _, erc20DeployErr = ContractDeployer.Tx(context.Background(), peggyTxOpts,
-						"deployERC20", withArgsFn("inj", "INJ", "INJ", byte(18)),
+						"deployERC20", withArgsFn("helios", "HELIOS", "HELIOS", byte(18)),
 					)
 					orFail(erc20DeployErr)
 				})
@@ -566,9 +566,9 @@ var _ = Describe("Contract Tests", func() {
 
 					_ = Describe("ERC20DeployedEvent", func() {
 						It("Should have valid token params", func() {
-							Ω(erc20DeployedEvent.CosmosDenom).Should(Equal("inj"))
-							Ω(erc20DeployedEvent.Symbol).Should(Equal("INJ"))
-							Ω(erc20DeployedEvent.Name).Should(Equal("INJ"))
+							Ω(erc20DeployedEvent.CosmosDenom).Should(Equal("helios"))
+							Ω(erc20DeployedEvent.Symbol).Should(Equal("HELIOS"))
+							Ω(erc20DeployedEvent.Name).Should(Equal("HELIOS"))
 							Ω(erc20DeployedEvent.Decimals).Should(BeEquivalentTo(18))
 						})
 

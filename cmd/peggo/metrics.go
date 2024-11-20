@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/InjectiveLabs/metrics"
+	"github.com/Helios-Chain-Labs/metrics"
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
 	log "github.com/xlab/suplog"

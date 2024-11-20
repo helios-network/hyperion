@@ -10,11 +10,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/InjectiveLabs/metrics"
-	"github.com/InjectiveLabs/peggo/orchestrator/ethereum/util"
-	"github.com/InjectiveLabs/peggo/orchestrator/loops"
-	peggyevents "github.com/InjectiveLabs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/InjectiveLabs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/metrics"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
+	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 const (
@@ -109,9 +109,9 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.V
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	latestInjectiveValsets, err := l.injective.LatestValsets(ctx)
+	latestHeliosValsets, err := l.helios.LatestValsets(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to get latest validator set from Injective")
+		return errors.Wrap(err, "failed to get latest validator set from Helios")
 	}
 
 	var (
@@ -119,8 +119,8 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.V
 		confirmations         []*peggytypes.MsgValsetConfirm
 	)
 
-	for _, set := range latestInjectiveValsets {
-		sigs, err := l.injective.AllValsetConfirms(ctx, set.Nonce)
+	for _, set := range latestHeliosValsets {
+		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
@@ -162,14 +162,14 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *peggytypes.Valset) 
 
 	// Check if other validators already updated the valset
 	if vs.Nonce <= latestEthereumValsetNonce.Uint64() {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthereumValsetNonce, "inj_nonce": vs.Nonce}).Debugln("validator set already updated on Ethereum")
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthereumValsetNonce, "helios_nonce": vs.Nonce}).Debugln("validator set already updated on Ethereum")
 		return false
 	}
 
 	// Check custom time delay offset
-	block, err := l.injective.GetBlock(ctx, int64(vs.Height))
+	block, err := l.helios.GetBlock(ctx, int64(vs.Height))
 	if err != nil {
-		l.Log().WithError(err).Warningln("unable to get latest block from Injective")
+		l.Log().WithError(err).Warningln("unable to get latest block from Helios")
 		return false
 	}
 
@@ -179,7 +179,7 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *peggytypes.Valset) 
 		return false
 	}
 
-	l.Log().WithFields(log.Fields{"inj_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
+	l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
 
 	return true
 }
@@ -189,7 +189,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytyp
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	batches, err := l.injective.LatestTransactionBatches(ctx)
+	batches, err := l.helios.LatestTransactionBatches(ctx)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytyp
 			continue
 		}
 
-		sigs, err := l.injective.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
 		if err != nil {
 			return err
 		}
@@ -254,14 +254,14 @@ func (l *relayer) shouldRelayBatch(ctx context.Context, batch *peggytypes.Outgoi
 
 	// Check if ethereum batch was updated by other validators
 	if batch.BatchNonce <= latestEthBatch.Uint64() {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthBatch.Uint64(), "inj_nonce": batch.BatchNonce}).Debugln("batch already updated on Ethereum")
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthBatch.Uint64(), "helios_nonce": batch.BatchNonce}).Debugln("batch already updated on Ethereum")
 		return false
 	}
 
 	// Check custom time delay offset
-	blockTime, err := l.injective.GetBlock(ctx, int64(batch.Block))
+	blockTime, err := l.helios.GetBlock(ctx, int64(batch.Block))
 	if err != nil {
-		l.Log().WithError(err).Warningln("unable to get latest block from Injective")
+		l.Log().WithError(err).Warningln("unable to get latest block from Helios")
 		return false
 	}
 
@@ -271,7 +271,7 @@ func (l *relayer) shouldRelayBatch(ctx context.Context, batch *peggytypes.Outgoi
 		return false
 	}
 
-	l.Log().WithFields(log.Fields{"inj_nonce": batch.BatchNonce, "eth_nonce": latestEthBatch.Uint64()}).Debugln("new batch update")
+	l.Log().WithFields(log.Fields{"helios_nonce": batch.BatchNonce, "eth_nonce": latestEthBatch.Uint64()}).Debugln("new batch update")
 
 	return true
 }
@@ -292,9 +292,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 		return nil, errors.Wrap(err, "failed to get latest valset nonce on Ethereum")
 	}
 
-	cosmosValset, err := l.injective.ValsetAt(ctx, latestEthereumValsetNonce.Uint64())
+	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get Injective valset")
+		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}
 
 	currentBlock := latestHeader.Number.Uint64()
