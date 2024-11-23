@@ -8,7 +8,7 @@ require (
 	cosmossdk.io/math v1.3.0
 	github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1
 	github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2
-	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-25
+	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-27
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cometbft/cometbft v0.38.10
 	github.com/cosmos/cosmos-sdk v0.50.8

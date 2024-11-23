@@ -130,8 +130,8 @@ github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1 h1:Fxk8qZds4pN6fzscouVoe
 github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1/go.mod h1:1t7EMdXXnQcOpAaLqcO3YYUsRzj50o9qVdf41hqBeoo=
 github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2 h1:os51E5nojjXF2N5NKn0BN8MsLzgZAvueg3SLiUGxGCA=
 github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2/go.mod h1:Za5YrKh2gyP44/7xWLA1+EA9x+dsUEg9o3cD0gcu9pA=
-github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-25 h1:D+uwQIwFFKoz1NXERq/xIjkj4FtrgeeY3imi5BzKpB8=
-github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-25/go.mod h1:+GtkEOGrVLryA7uKEdaCk3f/Jl5iQY7aNVPe858upsk=
+github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-27 h1:eE0bi1dU2+441kDsfzFTtmjEWRUNiw9EAvFsTb2+jFg=
+github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-27/go.mod h1:+GtkEOGrVLryA7uKEdaCk3f/Jl5iQY7aNVPe858upsk=
 github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2 h1:4Z+qXwo6H+rcoIuOLqyRX5qdWS6A0woypOAkkDB5DUo=
 github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2/go.mod h1:cxLwrKnl5QZsljZP/OmH/nEAIj89m4mE0FW5Mn31Nco=
 github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-5 h1:hVPq/PpGoJl1aeKLd7DntGZ92N+QGSaf3JRlCNKLxg4=

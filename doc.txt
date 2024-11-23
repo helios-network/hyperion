@@ -1,0 +1,8 @@
+
+
+
+
+heliades tx peggy set-orchestrator-address helios18rahl5zxhz2rkfpp42fgrh2f7vu6353mn0pfjn helios1080sh639k3z9pdz3vm8n8lymwv9zrvn86jwrnc 0x961a14bEaBd590229B1c68A21d7068c8233C8542 --chain-id=4242 --node="tcp://localhost:26657" --from="helios18rahl5zxhz2rkfpp42fgrh2f7vu6353mn0pfjn" --gas-prices=600000000ahelios --keyring-backend="test" --yes
+
+// verifier si ajouter avec success
+http://localhost:1317/peggy/v1/valset/current
