@@ -35,9 +35,9 @@ const (
 // and ferried over to Cosmos where they will be used to issue tokens or process batches.
 func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) error {
 	oracle := oracle{
-		Orchestrator:            s,
-		lastObservedEthHeight:   lastObservedBlock,
-		lastResyncWithHelios: time.Now(),
+		Orchestrator:          s,
+		lastObservedEthHeight: lastObservedBlock,
+		lastResyncWithHelios:  time.Now(),
 	}
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
@@ -49,8 +49,8 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 
 type oracle struct {
 	*Orchestrator
-	lastResyncWithHelios time.Time
-	lastObservedEthHeight   uint64
+	lastResyncWithHelios  time.Time
+	lastObservedEthHeight uint64
 }
 
 func (l *oracle) Log() log.Logger {
@@ -99,10 +99,16 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
+	if l.lastObservedEthHeight < 21261593 {
+		l.lastObservedEthHeight = 21261593
+	}
+
 	// ensure the block range is within defaultBlocksToSearch
 	if latestHeight > l.lastObservedEthHeight+defaultBlocksToSearch {
 		latestHeight = l.lastObservedEthHeight + defaultBlocksToSearch
 	}
+
+	l.Log().Infoln("GET ETHEREUM EVENTS FOR HEIGHT %d to %d", latestHeight, latestHeight+defaultBlocksToSearch)
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, latestHeight)
 	if err != nil {
@@ -120,9 +126,14 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	})
 
 	if len(newEvents) == 0 {
+		l.Log().Infoln("NO EVENTS DETECTED 0")
 		l.Log().WithFields(log.Fields{"last_claimed_event_nonce": lastClaim.EthereumEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("no new events on Ethereum")
 		l.lastObservedEthHeight = latestHeight
 		return nil
+	}
+
+	if len(newEvents) > 0 {
+		l.Log().Infoln("SOME EVENTS DETECTED %d", len(newEvents))
 	}
 
 	if expected, actual := lastClaim.EthereumEventNonce+1, newEvents[0].Nonce(); expected != actual {
@@ -152,10 +163,10 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 	scanEthEventsFn := func() error {
 		events = nil // clear previous result in case a retry occurred
 
-		oldDepositEvents, err := l.ethereum.GetSendToCosmosEvents(startBlock, endBlock)
-		if err != nil {
-			return errors.Wrap(err, "failed to get SendToCosmos events")
-		}
+		// oldDepositEvents, err := l.ethereum.GetSendToCosmosEvents(startBlock, endBlock)
+		// if err != nil {
+		// 	return errors.Wrap(err, "failed to get SendToCosmos events")
+		// }
 
 		depositEvents, err := l.ethereum.GetSendToHeliosEvents(startBlock, endBlock)
 		if err != nil {
@@ -177,10 +188,10 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get ValsetUpdated events")
 		}
 
-		for _, e := range oldDepositEvents {
-			ev := oldDeposit(*e)
-			events = append(events, &ev)
-		}
+		// for _, e := range oldDepositEvents {
+		// 	ev := oldDeposit(*e)
+		// 	events = append(events, &ev)
+		// }
 
 		for _, e := range depositEvents {
 			ev := deposit(*e)

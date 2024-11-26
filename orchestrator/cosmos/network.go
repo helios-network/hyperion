@@ -27,6 +27,7 @@ type NetworkConfig struct {
 	CosmosGRPC,
 	TendermintRPC,
 	GasPrice string
+	Gas string
 }
 
 type Network interface {
@@ -64,7 +65,7 @@ func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg Networ
 
 	log.Infoln("WithClient OK")
 
-	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice))
+	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas(cfg.Gas))
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,6 @@ func (cfg NetworkConfig) loadClientConfig() clientcommon.Network {
 		return customEndpoints(cfg)
 	}
 
-	panic("KSKKSKS")
 	c := loadBalancedEndpoints(cfg)
 	log.WithFields(log.Fields{"cosmos_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Helios")
 

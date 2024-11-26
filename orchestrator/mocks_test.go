@@ -161,7 +161,7 @@ type MockEthereumNetwork struct {
 	GetHeaderByNumberFn                 func(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetPeggyIDFn                        func(ctx context.Context) (gethcommon.Hash, error)
 	GetSendToCosmosEventsFn             func(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToCosmosEvent, error)
-	GetSendToHeliosEventsFn          func(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error)
+	GetSendToHeliosEventsFn             func(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error)
 	GetPeggyERC20DeployedEventsFn       func(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error)
 	GetValsetUpdatedEventsFn            func(startBlock, endBlock uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error)
 	GetTransactionBatchExecutedEventsFn func(startBlock, endBlock uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error)

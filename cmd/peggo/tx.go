@@ -32,6 +32,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 		cosmosGRPC      *string
 		tendermintRPC   *string
 		cosmosGasPrices *string
+		cosmosGas       *string
 
 		// Cosmos Key Management
 		cosmosKeyringDir     *string
@@ -60,6 +61,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 		&cosmosGRPC,
 		&tendermintRPC,
 		&cosmosGasPrices,
+		&cosmosGas,
 	)
 
 	initCosmosKeyOptions(
@@ -134,6 +136,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 			CosmosGRPC:       *cosmosGRPC,
 			TendermintRPC:    *tendermintRPC,
 			GasPrice:         *cosmosGasPrices,
+			Gas:              *cosmosGas,
 		})
 
 		if err != nil {

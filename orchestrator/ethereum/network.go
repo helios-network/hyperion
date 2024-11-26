@@ -146,29 +146,29 @@ func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress geth
 }
 
 func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-	peggyFilterer, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
+	_, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
 	}
 
-	iter, err := peggyFilterer.FilterSendToCosmosEvent(&bind.FilterOpts{
-		Start: startBlock,
-		End:   &endBlock,
-	}, nil, nil, nil)
-	if err != nil {
-		if !isUnknownBlockErr(err) {
-			return nil, errors.Wrap(err, "failed to scan past SendToCosmos events from Ethereum")
-		} else if iter == nil {
-			return nil, errors.New("no iterator returned")
-		}
-	}
+	// iter, err := peggyFilterer.FilterSendToCosmosEvent(&bind.FilterOpts{
+	// 	Start: startBlock,
+	// 	End:   &endBlock,
+	// }, nil, nil, nil)
+	// if err != nil {
+	// 	if !isUnknownBlockErr(err) {
+	// 		return nil, errors.Wrap(err, "failed to scan past SendToCosmos events from Ethereum")
+	// 	} else if iter == nil {
+	// 		return nil, errors.New("no iterator returned")
+	// 	}
+	// }
 
-	defer iter.Close()
+	// defer iter.Close()
 
 	var sendToCosmosEvents []*peggyevents.PeggySendToCosmosEvent
-	for iter.Next() {
-		sendToCosmosEvents = append(sendToCosmosEvents, iter.Event)
-	}
+	// for iter.Next() {
+	// 	sendToCosmosEvents = append(sendToCosmosEvents, iter.Event)
+	// }
 
 	return sendToCosmosEvents, nil
 }
@@ -179,13 +179,15 @@ func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyev
 		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
 	}
 
+	log.Infof("GetSendToHeliosEvents %d %d", startBlock, endBlock)
+
 	iter, err := peggyFilterer.FilterSendToHeliosEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
 	}, nil, nil, nil)
 	if err != nil {
 		if !isUnknownBlockErr(err) {
-			return nil, errors.Wrap(err, "failed to scan past SendToCosmos events from Ethereum")
+			return nil, errors.Wrap(err, "failed to scan past SendToHelios events from Ethereum")
 		} else if iter == nil {
 			return nil, errors.New("no iterator returned")
 		}
@@ -195,6 +197,7 @@ func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyev
 
 	var sendToHeliosEvents []*peggyevents.PeggySendToHeliosEvent
 	for iter.Next() {
+		log.Infof("NEW EVENTS OF SEND TO HELIOS FILTERED")
 		sendToHeliosEvents = append(sendToHeliosEvents, iter.Event)
 	}
 

@@ -2,8 +2,10 @@ package peggy
 
 import (
 	"context"
-	sdkmath "cosmossdk.io/math"
 	"fmt"
+	"time"
+
+	sdkmath "cosmossdk.io/math"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -243,6 +245,11 @@ func (c broadcastClient) SendOldDepositClaim(_ context.Context, deposit *peggyev
 		Data:           "",
 	}
 
+	log.WithFields(log.Fields{
+		"event_height": msg.BlockHeight,
+		"event_nonce":  msg.EventNonce,
+	}).Infoln("Oracle sending MsgDepositClaim")
+
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -287,6 +294,11 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevent
 		Data:           deposit.Data,
 	}
 
+	log.WithFields(log.Fields{
+		"event_nonce":  msg.EventNonce,
+		"event_height": msg.BlockHeight,
+	}).Infoln("EthOracle sending MsgDepositClaim")
+
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -322,6 +334,11 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, withdrawal *pegg
 		Orchestrator:  c.FromAddress().String(),
 	}
 
+	log.WithFields(log.Fields{
+		"event_height": msg.BlockHeight,
+		"event_nonce":  msg.EventNonce,
+	}).Infoln("EthOracle sending MsgWithdrawClaim")
+
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -337,7 +354,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, withdrawal *pegg
 	return nil
 }
 
-func (c broadcastClient) SendValsetClaim(_ context.Context, vs *peggyevents.PeggyValsetUpdatedEvent) error {
+func (c broadcastClient) SendValsetClaim(ctx context.Context, vs *peggyevents.PeggyValsetUpdatedEvent) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -368,6 +385,12 @@ func (c broadcastClient) SendValsetClaim(_ context.Context, vs *peggyevents.Pegg
 		Orchestrator: c.FromAddress().String(),
 	}
 
+	log.WithFields(log.Fields{
+		"event_nonce":  msg.EventNonce,
+		"event_height": msg.BlockHeight,
+		"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
+	}).Infoln("Oracle sending MsgValsetUpdatedClaim")
+
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -378,7 +401,20 @@ func (c broadcastClient) SendValsetClaim(_ context.Context, vs *peggyevents.Pegg
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
 		"tx_hash":      resp.TxResponse.TxHash,
+		"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
 	}).Infoln("Oracle sent MsgValsetUpdatedClaim")
+
+	// // Attendre que l'attestation soit observée avec un timeout de 5 minutes
+	// if err := c.WaitForAttestation(ctx, msg.EventNonce, msg.ClaimHash(), 5*time.Minute); err != nil {
+	// 	return errors.Wrap(err, "waiting for attestation to be observed")
+	// }
+
+	// log.WithFields(log.Fields{
+	// 	"event_nonce":  msg.EventNonce,
+	// 	"event_height": msg.BlockHeight,
+	// 	"tx_hash":      resp.TxResponse.TxHash,
+	// 	"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
+	// }).Infoln("Oracle Comfirmed MsgValsetUpdatedClaim")
 
 	return nil
 }
@@ -407,6 +443,11 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, erc20 *peggye
 		Orchestrator:  c.FromAddress().String(),
 	}
 
+	log.WithFields(log.Fields{
+		"event_nonce":  msg.EventNonce,
+		"event_height": msg.BlockHeight,
+	}).Infoln("Oracle sending MsgERC20DeployedClaim")
+
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -420,4 +461,37 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, erc20 *peggye
 	}).Infoln("Oracle sent MsgERC20DeployedClaim")
 
 	return nil
+}
+
+// / Potential use for wait observed state of specifical claim
+func (c broadcastClient) WaitForAttestation(ctx context.Context, eventNonce uint64, claimHash []byte, timeout time.Duration) error {
+	ticker := time.NewTicker(20 * time.Second)
+	defer ticker.Stop()
+
+	deadline := time.Now().Add(timeout)
+
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for attestation to be observed (nonce: %d)", eventNonce)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			// Vérifier le statut de l'attestation
+			att, err := c.ChainClient.GetAttestation(ctx, eventNonce, claimHash)
+			if err != nil {
+				log.WithError(err).Debugf("failed to get attestation status for nonce %d", eventNonce)
+				continue
+			}
+
+			if att.Attestation.Observed {
+				log.WithFields(log.Fields{
+					"event_nonce": eventNonce,
+				}).Infoln("Attestation has been observed")
+				return nil
+			}
+		}
+	}
 }

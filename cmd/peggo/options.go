@@ -49,6 +49,7 @@ func initCosmosOptions(
 	cosmosGRPC **string,
 	tendermintRPC **string,
 	cosmosGasPrices **string,
+	cosmosGas **string,
 ) {
 	*cosmosChainID = cmd.String(cli.StringOpt{
 		Name:   "cosmos-chain-id",
@@ -73,6 +74,13 @@ func initCosmosOptions(
 		Name:   "cosmos-gas-prices",
 		Desc:   "Specify Cosmos chain transaction fees as DecCoins gas prices",
 		EnvVar: "PEGGO_COSMOS_GAS_PRICES",
+		Value:  "", // example: 500000000helios
+	})
+
+	*cosmosGas = cmd.String(cli.StringOpt{
+		Name:   "cosmos-gas",
+		Desc:   "Specify Cosmos chain transaction gas",
+		EnvVar: "PEGGO_COSMOS_GAS",
 		Value:  "", // example: 500000000helios
 	})
 }
@@ -234,6 +242,7 @@ type Config struct {
 	cosmosGRPC      *string
 	tendermintRPC   *string
 	cosmosGasPrices *string
+	cosmosGas       *string
 
 	// Cosmos Key Management
 	cosmosKeyringDir     *string
@@ -301,6 +310,13 @@ func initConfig(cmd *cli.Cmd) Config {
 		Desc:   "Specify Cosmos chain transaction fees as DecCoins gas prices",
 		EnvVar: "PEGGO_COSMOS_GAS_PRICES",
 		Value:  "", // example: 500000000helios
+	})
+
+	cfg.cosmosGas = cmd.String(cli.StringOpt{
+		Name:   "cosmos-gas",
+		Desc:   "Specify Cosmos chain transaction gas",
+		EnvVar: "PEGGO_COSMOS_GAS",
+		Value:  "", // example: 2000000
 	})
 
 	cfg.cosmosKeyringBackend = cmd.String(cli.StringOpt{
