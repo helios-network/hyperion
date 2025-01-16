@@ -99,7 +99,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	if l.lastObservedEthHeight < 21261593 {
+	if l.lastObservedEthHeight < 21261593 { // TODO by config
 		l.lastObservedEthHeight = 21261593
 	}
 
@@ -108,7 +108,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		latestHeight = l.lastObservedEthHeight + defaultBlocksToSearch
 	}
 
-	l.Log().Infoln("GET ETHEREUM EVENTS FOR HEIGHT %d to %d", latestHeight, latestHeight+defaultBlocksToSearch)
+	l.Log().Infoln("GET ETHEREUM EVENTS FOR HEIGHT", latestHeight, latestHeight+defaultBlocksToSearch)
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, latestHeight)
 	if err != nil {

@@ -1,0 +1,39 @@
+#install packages for build layer
+FROM golang:1.22-alpine as builder
+
+ADD https://github.com/CosmWasm/wasmvm/releases/download/v2.1.2/libwasmvm_muslc.aarch64.a /lib/libwasmvm_muslc.aarch64.a
+ADD https://github.com/CosmWasm/wasmvm/releases/download/v2.1.2/libwasmvm_muslc.x86_64.a /lib/libwasmvm_muslc.x86_64.a
+
+RUN apk add --no-cache git gcc make perl jq libc-dev linux-headers libgcc
+
+#Set architecture
+RUN apk --print-arch > ./architecture
+RUN cp /lib/libwasmvm_muslc.$(cat ./architecture).a /lib/libwasmvm_muslc.a
+RUN rm ./architecture
+
+#build binary
+WORKDIR /src
+COPY . .
+RUN go mod download
+
+#install binary
+RUN DOCKER=true make install
+
+RUN git clone https://github.com/Helios-Chain-Labs/etherman.git
+WORKDIR /src/etherman
+RUN go mod download
+RUN go mod tidy
+RUN DOCKER=true go build .
+
+#build main container
+FROM alpine:latest
+RUN apk add --update --no-cache ca-certificates curl libgcc make
+COPY --from=builder /src/etherman/* /go/bin/
+
+#configure container
+VOLUME /apps/data
+WORKDIR /root/.helios/peggo
+COPY . .
+
+#default command
+CMD make test

@@ -17,7 +17,7 @@ var (
 	CoverageAgent    deployer.CoverageDataCollector
 )
 
-func TestPeggo(t *testing.T) {
+func TestHyperion(t *testing.T) {
 	if !testing.Verbose() {
 		// avoid errors from suites that would try to break things
 		log.DefaultLogger.SetLevel(log.FatalLevel)

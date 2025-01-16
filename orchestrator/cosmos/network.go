@@ -65,7 +65,9 @@ func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg Networ
 
 	log.Infoln("WithClient OK")
 
-	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas(cfg.Gas))
+	log.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
+
+	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas("200000"))
 	if err != nil {
 		return nil, err
 	}
