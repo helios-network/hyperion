@@ -1,4 +1,4 @@
-# Peggo Architecture
+# Hyperion Architecture
 
 [<img alt="sketch" src="architecture_sketch.png" width="800px" />](./architecture_sketch.png)
 
@@ -38,7 +38,7 @@ Runs orchestrator processes that only relay specific messages that do not requir
 
 This mode is specifically designed to run alongside a validator Helios node, as opposed to the more limited relayer mode which only runs the batch creator and relayer processes.
 
-Runs 4 key parallel processes for orchestrating the Peggy bridge:
+Runs 4 key parallel processes for orchestrating the Hyperion bridge:
 
 1. Oracle Process (`runOracle`):
    * Starts from `lastObservedEthHeight` height
@@ -46,7 +46,7 @@ Runs 4 key parallel processes for orchestrating the Peggy bridge:
    * See [Oracle Process](#oracle-process) for more details.
 
 2. Signer Process (`runSigner`):
-   * Takes `peggyContractID` as input
+   * Takes `hyperionContractID` as input
    * Handles signing of validator messages and transactions
    * See [Signer Process](#signer-process) for more details.
 
@@ -126,7 +126,7 @@ Implemented to handle cases where event nonce falls behind due to:
 * Takes input directly from a trusted Helios node
 * Assumes validity of batches and validator sets from the trusted node
 * Uses retry mechanisms for reliability
-* Requires both Ethereum address and Peggy ID for signing operations
+* Requires both Ethereum address and Hyperion ID for signing operations
 * Reports metrics for monitoring and timing
 * Operates as part of the main Orchestrator process
 
@@ -165,7 +165,7 @@ The BatchCreator runs as a loop with a default duration (60 seconds) checking fo
 
 ## Helios Broadcast Client
 
-1. `UpdatePeggyOrchestratorAddresses`
+1. `UpdateHyperionOrchestratorAddresses`
    * Allows validators to delegate voting responsibilities to a key
    * Sets the Ethereum address that represents validators on the Ethereum side
    * Validators must sign their Helios address using their submitted Ethereum address

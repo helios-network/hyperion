@@ -28,16 +28,16 @@ func TestHyperion(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	BeforeSuite(func() {
-		CoverageEnabled = toBool(os.Getenv("PEGGO_TEST_COVERAGE")) || toBool(os.Getenv("COVERAGE"))
+		CoverageEnabled = toBool(os.Getenv("HYPERION_TEST_COVERAGE")) || toBool(os.Getenv("COVERAGE"))
 
 		if CoverageEnabled {
 			CoverageAgent = deployer.NewCoverageDataCollector(
-				deployer.CoverageMode(os.Getenv("PEGGO_TEST_COVERAGE_MODE")),
+				deployer.CoverageMode(os.Getenv("HYPERION_TEST_COVERAGE_MODE")),
 			)
 		}
 
 		d, err := deployer.New(
-			deployer.OptionEVMRPCEndpoint(os.Getenv("PEGGO_TEST_EVM_RPC")),
+			deployer.OptionEVMRPCEndpoint(os.Getenv("HYPERION_TEST_EVM_RPC")),
 			deployer.OptionGasLimit(10000000),
 			deployer.OptionEnableCoverage(CoverageEnabled),
 		)
@@ -51,8 +51,8 @@ func TestHyperion(t *testing.T) {
 			var outFile *os.File = nil
 			var err error
 
-			contractNames := []string{"Peggy", "HashingTest"}
-			coverageOut := os.Getenv("PEGGO_TEST_COVERAGE_OUT")
+			contractNames := []string{"Hyperion", "HashingTest"}
+			coverageOut := os.Getenv("HYPERION_TEST_COVERAGE_OUT")
 
 			if len(coverageOut) > 0 && strings.HasSuffix(coverageOut, ".html") {
 				outFile, err = os.Create(coverageOut)
@@ -78,5 +78,5 @@ func TestHyperion(t *testing.T) {
 		}
 	})
 
-	RunSpecs(t, "Peggo Test Suite")
+	RunSpecs(t, "Hyperion Test Suite")
 }

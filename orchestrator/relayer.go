@@ -2,9 +2,10 @@ package orchestrator
 
 import (
 	"context"
-	sdkmath "cosmossdk.io/math"
 	"sort"
 	"time"
+
+	sdkmath "cosmossdk.io/math"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -13,8 +14,8 @@ import (
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 const (
@@ -81,12 +82,12 @@ func (l *relayer) relay(ctx context.Context) error {
 
 }
 
-func (l *relayer) getLatestEthValset(ctx context.Context) (*peggytypes.Valset, error) {
+func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	var latestEthValset *peggytypes.Valset
+	var latestEthValset *hyperiontypes.Valset
 	fn := func() error {
 		vs, err := l.findLatestValsetOnEth(ctx)
 		if err != nil {
@@ -104,7 +105,7 @@ func (l *relayer) getLatestEthValset(ctx context.Context) (*peggytypes.Valset, e
 	return latestEthValset, nil
 }
 
-func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.Valset) error {
+func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -115,8 +116,8 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.V
 	}
 
 	var (
-		latestConfirmedValset *peggytypes.Valset
-		confirmations         []*peggytypes.MsgValsetConfirm
+		latestConfirmedValset *hyperiontypes.Valset
+		confirmations         []*hyperiontypes.MsgValsetConfirm
 	)
 
 	for _, set := range latestHeliosValsets {
@@ -153,7 +154,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.V
 	return nil
 }
 
-func (l *relayer) shouldRelayValset(ctx context.Context, vs *peggytypes.Valset) bool {
+func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to get latest valset nonce from Ethereum")
@@ -184,7 +185,7 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *peggytypes.Valset) 
 	return true
 }
 
-func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytypes.Valset) error {
+func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -200,8 +201,8 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytyp
 	}
 
 	var (
-		oldestConfirmedBatch *peggytypes.OutgoingTxBatch
-		confirmations        []*peggytypes.MsgConfirmBatch
+		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
+		confirmations        []*hyperiontypes.MsgConfirmBatch
 	)
 
 	for _, batch := range batches {
@@ -245,7 +246,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytyp
 	return nil
 }
 
-func (l *relayer) shouldRelayBatch(ctx context.Context, batch *peggytypes.OutgoingTxBatch) bool {
+func (l *relayer) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.OutgoingTxBatch) bool {
 	latestEthBatch, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(batch.TokenContract))
 	if err != nil {
 		l.Log().WithError(err).Warningf("unable to get latest batch nonce from Ethereum: token_contract=%s", gethcommon.HexToAddress(batch.TokenContract))
@@ -276,12 +277,12 @@ func (l *relayer) shouldRelayBatch(ctx context.Context, batch *peggytypes.Outgoi
 	return true
 }
 
-// FindLatestValset finds the latest valset on the Peggy contract by looking back through the event
+// FindLatestValset finds the latest valset on the Hyperion contract by looking back through the event
 // history and finding the most recent ValsetUpdatedEvent. Most of the time this will be very fast
 // as the latest update will be in recent blockchain history and the search moves from the present
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
-func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset, error) {
+func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
 	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get latest ethereum header")
@@ -316,7 +317,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 		//
 		// TODO(xlab): this follows the original impl, but sort might be skipped there:
 		// we could access just the latest element later.
-		sort.Sort(sort.Reverse(PeggyValsetUpdatedEvents(valsetUpdatedEvents)))
+		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
 
 		if len(valsetUpdatedEvents) == 0 {
 			currentBlock = startSearchBlock
@@ -325,15 +326,15 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 
 		// we take only the first event if we find any at all.
 		event := valsetUpdatedEvents[0]
-		valset := &peggytypes.Valset{
+		valset := &hyperiontypes.Valset{
 			Nonce:        event.NewValsetNonce.Uint64(),
-			Members:      make([]*peggytypes.BridgeValidator, 0, len(event.Powers)),
+			Members:      make([]*hyperiontypes.BridgeValidator, 0, len(event.Powers)),
 			RewardAmount: sdkmath.NewIntFromBigInt(event.RewardAmount),
 			RewardToken:  event.RewardToken.Hex(),
 		}
 
 		for idx, p := range event.Powers {
-			valset.Members = append(valset.Members, &peggytypes.BridgeValidator{
+			valset.Members = append(valset.Members, &hyperiontypes.BridgeValidator{
 				Power:           p.Uint64(),
 				EthereumAddress: event.Validators[idx].Hex(),
 			})
@@ -350,24 +351,24 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 
 var ErrNotFound = errors.New("not found")
 
-type PeggyValsetUpdatedEvents []*peggyevents.PeggyValsetUpdatedEvent
+type HyperionValsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
 
-func (a PeggyValsetUpdatedEvents) Len() int { return len(a) }
-func (a PeggyValsetUpdatedEvents) Less(i, j int) bool {
+func (a HyperionValsetUpdatedEvents) Len() int { return len(a) }
+func (a HyperionValsetUpdatedEvents) Less(i, j int) bool {
 	return a[i].NewValsetNonce.Cmp(a[j].NewValsetNonce) < 0
 }
-func (a PeggyValsetUpdatedEvents) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a HyperionValsetUpdatedEvents) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // This function exists to provide a warning if Cosmos and Ethereum have different validator sets
 // for a given nonce. In the mundane version of this warning the validator sets disagree on sorting order
 // which can happen if some relayer uses an unstable sort, or in a case of a mild griefing attack.
-// The Peggy contract validates signatures in order of highest to lowest power. That way it can exit
+// The Hyperion contract validates signatures in order of highest to lowest power. That way it can exit
 // the loop early once a vote has enough power, if a relayer where to submit things in the reverse order
 // they could grief users of the contract into paying more in gas.
 // The other (and far worse) way a disagreement here could occur is if validators are colluding to steal
-// funds from the Peggy contract and have submitted a hijacking update. If slashing for off Cosmos chain
+// funds from the Hyperion contract and have submitted a hijacking update. If slashing for off Cosmos chain
 // Ethereum signatures is implemented you would put that handler here.
-func checkIfValsetsDiffer(cosmosValset, ethereumValset *peggytypes.Valset) {
+func checkIfValsetsDiffer(cosmosValset, ethereumValset *hyperiontypes.Valset) {
 	if cosmosValset == nil && ethereumValset.Nonce == 0 {
 		// bootstrapping case
 		return
@@ -408,7 +409,7 @@ func checkIfValsetsDiffer(cosmosValset, ethereumValset *peggytypes.Valset) {
 	}
 }
 
-type BridgeValidators []*peggytypes.BridgeValidator
+type BridgeValidators []*hyperiontypes.BridgeValidator
 
 // Sort sorts the validators by power
 func (b BridgeValidators) Sort() {

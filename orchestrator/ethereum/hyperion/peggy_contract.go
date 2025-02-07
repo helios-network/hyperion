@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -18,10 +18,10 @@ import (
 
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/committer"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
-	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 )
 
-type PeggyContract interface {
+type HyperionContract interface {
 	committer.EVMCommitter
 
 	Address() common.Address
@@ -59,7 +59,7 @@ type PeggyContract interface {
 		callerAddress common.Address,
 	) (*big.Int, error)
 
-	GetPeggyID(
+	GetHyperionID(
 		ctx context.Context,
 		callerAddress common.Address,
 	) (common.Hash, error)
@@ -74,37 +74,37 @@ type PeggyContract interface {
 		alchemyWebsocketURL string)
 }
 
-func NewPeggyContract(
+func NewHyperionContract(
 	ethCommitter committer.EVMCommitter,
-	peggyAddress common.Address,
+	hyperionAddress common.Address,
 	pendingTxInputList PendingTxInputList,
 	pendingTxWaitDuration time.Duration,
-) (PeggyContract, error) {
-	ethPeggy, err := wrappers.NewPeggy(peggyAddress, ethCommitter.Provider())
+) (HyperionContract, error) {
+	ethHyperion, err := wrappers.NewHyperion(hyperionAddress, ethCommitter.Provider())
 	if err != nil {
 		return nil, err
 	}
 
-	svc := &peggyContract{
+	svc := &hyperionContract{
 		EVMCommitter:          ethCommitter,
-		peggyAddress:          peggyAddress,
-		ethPeggy:              ethPeggy,
+		hyperionAddress:       hyperionAddress,
+		ethHyperion:           ethHyperion,
 		pendingTxInputList:    pendingTxInputList,
 		pendingTxWaitDuration: pendingTxWaitDuration,
 		svcTags: metrics.Tags{
-			"svc": "peggy_contract",
+			"svc": "hyperion_contract",
 		},
 	}
 
 	return svc, nil
 }
 
-type peggyContract struct {
+type hyperionContract struct {
 	committer.EVMCommitter
 
-	ethProvider  provider.EVMProvider
-	peggyAddress common.Address
-	ethPeggy     *wrappers.Peggy
+	ethProvider     provider.EVMProvider
+	hyperionAddress common.Address
+	ethHyperion     *wrappers.Hyperion
 
 	pendingTxInputList    PendingTxInputList
 	pendingTxWaitDuration time.Duration
@@ -112,16 +112,16 @@ type peggyContract struct {
 	svcTags metrics.Tags
 }
 
-func (s *peggyContract) Address() common.Address {
-	return s.peggyAddress
+func (s *hyperionContract) Address() common.Address {
+	return s.hyperionAddress
 }
 
 // maxUintAllowance is uint constant MAX_UINT = 2**256 - 1
 var maxUintAllowance = big.NewInt(0).Sub(big.NewInt(0).Exp(big.NewInt(2), big.NewInt(256), nil), big.NewInt(1))
 
 var (
-	peggyABI, _ = abi.JSON(strings.NewReader(wrappers.PeggyABI))
-	erc20ABI, _ = abi.JSON(strings.NewReader(wrappers.ERC20ABI))
+	hyperionABI, _ = abi.JSON(strings.NewReader(wrappers.HyperionABI))
+	erc20ABI, _    = abi.JSON(strings.NewReader(wrappers.ERC20ABI))
 )
 
 func sigToVRS(sigHex string) (v uint8, r, s common.Hash) {
@@ -140,15 +140,15 @@ func sigToVRS(sigHex string) (v uint8, r, s common.Hash) {
 	return
 }
 
-// The total power in the Peggy bridge is normalized to u32 max every
+// The total power in the Hyperion bridge is normalized to u32 max every
 // time a validator set is created. This value of up to u32 max is then
 // stored in a i64 to prevent overflow during computation.
-const totalPeggyPower int64 = math.MaxUint32
+const totalHyperionPower int64 = math.MaxUint32
 
-// peggyPowerToPercent takes in an amount of power in the peggy bridge, returns a percentage of total
-func peggyPowerToPercent(total *big.Int) float32 {
+// hyperionPowerToPercent takes in an amount of power in the hyperion bridge, returns a percentage of total
+func hyperionPowerToPercent(total *big.Int) float32 {
 	d := decimal.NewFromBigInt(total, 0)
-	f, _ := d.Div(decimal.NewFromInt(totalPeggyPower)).Shift(2).Float64()
+	f, _ := d.Div(decimal.NewFromInt(totalHyperionPower)).Shift(2).Float64()
 	return float32(f)
 }
 

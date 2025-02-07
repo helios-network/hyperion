@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -8,47 +8,47 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 var ErrNotFound = errors.New("not found")
 
 type QueryClient interface {
-	PeggyParams(ctx context.Context) (*peggytypes.Params, error)
-	LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error)
+	HyperionParams(ctx context.Context) (*hyperiontypes.Params, error)
+	LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddress(ctx context.Context, addr gethcommon.Address) (cosmostypes.AccAddress, error)
 
-	ValsetAt(ctx context.Context, nonce uint64) (*peggytypes.Valset, error)
-	CurrentValset(ctx context.Context) (*peggytypes.Valset, error)
-	OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*peggytypes.Valset, error)
-	LatestValsets(ctx context.Context) ([]*peggytypes.Valset, error)
-	AllValsetConfirms(ctx context.Context, nonce uint64) ([]*peggytypes.MsgValsetConfirm, error)
+	ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error)
+	CurrentValset(ctx context.Context) (*hyperiontypes.Valset, error)
+	OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
+	LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset, error)
+	AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 
-	OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error)
-	LatestTransactionBatches(ctx context.Context) ([]*peggytypes.OutgoingTxBatch, error)
-	UnbatchedTokensWithFees(ctx context.Context) ([]*peggytypes.BatchFees, error)
-	TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error)
+	OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
+	LatestTransactionBatches(ctx context.Context) ([]*hyperiontypes.OutgoingTxBatch, error)
+	UnbatchedTokensWithFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error)
+	TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
 }
 
 type queryClient struct {
-	peggytypes.QueryClient
+	hyperiontypes.QueryClient
 
 	svcTags metrics.Tags
 }
 
-func NewQueryClient(client peggytypes.QueryClient) QueryClient {
+func NewQueryClient(client hyperiontypes.QueryClient) QueryClient {
 	return queryClient{
 		QueryClient: client,
-		svcTags:     metrics.Tags{"svc": "peggy_query"},
+		svcTags:     metrics.Tags{"svc": "hyperion_query"},
 	}
 }
 
-func (c queryClient) ValsetAt(ctx context.Context, nonce uint64) (*peggytypes.Valset, error) {
+func (c queryClient) ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &peggytypes.QueryValsetRequestRequest{Nonce: nonce}
+	req := &hyperiontypes.QueryValsetRequestRequest{Nonce: nonce}
 
 	resp, err := c.QueryClient.ValsetRequest(ctx, req)
 	if err != nil {
@@ -64,12 +64,12 @@ func (c queryClient) ValsetAt(ctx context.Context, nonce uint64) (*peggytypes.Va
 	return resp.Valset, nil
 }
 
-func (c queryClient) CurrentValset(ctx context.Context) (*peggytypes.Valset, error) {
+func (c queryClient) CurrentValset(ctx context.Context) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.CurrentValset(ctx, &peggytypes.QueryCurrentValsetRequest{})
+	resp, err := c.QueryClient.CurrentValset(ctx, &hyperiontypes.QueryCurrentValsetRequest{})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query CurrentValset from client")
@@ -83,12 +83,12 @@ func (c queryClient) CurrentValset(ctx context.Context) (*peggytypes.Valset, err
 	return resp.Valset, nil
 }
 
-func (c queryClient) OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
+func (c queryClient) OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &peggytypes.QueryLastPendingValsetRequestByAddrRequest{
+	req := &hyperiontypes.QueryLastPendingValsetRequestByAddrRequest{
 		Address: valAccountAddress.String(),
 	}
 
@@ -106,12 +106,12 @@ func (c queryClient) OldestUnsignedValsets(ctx context.Context, valAccountAddres
 	return resp.Valsets, nil
 }
 
-func (c queryClient) LatestValsets(ctx context.Context) ([]*peggytypes.Valset, error) {
+func (c queryClient) LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.LastValsetRequests(ctx, &peggytypes.QueryLastValsetRequestsRequest{})
+	resp, err := c.QueryClient.LastValsetRequests(ctx, &hyperiontypes.QueryLastValsetRequestsRequest{})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query LastValsetRequests from daemon")
@@ -125,12 +125,12 @@ func (c queryClient) LatestValsets(ctx context.Context) ([]*peggytypes.Valset, e
 	return resp.Valsets, nil
 }
 
-func (c queryClient) AllValsetConfirms(ctx context.Context, nonce uint64) ([]*peggytypes.MsgValsetConfirm, error) {
+func (c queryClient) AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.ValsetConfirmsByNonce(ctx, &peggytypes.QueryValsetConfirmsByNonceRequest{Nonce: nonce})
+	resp, err := c.QueryClient.ValsetConfirmsByNonce(ctx, &hyperiontypes.QueryValsetConfirmsByNonceRequest{Nonce: nonce})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query ValsetConfirmsByNonce from daemon")
@@ -144,12 +144,12 @@ func (c queryClient) AllValsetConfirms(ctx context.Context, nonce uint64) ([]*pe
 	return resp.Confirms, nil
 }
 
-func (c queryClient) OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
+func (c queryClient) OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &peggytypes.QueryLastPendingBatchRequestByAddrRequest{
+	req := &hyperiontypes.QueryLastPendingBatchRequestByAddrRequest{
 		Address: valAccountAddress.String(),
 	}
 
@@ -167,12 +167,12 @@ func (c queryClient) OldestUnsignedTransactionBatch(ctx context.Context, valAcco
 	return resp.Batch, nil
 }
 
-func (c queryClient) LatestTransactionBatches(ctx context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
+func (c queryClient) LatestTransactionBatches(ctx context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.OutgoingTxBatches(ctx, &peggytypes.QueryOutgoingTxBatchesRequest{})
+	resp, err := c.QueryClient.OutgoingTxBatches(ctx, &hyperiontypes.QueryOutgoingTxBatchesRequest{})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query OutgoingTxBatches from daemon")
@@ -186,12 +186,12 @@ func (c queryClient) LatestTransactionBatches(ctx context.Context) ([]*peggytype
 	return resp.Batches, nil
 }
 
-func (c queryClient) UnbatchedTokensWithFees(ctx context.Context) ([]*peggytypes.BatchFees, error) {
+func (c queryClient) UnbatchedTokensWithFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.BatchFees(ctx, &peggytypes.QueryBatchFeeRequest{})
+	resp, err := c.QueryClient.BatchFees(ctx, &hyperiontypes.QueryBatchFeeRequest{})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query BatchFees from daemon")
@@ -205,12 +205,12 @@ func (c queryClient) UnbatchedTokensWithFees(ctx context.Context) ([]*peggytypes
 	return resp.BatchFees, nil
 }
 
-func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
+func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &peggytypes.QueryBatchConfirmsRequest{
+	req := &hyperiontypes.QueryBatchConfirmsRequest{
 		Nonce:           nonce,
 		ContractAddress: tokenContract.String(),
 	}
@@ -229,12 +229,12 @@ func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint6
 	return resp.Confirms, nil
 }
 
-func (c queryClient) LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error) {
+func (c queryClient) LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &peggytypes.QueryLastEventByAddrRequest{
+	req := &hyperiontypes.QueryLastEventByAddrRequest{
 		Address: validatorAccountAddress.String(),
 	}
 
@@ -252,15 +252,15 @@ func (c queryClient) LastClaimEventByAddr(ctx context.Context, validatorAccountA
 	return resp.LastClaimEvent, nil
 }
 
-func (c queryClient) PeggyParams(ctx context.Context) (*peggytypes.Params, error) {
+func (c queryClient) HyperionParams(ctx context.Context) (*hyperiontypes.Params, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.Params(ctx, &peggytypes.QueryParamsRequest{})
+	resp, err := c.QueryClient.Params(ctx, &hyperiontypes.QueryParamsRequest{})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query PeggyParams from daemon")
+		return nil, errors.Wrap(err, "failed to query HyperionParams from daemon")
 	}
 
 	if resp == nil {
@@ -276,7 +276,7 @@ func (c queryClient) GetValidatorAddress(ctx context.Context, addr gethcommon.Ad
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &peggytypes.QueryDelegateKeysByEthAddress{
+	req := &hyperiontypes.QueryDelegateKeysByEthAddress{
 		EthAddress: addr.Hex(),
 	}
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Based Cosmos 3-node bootstrap script by PeggyJV:
-# https://github.com/PeggyJV/sommelier/blob/main/scripts/three-node.sh
+# Based Cosmos 3-node bootstrap script by HyperionJV:
+# https://github.com/HyperionJV/sommelier/blob/main/scripts/three-node.sh
 
 # USAGE: ./multinode.sh COSMOS_NODE_BIN
 

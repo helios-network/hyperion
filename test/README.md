@@ -1,4 +1,4 @@
-## Peggo Testsuite
+## Hyperion Testsuite
 
 Welcome to the PegGo testing framework. The goal of this suite is aligned with the overall project goal - to move stuff onto common ground and iterate faster.
 By using the same lang for module, orchestrator and test we can achieve the full test coverage of all logical branches.
@@ -83,7 +83,7 @@ Running options can be set via ENV variables:
 
 ### Cosmos Daemon
 
-This testsuite supports different Cosmos backends, basically any app that has `peggy` module built-in will do. We expect that the generic app is Cosmos-SDK compatible and has very similar CLI interface to `gaiad`. There is a script that would launch an isolated full 3-node network, running natively on the host machine. Just make sure to provide the target executable as an argument.
+This testsuite supports different Cosmos backends, basically any app that has `hyperion` module built-in will do. We expect that the generic app is Cosmos-SDK compatible and has very similar CLI interface to `gaiad`. There is a script that would launch an isolated full 3-node network, running natively on the host machine. Just make sure to provide the target executable as an argument.
 
 ```
 $ CHAIN_ID=4242 DENOM=helios ./test/cosmos/multinode.sh helios
@@ -91,7 +91,7 @@ $ CHAIN_ID=somm DENOM=samoleans STAKE_DENOM=stake SCALE_FACTOR=000000 ./test/cos
 ```
 
 Full list of the supported ENV variables:
-* `CHAIN_ID` - specifies Cosmos Chain ID, like `peggy-1`
+* `CHAIN_ID` - specifies Cosmos Chain ID, like `hyperion-1`
 * `CHAIN_DIR` - is a prefix for all data dirs and logs, will be removed if `CLEANUP=1`
 * `DENOM` - Cosmos coin denom, the default coin of the network. Examples: `uatom`, `aphoton`, `samoleans` etc
 * `STAKE_DENOM` - Cosmos coin denom that is used for staking and governance. On the Cosmos Hub it's `stake`. Defaults to value of `DENOM` in the script.

@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/hyperion"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/tendermint"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
+	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 	comethttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
@@ -12,13 +18,6 @@ import (
 	log "github.com/xlab/suplog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
-
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/peggy"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/tendermint"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
-	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
-	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 )
 
 type NetworkConfig struct {
@@ -31,8 +30,8 @@ type NetworkConfig struct {
 }
 
 type Network interface {
-	peggy.QueryClient
-	peggy.BroadcastClient
+	hyperion.QueryClient
+	hyperion.BroadcastClient
 	tendermint.Client
 }
 
@@ -81,12 +80,12 @@ func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg Networ
 	log.Infoln("CON OK")
 
 	net := struct {
-		peggy.QueryClient
-		peggy.BroadcastClient
+		hyperion.QueryClient
+		hyperion.BroadcastClient
 		tendermint.Client
 	}{
-		peggy.NewQueryClient(peggytypes.NewQueryClient(conn)),
-		peggy.NewBroadcastClient(chainClient, ethSignFn),
+		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+		hyperion.NewBroadcastClient(chainClient, ethSignFn),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 	}
 

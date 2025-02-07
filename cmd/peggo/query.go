@@ -2,10 +2,10 @@ package main
 
 import cli "github.com/jawher/mow.cli"
 
-// queryCmdSubset contains actions that query stuff from Peggy module
+// queryCmdSubset contains actions that query stuff from Hyperion module
 // and the Ethereum contract
 //
-// $ peggo q
+// $ hyperion q
 func queryCmdSubset(cmd *cli.Cmd) {
 
 }

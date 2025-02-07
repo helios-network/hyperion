@@ -15,30 +15,30 @@ import (
 	"github.com/Helios-Chain-Labs/etherman/deployer"
 
 	"github.com/Helios-Chain-Labs/etherman/sol"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
-	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/hyperion"
+	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 )
 
 var _ = Describe("Contract Tests", func() {
-	_ = Describe("Peggy", func() {
+	_ = Describe("Hyperion", func() {
 		var (
-			peggyTxOpts   deployer.ContractTxOpts
-			peggyCallOpts deployer.ContractCallOpts
-			peggyLogsOpts deployer.ContractLogsOpts
-			peggyContract *sol.Contract
+			hyperionTxOpts   deployer.ContractTxOpts
+			hyperionCallOpts deployer.ContractCallOpts
+			hyperionLogsOpts deployer.ContractLogsOpts
+			hyperionContract *sol.Contract
 
 			deployArgs   deployer.AbiMethodInputMapperFunc
 			deployErr    error
 			deployTxHash common.Hash
 
-			peggyID    common.Hash
+			hyperionID common.Hash
 			minPower   *big.Int
 			validators []common.Address
 			powers     []*big.Int
 		)
 
 		BeforeEach(func() {
-			peggyID = formatBytes32String("foo")
+			hyperionID = formatBytes32String("foo")
 			validators = getEthAddresses(CosmosAccounts[:3]...)
 			minPower = big.NewInt(3500)
 			powers = []*big.Int{
@@ -48,7 +48,7 @@ var _ = Describe("Contract Tests", func() {
 			}
 
 			deployArgs = withArgsFn(
-				peggyID,
+				hyperionID,
 				minPower,
 				validators,
 				powers,
@@ -57,52 +57,52 @@ var _ = Describe("Contract Tests", func() {
 
 		JustBeforeEach(func() {
 			// don't redeploy if already deployed
-			if peggyContract != nil {
+			if hyperionContract != nil {
 				return
 			}
 
-			peggyDeployOpts := deployer.ContractDeployOpts{
+			hyperionDeployOpts := deployer.ContractDeployOpts{
 				From:          EthAccounts[0].EthAddress,
 				FromPk:        EthAccounts[0].EthPrivKey,
-				SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Peggy.sol",
-				ContractName:  "Peggy",
+				SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Hyperion.sol",
+				ContractName:  "Hyperion",
 				Await:         true,
 				CoverageAgent: CoverageAgent,
 			}
 
-			_, peggyContract, deployErr = ContractDeployer.Deploy(context.Background(), peggyDeployOpts, noArgs)
+			_, hyperionContract, deployErr = ContractDeployer.Deploy(context.Background(), hyperionDeployOpts, noArgs)
 			orFail(deployErr)
 
-			peggyTxOpts = deployer.ContractTxOpts{
+			hyperionTxOpts = deployer.ContractTxOpts{
 				From:          EthAccounts[0].EthAddress,
 				FromPk:        EthAccounts[0].EthPrivKey,
-				SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Peggy.sol",
-				ContractName:  "Peggy",
-				Contract:      peggyContract.Address,
+				SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Hyperion.sol",
+				ContractName:  "Hyperion",
+				Contract:      hyperionContract.Address,
 				Await:         true,
 				CoverageAgent: CoverageAgent,
 			}
 
-			deployTxHash, _, deployErr = ContractDeployer.Tx(context.Background(), peggyTxOpts, "initialize", deployArgs)
+			deployTxHash, _, deployErr = ContractDeployer.Tx(context.Background(), hyperionTxOpts, "initialize", deployArgs)
 		})
 
 		_ = Context("Contract fails to initialize", func() {
 			AfterEach(func() {
 				deployArgs = withArgsFn(
-					peggyID,
+					hyperionID,
 					minPower,
 					validators,
 					powers,
 				)
 
 				// force redeployment
-				peggyContract = nil
+				hyperionContract = nil
 			})
 
 			_ = When("Throws on malformed valset", func() {
 				BeforeEach(func() {
 					deployArgs = withArgsFn(
-						peggyID,
+						hyperionID,
 						minPower,
 						validators,
 						powers[:1], // only one
@@ -118,7 +118,7 @@ var _ = Describe("Contract Tests", func() {
 			_ = When("Throws on insufficient power", func() {
 				BeforeEach(func() {
 					deployArgs = withArgsFn(
-						peggyID,
+						hyperionID,
 						big.NewInt(10000),
 						validators,
 						powers,
@@ -132,57 +132,57 @@ var _ = Describe("Contract Tests", func() {
 			})
 		})
 
-		_ = Context("Peggy contract deployment and initialization done", func() {
+		_ = Context("Hyperion contract deployment and initialization done", func() {
 			var (
-				peggyOwner Account
+				hyperionOwner Account
 			)
 
 			BeforeEach(func() {
-				peggyOwner = EthAccounts[0]
+				hyperionOwner = EthAccounts[0]
 			})
 
 			JustBeforeEach(func() {
 				orFail(deployErr)
 
-				peggyTxOpts = deployer.ContractTxOpts{
-					From:          peggyOwner.EthAddress,
-					FromPk:        peggyOwner.EthPrivKey,
-					SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Peggy.sol",
-					ContractName:  "Peggy",
-					Contract:      peggyContract.Address,
+				hyperionTxOpts = deployer.ContractTxOpts{
+					From:          hyperionOwner.EthAddress,
+					FromPk:        hyperionOwner.EthPrivKey,
+					SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Hyperion.sol",
+					ContractName:  "Hyperion",
+					Contract:      hyperionContract.Address,
 					Await:         true,
 					CoverageAgent: CoverageAgent,
 				}
 
-				peggyCallOpts = deployer.ContractCallOpts{
-					From:          peggyOwner.EthAddress,
-					SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Peggy.sol",
-					ContractName:  "Peggy",
-					Contract:      peggyContract.Address,
+				hyperionCallOpts = deployer.ContractCallOpts{
+					From:          hyperionOwner.EthAddress,
+					SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Hyperion.sol",
+					ContractName:  "Hyperion",
+					Contract:      hyperionContract.Address,
 					CoverageAgent: CoverageAgent,
 					CoverageCall: deployer.ContractCoverageCallOpts{
-						FromPk: peggyOwner.EthPrivKey,
+						FromPk: hyperionOwner.EthPrivKey,
 					},
 				}
 
-				peggyLogsOpts = deployer.ContractLogsOpts{
-					SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Peggy.sol",
-					ContractName:  "Peggy",
-					Contract:      peggyContract.Address,
+				hyperionLogsOpts = deployer.ContractLogsOpts{
+					SolSource:     "../../../Ethereum-Bridge-Contract/contracts/Hyperion.sol",
+					ContractName:  "Hyperion",
+					Contract:      hyperionContract.Address,
 					CoverageAgent: CoverageAgent,
 				}
 			})
 
 			_ = Describe("Check contract state", func() {
 				It("Should have address", func() {
-					Ω(peggyTxOpts.Contract).ShouldNot(Equal(zeroAddress))
-					Ω(peggyCallOpts.Contract).ShouldNot(Equal(zeroAddress))
+					Ω(hyperionTxOpts.Contract).ShouldNot(Equal(zeroAddress))
+					Ω(hyperionCallOpts.Contract).ShouldNot(Equal(zeroAddress))
 				})
 
 				It("Should have valid power threshold", func() {
 					var state_powerThreshold *big.Int
 
-					out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+					out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 						"state_powerThreshold", noArgs,
 					)
 					Ω(err).Should(BeNil())
@@ -192,28 +192,28 @@ var _ = Describe("Contract Tests", func() {
 					Ω(state_powerThreshold.String()).Should(Equal(minPower.String()))
 				})
 
-				It("Should have valid peggyId", func() {
-					var state_peggyId common.Hash
+				It("Should have valid hyperionId", func() {
+					var state_hyperionId common.Hash
 
-					out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
-						"state_peggyId", noArgs,
+					out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
+						"state_hyperionId", noArgs,
 					)
 					Ω(err).Should(BeNil())
 
-					err = outAbi.Copy(&state_peggyId, out)
+					err = outAbi.Copy(&state_hyperionId, out)
 					Ω(err).Should(BeNil())
-					Ω(state_peggyId).Should(Equal(peggyID))
+					Ω(state_hyperionId).Should(Equal(hyperionID))
 				})
 
 				It("Should have generated a valid checkpoint", func() {
 					var state_lastValsetCheckpoint common.Hash
 
-					out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+					out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 						"state_lastValsetCheckpoint", noArgs,
 					)
 					Ω(err).Should(BeNil())
 
-					offchainCheckpoint := makeValsetCheckpoint(peggyID, validators, powers, big.NewInt(0))
+					offchainCheckpoint := makeValsetCheckpoint(hyperionID, validators, powers, big.NewInt(0))
 
 					err = outAbi.Copy(&state_lastValsetCheckpoint, out)
 					Ω(err).Should(BeNil())
@@ -222,13 +222,13 @@ var _ = Describe("Contract Tests", func() {
 
 				_ = Describe("ValsetUpdatedEvent", func() {
 					var (
-						valsetUpdatedEvent = wrappers.PeggyValsetUpdatedEvent{}
+						valsetUpdatedEvent = wrappers.HyperionValsetUpdatedEvent{}
 					)
 
 					BeforeEach(func() {
 						_, err := ContractDeployer.Logs(
 							context.Background(),
-							peggyLogsOpts,
+							hyperionLogsOpts,
 							deployTxHash,
 							"ValsetUpdatedEvent",
 							unpackValsetUpdatedEventTo(&valsetUpdatedEvent),
@@ -264,7 +264,7 @@ var _ = Describe("Contract Tests", func() {
 				)
 
 				BeforeEach(func() {
-					out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+					out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 						"state_lastValsetNonce", noArgs,
 					)
 					Ω(err).Should(BeNil())
@@ -294,7 +294,7 @@ var _ = Describe("Contract Tests", func() {
 						nextValsetNonce = new(big.Int).Add(state_lastValsetNonce, big.NewInt(1))
 
 						valsetCheckpointHash = makeValsetCheckpoint(
-							peggyID,
+							hyperionID,
 							newValidators,
 							newPowers,
 							nextValsetNonce,
@@ -311,7 +311,7 @@ var _ = Describe("Contract Tests", func() {
 							return
 						}
 
-						updateValsetTxHash, _, updateValsetErr = ContractDeployer.Tx(context.Background(), peggyTxOpts,
+						updateValsetTxHash, _, updateValsetErr = ContractDeployer.Tx(context.Background(), hyperionTxOpts,
 							"updateValset", withArgsFn(
 								// The new version of the validator set
 								newValidators,   // address[] memory _newValidators,
@@ -342,7 +342,7 @@ var _ = Describe("Contract Tests", func() {
 						})
 
 						It("Updates Valset Nonce", func() {
-							out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+							out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 								"state_lastValsetNonce", noArgs,
 							)
 							Ω(err).Should(BeNil())
@@ -356,7 +356,7 @@ var _ = Describe("Contract Tests", func() {
 						It("Updates Valset Checkpoint", func() {
 							var state_lastValsetCheckpoint common.Hash
 
-							out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+							out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 								"state_lastValsetCheckpoint", noArgs,
 							)
 							Ω(err).Should(BeNil())
@@ -368,13 +368,13 @@ var _ = Describe("Contract Tests", func() {
 
 						_ = Describe("ValsetUpdatedEvent", func() {
 							var (
-								valsetUpdatedEvent = wrappers.PeggyValsetUpdatedEvent{}
+								valsetUpdatedEvent = wrappers.HyperionValsetUpdatedEvent{}
 							)
 
 							BeforeEach(func() {
 								_, err := ContractDeployer.Logs(
 									context.Background(),
-									peggyLogsOpts,
+									hyperionLogsOpts,
 									updateValsetTxHash,
 									"ValsetUpdatedEvent",
 									unpackValsetUpdatedEventTo(&valsetUpdatedEvent),
@@ -409,7 +409,7 @@ var _ = Describe("Contract Tests", func() {
 						nextValsetNonce = new(big.Int).Add(state_lastValsetNonce, big.NewInt(1))
 
 						valsetCheckpointHash = makeValsetCheckpoint(
-							peggyID,
+							hyperionID,
 							validators,
 							powers,
 							nextValsetNonce,
@@ -420,7 +420,7 @@ var _ = Describe("Contract Tests", func() {
 						orFail(signValsetErr)
 
 						// NOTE: this is a rollback, the current valset was the "new valset".
-						rollbackValsetTxHash, _, rollbackValsetErr = ContractDeployer.Tx(context.Background(), peggyTxOpts,
+						rollbackValsetTxHash, _, rollbackValsetErr = ContractDeployer.Tx(context.Background(), hyperionTxOpts,
 							"updateValset", withArgsFn(
 								// The new version of the validator set
 								validators,      // address[] memory _newValidators,
@@ -439,7 +439,7 @@ var _ = Describe("Contract Tests", func() {
 					})
 
 					It("Updates Valset Nonce", func() {
-						out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+						out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 							"state_lastValsetNonce", noArgs,
 						)
 						Ω(err).Should(BeNil())
@@ -453,7 +453,7 @@ var _ = Describe("Contract Tests", func() {
 					It("Updates Valset Checkpoint", func() {
 						var state_lastValsetCheckpoint common.Hash
 
-						out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+						out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 							"state_lastValsetCheckpoint", noArgs,
 						)
 						Ω(err).Should(BeNil())
@@ -465,13 +465,13 @@ var _ = Describe("Contract Tests", func() {
 
 					_ = Describe("ValsetUpdatedEvent", func() {
 						var (
-							valsetUpdatedEvent = wrappers.PeggyValsetUpdatedEvent{}
+							valsetUpdatedEvent = wrappers.HyperionValsetUpdatedEvent{}
 						)
 
 						BeforeEach(func() {
 							_, err := ContractDeployer.Logs(
 								context.Background(),
-								peggyLogsOpts,
+								hyperionLogsOpts,
 								rollbackValsetTxHash,
 								"ValsetUpdatedEvent",
 								unpackValsetUpdatedEventTo(&valsetUpdatedEvent),
@@ -490,7 +490,7 @@ var _ = Describe("Contract Tests", func() {
 				})
 			})
 
-			_ = Describe("ERC20 token deployment via Peggy", func() {
+			_ = Describe("ERC20 token deployment via Hyperion", func() {
 				var (
 					state_lastValsetNonce *big.Int
 					state_lastEventNonce  *big.Int
@@ -498,7 +498,7 @@ var _ = Describe("Contract Tests", func() {
 
 					erc20DeployTxHash  common.Hash
 					erc20DeployErr     error
-					erc20DeployedEvent = wrappers.PeggyERC20DeployedEvent{}
+					erc20DeployedEvent = wrappers.HyperionERC20DeployedEvent{}
 				)
 
 				BeforeEach(func() {
@@ -506,7 +506,7 @@ var _ = Describe("Contract Tests", func() {
 						prevEventNonce = state_lastEventNonce
 					}
 
-					out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+					out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 						"state_lastValsetNonce", noArgs,
 					)
 					Ω(err).Should(BeNil())
@@ -515,7 +515,7 @@ var _ = Describe("Contract Tests", func() {
 				})
 
 				BeforeEach(func() {
-					out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+					out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 						"state_lastEventNonce", noArgs,
 					)
 					Ω(err).Should(BeNil())
@@ -529,7 +529,7 @@ var _ = Describe("Contract Tests", func() {
 						return
 					}
 
-					erc20DeployTxHash, _, erc20DeployErr = ContractDeployer.Tx(context.Background(), peggyTxOpts,
+					erc20DeployTxHash, _, erc20DeployErr = ContractDeployer.Tx(context.Background(), hyperionTxOpts,
 						"deployERC20", withArgsFn("helios", "HELIOS", "HELIOS", byte(18)),
 					)
 					orFail(erc20DeployErr)
@@ -551,7 +551,7 @@ var _ = Describe("Contract Tests", func() {
 
 						_, err := ContractDeployer.Logs(
 							context.Background(),
-							peggyLogsOpts,
+							hyperionLogsOpts,
 							erc20DeployTxHash,
 							"ERC20DeployedEvent",
 							unpackERC20DeployedEventTo(&erc20DeployedEvent),
@@ -589,28 +589,28 @@ var _ = Describe("Contract Tests", func() {
 
 						BeforeEach(func() {
 							erc20CallOpts = deployer.ContractCallOpts{
-								From:          peggyOwner.EthAddress,
+								From:          hyperionOwner.EthAddress,
 								SolSource:     "../../../Ethereum-Bridge-Contract/contracts/CosmosToken.sol",
 								ContractName:  "CosmosERC20",
 								Contract:      erc20DeployedEvent.TokenContract,
 								CoverageAgent: CoverageAgent,
 								CoverageCall: deployer.ContractCoverageCallOpts{
-									FromPk: peggyOwner.EthPrivKey,
+									FromPk: hyperionOwner.EthPrivKey,
 								},
 							}
 						})
 
-						It("Should have MAX_UINT balance on Peggy", func() {
-							var peggyBalance *big.Int
+						It("Should have MAX_UINT balance on Hyperion", func() {
+							var hyperionBalance *big.Int
 
 							out, outAbi, err := ContractDeployer.Call(context.Background(), erc20CallOpts,
-								"balanceOf", withArgsFn(peggyContract.Address))
+								"balanceOf", withArgsFn(hyperionContract.Address))
 							Ω(err).Should(BeNil())
 
-							err = outAbi.Copy(&peggyBalance, out)
+							err = outAbi.Copy(&hyperionBalance, out)
 							Ω(err).Should(BeNil())
 
-							Ω(peggyBalance).Should(BeEquivalentTo(maxUInt256()))
+							Ω(hyperionBalance).Should(BeEquivalentTo(maxUInt256()))
 						})
 
 						_ = When("Cosmos -> Ethereum batch being submitted", func() {
@@ -650,7 +650,7 @@ var _ = Describe("Contract Tests", func() {
 								}
 
 								transactionBatchHash := prepareOutgoingTransferBatch(
-									peggyID,
+									hyperionID,
 									erc20DeployedEvent.TokenContract,
 									txAmounts,
 									txDestinations,
@@ -670,7 +670,7 @@ var _ = Describe("Contract Tests", func() {
 									return
 								}
 
-								submitBatchTxHash, _, submitBatchErr = ContractDeployer.Tx(context.Background(), peggyTxOpts,
+								submitBatchTxHash, _, submitBatchErr = ContractDeployer.Tx(context.Background(), hyperionTxOpts,
 									"submitBatch", withArgsFn(
 										// The validators that approve the batch
 										validators,            // 	address[] memory _currentValidators,
@@ -708,20 +708,20 @@ var _ = Describe("Contract Tests", func() {
 									orFail(submitBatchErr)
 								})
 
-								It("Changes the balance of the Peggy contract", func() {
-									var peggyBalance *big.Int
+								It("Changes the balance of the Hyperion contract", func() {
+									var hyperionBalance *big.Int
 
 									out, outAbi, err := ContractDeployer.Call(context.Background(), erc20CallOpts,
-										"balanceOf", withArgsFn(peggyContract.Address))
+										"balanceOf", withArgsFn(hyperionContract.Address))
 									Ω(err).Should(BeNil())
 
-									err = outAbi.Copy(&peggyBalance, out)
+									err = outAbi.Copy(&hyperionBalance, out)
 									Ω(err).Should(BeNil())
 
 									expenses := sumInts(nil, txAmounts...)
 									expenses = sumInts(expenses, txFees...)
 									remainder := new(big.Int).Sub(maxUInt256(), expenses)
-									Ω(peggyBalance.String()).Should(Equal(remainder.String()))
+									Ω(hyperionBalance.String()).Should(Equal(remainder.String()))
 								})
 
 								It("Increases the token balances of recipients", func() {
@@ -736,8 +736,8 @@ var _ = Describe("Contract Tests", func() {
 										err = outAbi.Copy(&recipientBalance, out)
 										Ω(err).Should(BeNil())
 
-										if recipient == peggyOwner.EthAddress {
-											// the peggyOwner address collected all the fees also
+										if recipient == hyperionOwner.EthAddress {
+											// the hyperionOwner address collected all the fees also
 											Ω(recipientBalance.String()).Should(Equal(
 												sumInts(big.NewInt(1), txFees...).String(),
 											))
@@ -750,7 +750,7 @@ var _ = Describe("Contract Tests", func() {
 								It("Updates batch nonce for the token contract", func() {
 									var lastBatchNonce *big.Int
 
-									out, outAbi, err := ContractDeployer.Call(context.Background(), peggyCallOpts,
+									out, outAbi, err := ContractDeployer.Call(context.Background(), hyperionCallOpts,
 										"lastBatchNonce", withArgsFn(erc20DeployedEvent.TokenContract))
 									Ω(err).Should(BeNil())
 
@@ -763,7 +763,7 @@ var _ = Describe("Contract Tests", func() {
 
 								_ = Describe("TransactionBatchExecutedEvent", func() {
 									var (
-										transactionBatchExecutedEvent = wrappers.PeggyTransactionBatchExecutedEvent{}
+										transactionBatchExecutedEvent = wrappers.HyperionTransactionBatchExecutedEvent{}
 									)
 
 									BeforeEach(func() {
@@ -771,7 +771,7 @@ var _ = Describe("Contract Tests", func() {
 
 										_, err := ContractDeployer.Logs(
 											context.Background(),
-											peggyLogsOpts,
+											hyperionLogsOpts,
 											submitBatchTxHash,
 											"TransactionBatchExecutedEvent",
 											unpackTransactionBatchExecutedEventTo(&transactionBatchExecutedEvent),
@@ -800,10 +800,10 @@ var _ = Describe("Contract Tests", func() {
 	})
 })
 
-var outgoingBatchTxConfirmABI, _ = abi.JSON(strings.NewReader(peggy.OutgoingBatchTxConfirmABIJSON))
+var outgoingBatchTxConfirmABI, _ = abi.JSON(strings.NewReader(hyperion.OutgoingBatchTxConfirmABIJSON))
 
 func prepareOutgoingTransferBatch(
-	peggyID common.Hash,
+	hyperionID common.Hash,
 	tokenContract common.Address,
 	txAmounts []*big.Int,
 	txDestinations []common.Address,
@@ -812,7 +812,7 @@ func prepareOutgoingTransferBatch(
 	batchTimeout *big.Int,
 ) common.Hash {
 	abiEncodedBatch, err := outgoingBatchTxConfirmABI.Pack("transactionBatch",
-		peggyID,
+		hyperionID,
 		formatBytes32String("transactionBatch"),
 		txAmounts,
 		txDestinations,
@@ -826,21 +826,21 @@ func prepareOutgoingTransferBatch(
 	return crypto.Keccak256Hash(abiEncodedBatch[4:])
 }
 
-func unpackERC20DeployedEventTo(result *wrappers.PeggyERC20DeployedEvent) deployer.ContractLogUnpackFunc {
+func unpackERC20DeployedEventTo(result *wrappers.HyperionERC20DeployedEvent) deployer.ContractLogUnpackFunc {
 	return func(unpacker deployer.LogUnpacker, event abi.Event, log ctypes.Log) (interface{}, error) {
 		err := unpacker.UnpackLog(result, event.Name, log)
 		return &result, err
 	}
 }
 
-func unpackValsetUpdatedEventTo(result *wrappers.PeggyValsetUpdatedEvent) deployer.ContractLogUnpackFunc {
+func unpackValsetUpdatedEventTo(result *wrappers.HyperionValsetUpdatedEvent) deployer.ContractLogUnpackFunc {
 	return func(unpacker deployer.LogUnpacker, event abi.Event, log ctypes.Log) (interface{}, error) {
 		err := unpacker.UnpackLog(result, event.Name, log)
 		return &result, err
 	}
 }
 
-func unpackTransactionBatchExecutedEventTo(result *wrappers.PeggyTransactionBatchExecutedEvent) deployer.ContractLogUnpackFunc {
+func unpackTransactionBatchExecutedEventTo(result *wrappers.HyperionTransactionBatchExecutedEvent) deployer.ContractLogUnpackFunc {
 	return func(unpacker deployer.LogUnpacker, event abi.Event, log ctypes.Log) (interface{}, error) {
 		err := unpacker.UnpackLog(result, event.Name, log)
 		return &result, err

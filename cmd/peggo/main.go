@@ -10,7 +10,7 @@ import (
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/version"
 )
 
-var app = cli.App("peggo", "Peggo is a companion executable for orchestrating a Peggy validator.")
+var app = cli.App("hyperion", "Hyperion is a companion executable for orchestrating a Hyperion validator.")
 
 var (
 	envName        *string
@@ -31,8 +31,8 @@ func main() {
 	}
 
 	app.Command("orchestrator", "Starts the orchestrator main loop.", orchestratorCmd)
-	app.Command("q query", "Query commands that can get state info from Peggy.", queryCmdSubset)
-	app.Command("tx", "Transactions for Peggy governance and maintenance.", txCmdSubset)
+	app.Command("q query", "Query commands that can get state info from Hyperion.", queryCmdSubset)
+	app.Command("tx", "Transactions for Hyperion governance and maintenance.", txCmdSubset)
 	app.Command("version", "Print the version information and exit.", versionCmd)
 
 	_ = app.Run(os.Args)

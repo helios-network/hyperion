@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
-func (s *peggyContract) SendTransactionBatch(
+func (s *hyperionContract) SendTransactionBatch(
 	ctx context.Context,
 	currentValset *types.Valset,
 	batch *types.OutgoingTxBatch,
@@ -70,7 +70,7 @@ func (s *peggyContract) SendTransactionBatch(
 		RewardToken:  common.HexToAddress(currentValset.RewardToken),
 	}
 
-	txData, err := peggyABI.Pack("submitBatch",
+	txData, err := hyperionABI.Pack("submitBatch",
 		currentValsetArs,
 		sigV, sigR, sigS,
 		amounts,
@@ -82,7 +82,7 @@ func (s *peggyContract) SendTransactionBatch(
 	)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).Errorln("ABI Pack (Peggy submitBatch) method")
+		log.WithError(err).Errorln("ABI Pack (Hyperion submitBatch) method")
 		return nil, err
 	}
 
@@ -91,14 +91,14 @@ func (s *peggyContract) SendTransactionBatch(
 		return nil, errors.New("Transaction with same batch input data is already present in mempool")
 	}
 
-	txHash, err := s.SendTx(ctx, s.peggyAddress, txData)
+	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		return nil, err
 	}
 
 	//     let before_nonce = get_tx_batch_nonce(
-	//         peggy_contract_address,
+	//         hyperion_contract_address,
 	//         batch.token_contract,
 	//         eth_address,
 	//         &web3,
@@ -114,7 +114,7 @@ func (s *peggyContract) SendTransactionBatch(
 
 	//     let tx = web3
 	//         .send_transaction(
-	//             peggy_contract_address,
+	//             hyperion_contract_address,
 	//             payload,
 	//             0u32.into(),
 	//             eth_address,
@@ -132,7 +132,7 @@ func (s *peggyContract) SendTransactionBatch(
 	//     web3.wait_for_transaction(tx, timeout, None).await?;
 
 	//     let last_nonce = get_tx_batch_nonce(
-	//         peggy_contract_address,
+	//         hyperion_contract_address,
 	//         batch.token_contract,
 	//         eth_address,
 	//         &web3,
@@ -213,8 +213,8 @@ func checkBatchSigsAndRepack(
 		return
 	}
 
-	if peggyPowerToPercent(powerOfGoodSigs) < 66 {
-		err = errors.New(fmt.Sprintf("insufficient voting power %f", peggyPowerToPercent(powerOfGoodSigs)))
+	if hyperionPowerToPercent(powerOfGoodSigs) < 66 {
+		err = errors.New(fmt.Sprintf("insufficient voting power %f", hyperionPowerToPercent(powerOfGoodSigs)))
 		return
 	}
 

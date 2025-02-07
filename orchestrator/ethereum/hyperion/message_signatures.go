@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"fmt"
@@ -15,9 +15,9 @@ import (
 )
 
 // EncodeValsetConfirm takes the required input data and produces the required signature to confirm a validator
-// set update on the Peggy Ethereum contract. This value will then be signed before being
+// set update on the Hyperion Ethereum contract. This value will then be signed before being
 // submitted to Cosmos, verified, and then relayed to Ethereum
-func EncodeValsetConfirm(peggyID common.Hash, valset *types.Valset) common.Hash {
+func EncodeValsetConfirm(hyperionID common.Hash, valset *types.Valset) common.Hash {
 	// error case here should not occur outside of testing since the above is a constant
 	contractAbi, abiErr := abi.JSON(strings.NewReader(ValsetCheckpointABIJSON))
 	if abiErr != nil {
@@ -48,7 +48,7 @@ func EncodeValsetConfirm(peggyID common.Hash, valset *types.Valset) common.Hash 
 	// it gets encoded as a function name which we must then discard.
 	bytes, packErr := contractAbi.Pack(
 		"checkpoint",
-		peggyID,
+		hyperionID,
 		checkpoint,
 		big.NewInt(int64(valset.Nonce)),
 		memberAddresses,
@@ -70,9 +70,9 @@ func EncodeValsetConfirm(peggyID common.Hash, valset *types.Valset) common.Hash 
 }
 
 // EncodeTxBatchConfirm takes the required input data and produces the required signature to confirm a transaction
-// batch on the Peggy Ethereum contract. This value will then be signed before being
+// batch on the Hyperion Ethereum contract. This value will then be signed before being
 // submitted to Cosmos, verified, and then relayed to Ethereum
-func EncodeTxBatchConfirm(peggyID common.Hash, batch *types.OutgoingTxBatch) common.Hash {
+func EncodeTxBatchConfirm(hyperionID common.Hash, batch *types.OutgoingTxBatch) common.Hash {
 	abi, err := abi.JSON(strings.NewReader(OutgoingBatchTxConfirmABIJSON))
 	if err != nil {
 		log.Fatalln("bad ABI constant")
@@ -97,7 +97,7 @@ func EncodeTxBatchConfirm(peggyID common.Hash, batch *types.OutgoingTxBatch) com
 	// but other than that it's a constant that has no impact on the output. This is because
 	// it gets encoded as a function name which we must then discard.
 	abiEncodedBatch, err := abi.Pack("transactionBatch",
-		peggyID,
+		hyperionID,
 		batchMethodName,
 		txAmounts,
 		txDestinations,
@@ -125,7 +125,7 @@ const (
 	//     "stateMutability": "pure",
 	//     "type": "function",
 	//     "inputs": [
-	//         { "internalType": "bytes32",   "name": "_peggyId",     "type": "bytes32" },
+	//         { "internalType": "bytes32",   "name": "_hyperionId",     "type": "bytes32" },
 	//         { "internalType": "bytes32",   "name": "_checkpoint",  "type": "bytes32" },
 	//         { "internalType": "uint256",   "name": "_valsetNonce", "type": "uint256" },
 	//         { "internalType": "address[]", "name": "_validators",  "type": "address[]" },
@@ -139,7 +139,7 @@ const (
 		"stateMutability": "pure",
 		"type": "function",
 		"inputs": [
-			{ "internalType": "bytes32",   "name": "_peggyId",   "type": "bytes32"   },
+			{ "internalType": "bytes32",   "name": "_hyperionId",   "type": "bytes32"   },
 			{ "internalType": "bytes32",   "name": "_checkpoint",  "type": "bytes32"   },
 			{ "internalType": "uint256",   "name": "_valsetNonce", "type": "uint256"   },
 			{ "internalType": "address[]", "name": "_validators",  "type": "address[]" },
@@ -157,7 +157,7 @@ const (
         "stateMutability": "pure",
         "type": "function",
         "inputs": [
-            { "internalType": "bytes32",   "name": "_peggyId",       "type": "bytes32" },
+            { "internalType": "bytes32",   "name": "_hyperionId",       "type": "bytes32" },
             { "internalType": "bytes32",   "name": "_methodName",    "type": "bytes32" },
             { "internalType": "uint256[]", "name": "_amounts",       "type": "uint256[]" },
             { "internalType": "address[]", "name": "_destinations",  "type": "address[]" },

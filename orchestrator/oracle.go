@@ -10,8 +10,9 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 const (
@@ -24,10 +25,10 @@ const (
 	defaultBlocksToSearch uint64 = 2000
 
 	// Auto re-sync to catch up the validator's last observed event nonce. Reasons why event nonce fall behind:
-	// 1. It takes some time for events to be indexed on Ethereum. So if peggo queried events immediately as block produced, there is a chance the event is missed.
+	// 1. It takes some time for events to be indexed on Ethereum. So if hyperion queried events immediately as block produced, there is a chance the event is missed.
 	//  We need to re-scan this block to ensure events are not missed due to indexing delay.
 	// 2. if validator was in UnBonding state, the claims broadcasted in last iteration are failed.
-	// 3. if infura call failed while filtering events, the peggo missed to broadcast claim events occured in last iteration.
+	// 3. if infura call failed while filtering events, the hyperion missed to broadcast claim events occured in last iteration.
 	resyncInterval = 24 * time.Hour
 )
 
@@ -178,7 +179,7 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get TransactionBatchExecuted events")
 		}
 
-		erc20DeploymentEvents, err := l.ethereum.GetPeggyERC20DeployedEvents(startBlock, endBlock)
+		erc20DeploymentEvents, err := l.ethereum.GetHyperionERC20DeployedEvents(startBlock, endBlock)
 		if err != nil {
 			return errors.Wrap(err, "failed to get ERC20Deployed events")
 		}
@@ -242,8 +243,8 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	return latestHeight, nil
 }
 
-func (l *oracle) getLastClaimEvent(ctx context.Context) (*peggytypes.LastClaimEvent, error) {
-	var claim *peggytypes.LastClaimEvent
+func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClaimEvent, error) {
+	var claim *hyperiontypes.LastClaimEvent
 	fn := func() (err error) {
 		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
 		return
@@ -311,19 +312,19 @@ func (l *oracle) autoResync(ctx context.Context) error {
 func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 	switch e := ev.(type) {
 	case *oldDeposit:
-		ev := peggyevents.PeggySendToCosmosEvent(*e)
+		ev := hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent(*e)
 		return l.helios.SendOldDepositClaim(ctx, &ev)
 	case *deposit:
-		ev := peggyevents.PeggySendToHeliosEvent(*e)
+		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
 		return l.helios.SendDepositClaim(ctx, &ev)
 	case *valsetUpdate:
-		ev := peggyevents.PeggyValsetUpdatedEvent(*e)
+		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
 		return l.helios.SendValsetClaim(ctx, &ev)
 	case *withdrawal:
-		ev := peggyevents.PeggyTransactionBatchExecutedEvent(*e)
+		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
 		return l.helios.SendWithdrawalClaim(ctx, &ev)
 	case *erc20Deployment:
-		ev := peggyevents.PeggyERC20DeployedEvent(*e)
+		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
 		return l.helios.SendERC20DeployedClaim(ctx, &ev)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
@@ -331,11 +332,11 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 }
 
 type (
-	oldDeposit      peggyevents.PeggySendToCosmosEvent
-	deposit         peggyevents.PeggySendToHeliosEvent
-	valsetUpdate    peggyevents.PeggyValsetUpdatedEvent
-	withdrawal      peggyevents.PeggyTransactionBatchExecutedEvent
-	erc20Deployment peggyevents.PeggyERC20DeployedEvent
+	oldDeposit      hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent
+	deposit         hyperionevents.HyperionSendToHeliosEvent
+	valsetUpdate    hyperionevents.HyperionValsetUpdatedEvent
+	withdrawal      hyperionevents.HyperionTransactionBatchExecutedEvent
+	erc20Deployment hyperionevents.HyperionERC20DeployedEvent
 
 	event interface {
 		Nonce() uint64

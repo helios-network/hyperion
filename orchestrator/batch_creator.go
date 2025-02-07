@@ -9,7 +9,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
 )
 
 func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
@@ -52,8 +52,8 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 	return nil
 }
 
-func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*peggytypes.BatchFees, error) {
-	var fees []*peggytypes.BatchFees
+func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
+	var fees []*hyperiontypes.BatchFees
 	fn := func() (err error) {
 		fees, err = l.helios.UnbatchedTokensWithFees(ctx)
 		return
@@ -66,7 +66,7 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*peggytypes
 	return fees, nil
 }
 
-func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *peggytypes.BatchFees) {
+func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) {
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
 	tokenDenom := l.getTokenDenom(tokenAddress)
 
@@ -90,10 +90,10 @@ func (l *batchCreator) getTokenDenom(tokenAddr gethcommon.Address) string {
 		return cosmosDenom
 	}
 
-	return peggytypes.PeggyDenomString(tokenAddr)
+	return hyperiontypes.PeggyDenomString(tokenAddr)
 }
 
-func (l *batchCreator) checkMinBatchFee(fee *peggytypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
+func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
 	if l.cfg.MinBatchFeeUSD == 0 {
 		return true
 	}

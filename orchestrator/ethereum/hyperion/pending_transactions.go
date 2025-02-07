@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ func (p *PendingTxInputList) AddPendingTxInput(pendingTx *RPCTransaction) {
 
 	// Enqueue pending tx input
 	*p = append(*p, pendingTxInput)
-	// Persisting top 100 pending txs of peggy contract only.
+	// Persisting top 100 pending txs of hyperion contract only.
 	if len(*p) > 100 {
 		(*p)[0] = PendingTxInput{} // to avoid memory leak
 		// Dequeue pending tx input
@@ -43,8 +43,8 @@ func (p *PendingTxInputList) AddPendingTxInput(pendingTx *RPCTransaction) {
 
 func IsBatchOrValsetUpdateTx(inputData hexutil.Bytes) bool {
 
-	submitBatchMethod := peggyABI.Methods["submitBatch"]
-	valsetUpdateMethod := peggyABI.Methods["updateValset"]
+	submitBatchMethod := hyperionABI.Methods["submitBatch"]
+	valsetUpdateMethod := hyperionABI.Methods["updateValset"]
 
 	if bytes.Equal(submitBatchMethod.ID, inputData[:4]) || bytes.Equal(valsetUpdateMethod.ID, inputData[:4]) {
 		return true
@@ -67,9 +67,9 @@ func (p PendingTxInputList) IsPendingTxInput(txInput []byte, pendingTxWaitDurati
 	return false
 }
 
-func (s *peggyContract) SubscribeToPendingTxs(alchemyWebsocketURL string) {
+func (s *hyperionContract) SubscribeToPendingTxs(alchemyWebsocketURL string) {
 	args := map[string]interface{}{
-		"address": s.peggyAddress.Hex(),
+		"address": s.hyperionAddress.Hex(),
 	}
 
 	wsClient, err := rpc.Dial(alchemyWebsocketURL)

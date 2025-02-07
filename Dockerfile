@@ -26,7 +26,7 @@ COPY --from=builder /go/bin/* /usr/local/bin/
 
 #configure container
 VOLUME /apps/data
-WORKDIR /root/.helios/peggo
+WORKDIR /root/.helios/hyperion
 
 #default command
-CMD peggo orchestrator
+CMD hyperion orchestrator

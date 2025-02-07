@@ -28,7 +28,7 @@ RUN addgroup -S helios && adduser -S -G helios helios
 # Install dependencies
 RUN apk add --update --no-cache ca-certificates curl
 
-# Copy the peggo binary
+# Copy the hyperion binary
 COPY --from=builder /go/bin/* /usr/local/bin/
 
 # Set ownership and permissions
@@ -37,8 +37,8 @@ RUN chown -R helios:helios /usr/local/bin
 # Configure container
 USER helios
 VOLUME /apps/data
-WORKDIR /home/helios/.heliosd/peggo
+WORKDIR /home/helios/.heliosd/hyperion
 
 # Default command
-CMD peggo orchestrator
+CMD hyperion orchestrator
 

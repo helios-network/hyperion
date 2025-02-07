@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/peggy"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/hyperion"
 
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
@@ -14,7 +14,7 @@ import (
 )
 
 // txCmdSubset contains actions that can sign and send messages to Cosmos module
-// as well as Ethereum transactions to Peggy contract.
+// as well as Ethereum transactions to Hyperion contract.
 //
 // $ peggo tx
 func txCmdSubset(cmd *cli.Cmd) {
@@ -125,7 +125,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 		log.Infoln("Using Cosmos ValAddress", keyring.Addr.String())
 		log.Infoln("Using Ethereum address", ethKeyFromAddress.String())
 
-		actionConfirmed := *alwaysAutoConfirm || stdinConfirm("Confirm UpdatePeggyOrchestratorAddresses transaction? [y/N]: ")
+		actionConfirmed := *alwaysAutoConfirm || stdinConfirm("Confirm UpdateHyperionOrchestratorAddresses transaction? [y/N]: ")
 		if !actionConfirmed {
 			return
 		}
@@ -146,7 +146,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 		broadcastCtx, cancelFn := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancelFn()
 
-		if err = peggy.BroadcastClient(net).UpdatePeggyOrchestratorAddresses(broadcastCtx, ethKeyFromAddress, keyring.Addr); err != nil {
+		if err = hyperion.BroadcastClient(net).UpdateHyperionOrchestratorAddresses(broadcastCtx, ethKeyFromAddress, keyring.Addr); err != nil {
 			log.WithError(err).Errorln("failed to broadcast Tx")
 			time.Sleep(time.Second)
 			return

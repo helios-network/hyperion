@@ -13,7 +13,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/etherman/deployer"
 	"github.com/Helios-Chain-Labs/etherman/sol"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
+	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/hyperion"
 )
 
 var _ = Describe("Contract Tests", func() {
@@ -50,7 +50,7 @@ var _ = Describe("Contract Tests", func() {
 
 		_ = Context("HashingTest contract deployment done", func() {
 			var (
-				peggyID     common.Hash
+				hyperionID  common.Hash
 				validators  []common.Address
 				powers      []*big.Int
 				valsetNonce *big.Int
@@ -82,7 +82,7 @@ var _ = Describe("Contract Tests", func() {
 			})
 
 			BeforeEach(func() {
-				peggyID = formatBytes32String("foo")
+				hyperionID = formatBytes32String("foo")
 				validators = getEthAddresses(CosmosAccounts[:3]...)
 				powers = make([]*big.Int, len(validators))
 				for i := range powers {
@@ -99,21 +99,21 @@ var _ = Describe("Contract Tests", func() {
 
 			It("Update checkpoint using IterativeHash", func() {
 				_, _, err := ContractDeployer.Tx(context.Background(), hashingTestTxOpts,
-					"IterativeHash", withArgsFn(validators, powers, valsetNonce, peggyID),
+					"IterativeHash", withArgsFn(validators, powers, valsetNonce, hyperionID),
 				)
 				Ω(err).Should(BeNil())
 			})
 
 			It("Update checkpoint using ConcatHash", func() {
 				_, _, err := ContractDeployer.Tx(context.Background(), hashingTestTxOpts,
-					"ConcatHash", withArgsFn(validators, powers, valsetNonce, peggyID),
+					"ConcatHash", withArgsFn(validators, powers, valsetNonce, hyperionID),
 				)
 				Ω(err).Should(BeNil())
 			})
 
 			It("Update checkpoint using ConcatHash2", func() {
 				_, _, err := ContractDeployer.Tx(context.Background(), hashingTestTxOpts,
-					"ConcatHash2", withArgsFn(validators, powers, valsetNonce, peggyID),
+					"ConcatHash2", withArgsFn(validators, powers, valsetNonce, hyperionID),
 				)
 				Ω(err).Should(BeNil())
 			})
@@ -131,7 +131,7 @@ var _ = Describe("Contract Tests", func() {
 
 				Ω(lastCheckpoint).ShouldNot(Equal(zeroHash))
 				Ω(lastCheckpoint).Should(Equal(
-					makeValsetCheckpoint(peggyID, validators, powers, valsetNonce),
+					makeValsetCheckpoint(hyperionID, validators, powers, valsetNonce),
 				))
 			})
 
@@ -152,10 +152,10 @@ var _ = Describe("Contract Tests", func() {
 	})
 })
 
-var valsetConfirmABI, _ = abi.JSON(strings.NewReader(peggy.ValsetCheckpointABIJSON))
+var valsetConfirmABI, _ = abi.JSON(strings.NewReader(hyperion.ValsetCheckpointABIJSON))
 
 func makeValsetCheckpoint(
-	peggyID common.Hash,
+	hyperionID common.Hash,
 	validators []common.Address,
 	powers []*big.Int,
 	valsetNonce *big.Int,
@@ -163,7 +163,7 @@ func makeValsetCheckpoint(
 	methodName := formatBytes32String("checkpoint")
 
 	buf, err := valsetConfirmABI.Pack("checkpoint",
-		peggyID, methodName, valsetNonce, validators, powers,
+		hyperionID, methodName, valsetNonce, validators, powers,
 	)
 	orFail(err)
 

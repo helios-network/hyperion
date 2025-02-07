@@ -24,7 +24,7 @@ import (
 // startOrchestrator action runs an infinite loop,
 // listening for events and performing hooks.
 //
-// $ peggo orchestrator
+// $ hyperion orchestrator
 func orchestratorCmd(cmd *cli.Cmd) {
 	cmd.Before = func() {
 		initMetrics(cmd)
@@ -74,7 +74,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"build_date": version.BuildDate,
 			"go_version": version.GoVersion,
 			"go_arch":    version.GoArch,
-		}).Infoln("Peggo - Peggy module companion binary for bridging assets between Helios and Ethereum")
+		}).Infoln("Hyperion - Hyperion module companion binary for bridging assets between Helios and Ethereum")
 
 		// 1. Connect to Helios network
 
@@ -101,20 +101,20 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		peggyParams, err := cosmosNetwork.PeggyParams(ctx)
-		orShutdown(errors.Wrap(err, "failed to query peggy params, is heliades running?"))
+		hyperionParams, err := cosmosNetwork.HyperionParams(ctx)
+		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
 
 		var (
-			peggyContractAddr    = gethcommon.HexToAddress(peggyParams.BridgeEthereumAddress)
-			heliosTokenAddr         = gethcommon.HexToAddress(peggyParams.CosmosCoinErc20Contract)
+			hyperionContractAddr = gethcommon.HexToAddress(hyperionParams.BridgeEthereumAddress)
+			heliosTokenAddr      = gethcommon.HexToAddress(hyperionParams.CosmosCoinErc20Contract)
 			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 
-		log.WithFields(log.Fields{"peggy_contract": peggyContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Peggy module params")
+		log.WithFields(log.Fields{"hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
 
 		// 2. Connect to ethereum network
 
-		ethNetwork, err := ethereum.NewNetwork(peggyContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
+		ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
 		orShutdown(err)
 
 		log.WithFields(log.Fields{
@@ -156,8 +156,8 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			RelayerMode:          !isValidator,
 		}
 
-		// Create peggo and run it
-		peggo, err := orchestrator.NewOrchestrator(
+		// Create hyperion and run it
+		hyperion, err := orchestrator.NewOrchestrator(
 			cosmosNetwork,
 			ethNetwork,
 			pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: *cfg.coingeckoApi}),
@@ -166,7 +166,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		orShutdown(err)
 
 		go func() {
-			if err := peggo.Run(ctx, cosmosNetwork, ethNetwork); err != nil {
+			if err := hyperion.Run(ctx, cosmosNetwork, ethNetwork); err != nil {
 				log.Errorln(err)
 				os.Exit(1)
 			}

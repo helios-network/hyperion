@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 )
 
 // Gets the latest transaction batch nonce
-func (s *peggyContract) GetTxBatchNonce(
+func (s *hyperionContract) GetTxBatchNonce(
 	ctx context.Context,
 	erc20ContractAddress common.Address,
 	callerAddress common.Address,
 ) (*big.Int, error) {
 
-	nonce, err := s.ethPeggy.LastBatchNonce(&bind.CallOpts{
+	nonce, err := s.ethHyperion.LastBatchNonce(&bind.CallOpts{
 		From:    callerAddress,
 		Context: ctx,
 	}, erc20ContractAddress)
@@ -31,12 +31,12 @@ func (s *peggyContract) GetTxBatchNonce(
 }
 
 // Gets the latest validator set nonce
-func (s *peggyContract) GetValsetNonce(
+func (s *hyperionContract) GetValsetNonce(
 	ctx context.Context,
 	callerAddress common.Address,
 ) (*big.Int, error) {
 
-	nonce, err := s.ethPeggy.StateLastValsetNonce(&bind.CallOpts{
+	nonce, err := s.ethHyperion.StateLastValsetNonce(&bind.CallOpts{
 		From:    callerAddress,
 		Context: ctx,
 	})
@@ -49,26 +49,26 @@ func (s *peggyContract) GetValsetNonce(
 	return nonce, nil
 }
 
-// Gets the peggyID
-func (s *peggyContract) GetPeggyID(
+// Gets the hyperionID
+func (s *hyperionContract) GetHyperionID(
 	ctx context.Context,
 	callerAddress common.Address,
 ) (common.Hash, error) {
 
-	peggyID, err := s.ethPeggy.StatePeggyId(&bind.CallOpts{
+	hyperionID, err := s.ethHyperion.StateHyperionId(&bind.CallOpts{
 		From:    callerAddress,
 		Context: ctx,
 	})
 
 	if err != nil {
-		err = errors.Wrap(err, "StatePeggyId call failed")
+		err = errors.Wrap(err, "StateHyperionId call failed")
 		return common.Hash{}, err
 	}
 
-	return peggyID, nil
+	return hyperionID, nil
 }
 
-func (s *peggyContract) GetERC20Symbol(
+func (s *hyperionContract) GetERC20Symbol(
 	ctx context.Context,
 	erc20ContractAddress common.Address,
 	callerAddress common.Address,

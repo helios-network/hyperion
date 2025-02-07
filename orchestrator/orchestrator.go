@@ -42,7 +42,7 @@ type Orchestrator struct {
 	cfg         Config
 	maxAttempts uint
 
-	helios cosmos.Network
+	helios    cosmos.Network
 	ethereum  ethereum.Network
 	priceFeed PriceFeed
 }
@@ -55,7 +55,7 @@ func NewOrchestrator(
 ) (*Orchestrator, error) {
 	o := &Orchestrator{
 		logger:      log.DefaultLogger,
-		svcTags:     metrics.Tags{"svc": "peggy_orchestrator"},
+		svcTags:     metrics.Tags{"svc": "hyperion_orchestrator"},
 		helios:      helios,
 		ethereum:    eth,
 		priceFeed:   priceFeed,
@@ -83,24 +83,24 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 
 	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
 	if lastObservedEthBlock == 0 {
-		peggyParams, err := helios.PeggyParams(ctx)
+		hyperionParams, err := helios.HyperionParams(ctx)
 		if err != nil {
-			s.logger.WithError(err).Fatalln("unable to query peggy module params, is heliades running?")
+			s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
 		}
 
-		lastObservedEthBlock = peggyParams.BridgeContractStartHeight
+		lastObservedEthBlock = hyperionParams.BridgeContractStartHeight
 	}
 
-	// get peggy ID from contract
-	peggyContractID, err := eth.GetPeggyID(ctx)
+	// get hyperion ID from contract
+	hyperionContractID, err := eth.GetHyperionID(ctx)
 	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query peggy ID from contract")
+		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
 	}
 
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
-	pg.Go(func() error { return s.runSigner(ctx, peggyContractID) })
+	pg.Go(func() error { return s.runSigner(ctx, hyperionContractID) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
 
