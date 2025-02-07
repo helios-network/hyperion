@@ -34,6 +34,6 @@ solidity-wrappers: $(SOLIDITY_DIR)/contracts/*.sol
 	cd $(SOLIDITY_DIR)/contracts/ ; \
 	for file in $(^F) ; do \
 			mkdir -p ../wrappers/$${file} ; \
-			echo abigen --type=peggy --pkg wrappers --out=../wrappers/$${file}/wrapper.go --sol $${file} ; \
-			abigen --type=peggy --pkg wrappers --out=../wrappers/$${file}/wrapper.go --sol $${file} ; \
+			echo "Compiling and generating Go bindings for $${file}..."; \
+			solc --via-ir --optimize --combined-json abi,bin $${file} | abigen --type=hyperion --pkg=wrappers --out=../wrappers/$${file}/wrapper.go --combined-json -; \
 	done
