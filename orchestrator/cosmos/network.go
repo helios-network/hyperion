@@ -8,7 +8,7 @@ import (
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/hyperion"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/tendermint"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 	comethttp "github.com/cometbft/cometbft/rpc/client/http"

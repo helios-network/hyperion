@@ -19,7 +19,7 @@ import (
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
 	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type NetworkConfig struct {

@@ -8,7 +8,7 @@ require (
 	cosmossdk.io/math v1.3.0
 	github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1
 	github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2
-	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-32
+	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-33
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cometbft/cometbft v0.38.10
 	github.com/cosmos/cosmos-sdk v0.50.8
@@ -202,10 +202,10 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
 	github.com/tidwall/btree v1.7.0 // indirect
-	github.com/tidwall/gjson v1.16.0 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/tidwall/sjson v1.1.5 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect

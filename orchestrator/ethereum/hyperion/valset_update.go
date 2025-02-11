@@ -10,7 +10,7 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type ValsetArgs struct {

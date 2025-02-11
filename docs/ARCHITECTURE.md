@@ -180,7 +180,7 @@ The BatchCreator runs as a loop with a default duration (60 seconds) checking fo
    * Includes validator's Ethereum signature over the batch
    * Batches are cut off at max size or when transactions stop being profitable
 
-4. `SendToEth`
+4. `SendToChain`
    * User-initiated message to bridge assets
    * Removes tokens from user's balance immediately
    * Has two layers of fees: bridge fee and chain fee

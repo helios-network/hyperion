@@ -255,11 +255,11 @@ type Config struct {
 	cosmosUseLedger     *bool
 
 	// Ethereum params
-	ethChainID            *int
-	ethNodeRPC            *string
-	ethNodeAlchemyWS      *string
-	ethGasPriceAdjustment *float64
-	ethMaxGasPrice        *string
+	ethChainID            map[string]*int
+	ethNodeRPC            map[string]*string
+	ethNodeAlchemyWS      map[string]*string
+	ethGasPriceAdjustment map[string]*float64
+	ethMaxGasPrice        map[string]*string
 
 	// Ethereum Key Management
 	ethKeystoreDir *string
@@ -281,7 +281,7 @@ type Config struct {
 	coingeckoApi *string
 }
 
-func initConfig(cmd *cli.Cmd) Config {
+func initConfig(cmd *cli.Cmd, hyperionId string) Config {
 	cfg := Config{}
 
 	/** Helios **/
@@ -368,35 +368,35 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	/** Ethereum **/
 
-	cfg.ethChainID = cmd.Int(cli.IntOpt{
+	cfg.ethChainID[hyperionId] = cmd.Int(cli.IntOpt{
 		Name:   "eth-chain-id",
 		Desc:   "Specify Chain ID of the Ethereum network.",
 		EnvVar: "HYPERION_ETH_CHAIN_ID",
 		Value:  42,
 	})
 
-	cfg.ethNodeRPC = cmd.String(cli.StringOpt{
+	cfg.ethNodeRPC[hyperionId] = cmd.String(cli.StringOpt{
 		Name:   "eth-node-http",
 		Desc:   "Specify HTTP endpoint for an Ethereum node.",
 		EnvVar: "HYPERION_ETH_RPC",
 		Value:  "http://localhost:1317",
 	})
 
-	cfg.ethNodeAlchemyWS = cmd.String(cli.StringOpt{
+	cfg.ethNodeAlchemyWS[hyperionId] = cmd.String(cli.StringOpt{
 		Name:   "eth-node-alchemy-ws",
 		Desc:   "Specify websocket url for an Alchemy ethereum node.",
 		EnvVar: "HYPERION_ETH_ALCHEMY_WS",
 		Value:  "",
 	})
 
-	cfg.ethGasPriceAdjustment = cmd.Float64(cli.Float64Opt{
+	cfg.ethGasPriceAdjustment[hyperionId] = cmd.Float64(cli.Float64Opt{
 		Name:   "eth_gas_price_adjustment",
 		Desc:   "gas price adjustment for Ethereum transactions",
 		EnvVar: "HYPERION_ETH_GAS_PRICE_ADJUSTMENT",
 		Value:  float64(1.3),
 	})
 
-	cfg.ethMaxGasPrice = cmd.String(cli.StringOpt{
+	cfg.ethMaxGasPrice[hyperionId] = cmd.String(cli.StringOpt{
 		Name:   "eth-max-gas-price",
 		Desc:   "Specify Max gas price for Ethereum Transactions in GWei",
 		EnvVar: "HYPERION_ETH_MAX_GAS_PRICE",

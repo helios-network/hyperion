@@ -13,7 +13,7 @@ import (
 
 	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type MockPriceFeed struct {
@@ -41,7 +41,7 @@ type MockCosmosNetwork struct {
 	SendValsetConfirmFn                   func(ctx context.Context, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirmFn                    func(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatchFn                    func(ctx context.Context, denom string) error
-	SendToEthFn                           func(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendToChainFn                         func(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendOldDepositClaimFn                 func(ctx context.Context, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
 	SendDepositClaimFn                    func(ctx context.Context, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaimFn                 func(ctx context.Context, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
@@ -115,8 +115,8 @@ func (n MockCosmosNetwork) SendRequestBatch(ctx context.Context, denom string) e
 	return n.SendRequestBatchFn(ctx, denom)
 }
 
-func (n MockCosmosNetwork) SendToEth(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
-	return n.SendToEthFn(ctx, destination, amount, fee)
+func (n MockCosmosNetwork) SendToChain(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+	return n.SendToChainFn(ctx, destination, amount, fee)
 }
 
 func (n MockCosmosNetwork) SendOldDepositClaim(ctx context.Context, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {

@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 // EncodeValsetConfirm takes the required input data and produces the required signature to confirm a validator

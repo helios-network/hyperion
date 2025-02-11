@@ -9,7 +9,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
@@ -90,7 +90,7 @@ func (l *batchCreator) getTokenDenom(tokenAddr gethcommon.Address) string {
 		return cosmosDenom
 	}
 
-	return hyperiontypes.PeggyDenomString(tokenAddr)
+	return hyperiontypes.HyperionDenomString(tokenAddr)
 }
 
 func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {

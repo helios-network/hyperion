@@ -13,7 +13,7 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/hyperion"
@@ -27,7 +27,7 @@ type BroadcastClient interface {
 	SendValsetConfirm(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, denom string) error
-	SendToEth(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendToChain(ctx context.Context, hyperionId string, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendOldDepositClaim(ctx context.Context, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
 	SendDepositClaim(ctx context.Context, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaim(ctx context.Context, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
@@ -159,12 +159,12 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, ethFrom gethcommon.
 	return nil
 }
 
-func (c broadcastClient) SendToEth(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+func (c broadcastClient) SendToChain(ctx context.Context, hyperionId string, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	// MsgSendToEth
+	// MsgSendToChain
 	// This is the message that a user calls when they want to bridge an asset
 	// it will later be removed when it is included in a batch and successfully
 	// submitted tokens are removed from the users balance immediately
@@ -177,16 +177,17 @@ func (c broadcastClient) SendToEth(ctx context.Context, destination gethcommon.A
 	// actually send this message in the first place. So a successful send has
 	// two layers of fees for the user
 	// -------------
-	msg := &hyperiontypes.MsgSendToEth{
-		Sender:    c.FromAddress().String(),
-		EthDest:   destination.Hex(),
-		Amount:    amount,
-		BridgeFee: fee, // TODO: use exactly that fee for transaction
+	msg := &hyperiontypes.MsgSendToChain{
+		Sender:         c.FromAddress().String(),
+		DestHyperionId: hyperionId,
+		Dest:           destination.Hex(),
+		Amount:         amount,
+		BridgeFee:      fee, // TODO: use exactly that fee for transaction
 	}
 
 	if err := c.ChainClient.QueueBroadcastMsg(msg); err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgSendToEth failed")
+		return errors.Wrap(err, "broadcasting MsgSendToChain failed")
 	}
 
 	return nil

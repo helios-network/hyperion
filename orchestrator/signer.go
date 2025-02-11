@@ -8,7 +8,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 // runSigner simply signs off on any batches or validator sets provided by the validator

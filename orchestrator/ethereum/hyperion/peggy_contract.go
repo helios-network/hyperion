@@ -14,7 +14,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/committer"
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"

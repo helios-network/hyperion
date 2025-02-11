@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 var ErrNotFound = errors.New("not found")
