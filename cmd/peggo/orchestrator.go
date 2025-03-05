@@ -63,7 +63,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				EthNodeAlchemyWS:      *cfg.ethNodeAlchemyWS,
 			}
 		)
-
+		log.Println("cosmosKeyringCfg", cosmosKeyringCfg)
 		if *cfg.cosmosUseLedger || *cfg.ethUseLedger {
 			log.Fatalln("cannot use Ledger for orchestrator, since signatures must be realtime")
 		}
@@ -104,22 +104,22 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		hyperionParams, err := cosmosNetwork.HyperionParams(ctx)
 		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
 
-		for _, hyperionCounterpartyChainParams := range hyperionParams.CounterpartyChainParams {
-			var (
-				hyperionContractAddr = gethcommon.HexToAddress(hyperionCounterpartyChainParams.BridgeCounterpartyAddress)
-				heliosTokenAddr      = gethcommon.HexToAddress(hyperionCounterpartyChainParams.CosmosCoinErc20Contract)
-				erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
-			)
+		// for _, hyperionCounterpartyChainParams := range hyperionParams.CounterpartyChainParams {
+		// 	var (
+		// 		hyperionContractAddr = gethcommon.HexToAddress(hyperionCounterpartyChainParams.BridgeCounterpartyAddress)
+		// 		heliosTokenAddr      = gethcommon.HexToAddress(hyperionCounterpartyChainParams.CosmosCoinErc20Contract)
+		// 		// erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
+		// 	)
 
-			log.WithFields(log.Fields{"hyperion_id": hyperionCounterpartyChainParams.HyperionId, "hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
+		// 	log.WithFields(log.Fields{"hyperion_id": hyperionCounterpartyChainParams.HyperionId, "hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
 
-			ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
-			orShutdown(err)
-		}
+		// 	_, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
+		// 	orShutdown(err)
+		// }
 
 		var (
-			hyperionContractAddr = gethcommon.HexToAddress(hyperionParams.BridgeEthereumAddress)
-			heliosTokenAddr      = gethcommon.HexToAddress(hyperionParams.CosmosCoinErc20Contract)
+			hyperionContractAddr = gethcommon.HexToAddress(hyperionParams.CounterpartyChainParams[*cfg.hyperionID].BridgeCounterpartyAddress)
+			heliosTokenAddr      = gethcommon.HexToAddress(hyperionParams.CounterpartyChainParams[*cfg.hyperionID].CosmosCoinErc20Contract)
 			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 
