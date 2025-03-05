@@ -81,6 +81,12 @@ func (s *Orchestrator) Run(ctx context.Context, helios cosmos.Network, eth ether
 func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
 	log.Infoln("running orchestrator in validator mode")
 
+	// get hyperion ID from contract
+	hyperionID, err := eth.GetHyperionID(ctx)
+	if err != nil {
+		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+	}
+
 	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
 	if lastObservedEthBlock == 0 {
 		hyperionParams, err := helios.HyperionParams(ctx)
@@ -88,19 +94,18 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 			s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
 		}
 
-		lastObservedEthBlock = hyperionParams.BridgeContractStartHeight
-	}
-
-	// get hyperion ID from contract
-	hyperionContractID, err := eth.GetHyperionID(ctx)
-	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+		for _, params := range hyperionParams.CounterpartyChainParams {
+			if params.HyperionId == hyperionID.String() {
+				lastObservedEthBlock = params.BridgeContractStartHeight
+				break
+			}
+		}
 	}
 
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
-	pg.Go(func() error { return s.runSigner(ctx, hyperionContractID) })
+	pg.Go(func() error { return s.runSigner(ctx, hyperionID) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
 
