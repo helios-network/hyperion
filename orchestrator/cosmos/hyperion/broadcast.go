@@ -3,6 +3,8 @@ package hyperion
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
@@ -20,6 +22,7 @@ import (
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
 	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
+	"github.com/joho/godotenv"
 )
 
 type BroadcastClient interface {
@@ -27,7 +30,7 @@ type BroadcastClient interface {
 	SendValsetConfirm(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, denom string) error
-	SendToChain(ctx context.Context, hyperionId string, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendOldDepositClaim(ctx context.Context, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
 	SendDepositClaim(ctx context.Context, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaim(ctx context.Context, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
@@ -159,7 +162,7 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, ethFrom gethcommon.
 	return nil
 }
 
-func (c broadcastClient) SendToChain(ctx context.Context, hyperionId string, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+func (c broadcastClient) SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -273,6 +276,11 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *hyperionev
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
 	// issued to the Cosmos address in question
 	// -------------
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -286,6 +294,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *hyperionev
 	}).Debugln("observed SendToHeliosEvent")
 
 	msg := &hyperiontypes.MsgDepositClaim{
+		HyperionId:     hyperionId,
 		EventNonce:     deposit.EventNonce.Uint64(),
 		BlockHeight:    deposit.Raw.BlockNumber,
 		TokenContract:  deposit.TokenContract.Hex(),

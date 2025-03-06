@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -95,7 +96,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 		}
 
 		for _, params := range hyperionParams.CounterpartyChainParams {
-			if params.HyperionId == hyperionID.String() {
+			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionID {
 				lastObservedEthBlock = params.BridgeContractStartHeight
 				break
 			}

@@ -8,7 +8,7 @@ require (
 	cosmossdk.io/math v1.3.0
 	github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1
 	github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2
-	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-33
+	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-36
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cometbft/cometbft v0.38.10
 	github.com/cosmos/cosmos-sdk v0.50.8
@@ -148,6 +148,7 @@ require (
 	github.com/itchyny/timefmt-go v0.1.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
+	github.com/joho/godotenv v1.5.1
 	github.com/karalabe/usb v0.0.2 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
