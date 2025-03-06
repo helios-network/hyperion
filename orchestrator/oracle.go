@@ -2,9 +2,12 @@ package orchestrator
 
 import (
 	"context"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -310,22 +313,28 @@ func (l *oracle) autoResync(ctx context.Context) error {
 }
 
 func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
+
 	switch e := ev.(type) {
 	case *oldDeposit:
 		ev := hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent(*e)
-		return l.helios.SendOldDepositClaim(ctx, &ev)
+		return l.helios.SendOldDepositClaim(ctx, hyperionId, &ev)
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
-		return l.helios.SendDepositClaim(ctx, &ev)
+		return l.helios.SendDepositClaim(ctx, hyperionId, &ev)
 	case *valsetUpdate:
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaim(ctx, &ev)
+		return l.helios.SendValsetClaim(ctx, hyperionId, &ev)
 	case *withdrawal:
 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaim(ctx, &ev)
+		return l.helios.SendWithdrawalClaim(ctx, hyperionId, &ev)
 	case *erc20Deployment:
 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaim(ctx, &ev)
+		return l.helios.SendERC20DeployedClaim(ctx, hyperionId, &ev)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}

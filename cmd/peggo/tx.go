@@ -121,7 +121,7 @@ func registerEthKeyCmd(cmd *cli.Cmd) {
 		if err != nil {
 			log.WithError(err).Fatalln("failed to init Ethereum account")
 		}
-
+		log.Infoln("Using Ethereum address", ethKeyFrom)
 		log.Infoln("Using Cosmos ValAddress", keyring.Addr.String())
 		log.Infoln("Using Ethereum address", ethKeyFromAddress.String())
 

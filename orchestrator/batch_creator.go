@@ -2,8 +2,11 @@ package orchestrator
 
 import (
 	"context"
+	"os"
+	"strconv"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	"github.com/shopspring/decimal"
 	log "github.com/xlab/suplog"
 
@@ -67,6 +70,11 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperionty
 }
 
 func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
 	tokenDenom := l.getTokenDenom(tokenAddress)
 
@@ -82,7 +90,7 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 
 	l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
 
-	_ = l.helios.SendRequestBatch(ctx, tokenDenom)
+	_ = l.helios.SendRequestBatch(ctx, hyperionId, tokenDenom)
 }
 
 func (l *batchCreator) getTokenDenom(tokenAddr gethcommon.Address) string {

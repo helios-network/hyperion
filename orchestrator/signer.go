@@ -2,8 +2,11 @@ package orchestrator
 
 import (
 	"context"
+	"os"
+	"strconv"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
@@ -54,6 +57,11 @@ func (l *signer) sign(ctx context.Context) error {
 
 func (l *signer) signValidatorSets(ctx context.Context) error {
 	var valsets []*hyperiontypes.Valset
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	fn := func() error {
 		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.CosmosAddr)
 		return nil
@@ -70,7 +78,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
-			return l.helios.SendValsetConfirm(ctx, l.cfg.EthereumAddr, l.hyperionID, vs)
+			return l.helios.SendValsetConfirm(ctx, hyperionId, l.cfg.EthereumAddr, l.hyperionID, vs)
 		}); err != nil {
 			return err
 		}
@@ -83,6 +91,11 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 
 func (l *signer) signNewBatch(ctx context.Context) error {
 	var oldestUnsignedBatch *hyperiontypes.OutgoingTxBatch
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	getBatchFn := func() error {
 		oldestUnsignedBatch, _ = l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
 		return nil
@@ -99,6 +112,7 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 
 	if err := l.retry(ctx, func() error {
 		return l.helios.SendBatchConfirm(ctx,
+			hyperionId,
 			l.cfg.EthereumAddr,
 			l.hyperionID,
 			oldestUnsignedBatch,

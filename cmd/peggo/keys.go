@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	log "github.com/xlab/suplog"
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
@@ -44,8 +45,10 @@ func initEthereumAccountsManager(
 			err := errors.New("cannot use Ledger without from address specified")
 			return emptyEthAddress, nil, nil, err
 		}
+		log.Infoln("initialized Ethereum keyring with ethKeyFrom", ethKeyFrom)
 
 		ethKeyFromAddress = ethcmn.HexToAddress(*ethKeyFrom)
+		log.Infoln("after convert", ethKeyFrom)
 		if ethKeyFromAddress == (ethcmn.Address{}) {
 			err = errors.Wrap(err, "failed to parse Ethereum from address")
 			return emptyEthAddress, nil, nil, err
