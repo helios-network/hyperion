@@ -103,8 +103,8 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	if l.lastObservedEthHeight < 18879185 { // TODO by config
-		l.lastObservedEthHeight = 18879185
+	if l.lastObservedEthHeight < 18906985 { // TODO by config
+		l.lastObservedEthHeight = 18906985
 	}
 
 	// ensure the block range is within defaultBlocksToSearch
@@ -118,13 +118,15 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Info("events: ", events)
 
 	lastClaim, err := l.getLastClaimEvent(ctx)
 	if err != nil {
 		return err
 	}
-
+	log.Info("lastClaim: ", lastClaim)
 	newEvents := filterEvents(events, lastClaim.EthereumEventNonce)
+	log.Info("newEvents: ", newEvents)
 	sort.Slice(newEvents, func(i, j int) bool {
 		return newEvents[i].Nonce() < newEvents[j].Nonce()
 	})
@@ -140,13 +142,17 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("SOME EVENTS DETECTED %d", len(newEvents))
 	}
 
-	if expected, actual := lastClaim.EthereumEventNonce+1, newEvents[0].Nonce(); expected != actual {
-		l.Log().WithFields(log.Fields{"expected": expected, "actual": actual, "last_claimed_event_nonce": lastClaim.EthereumEventNonce}).Debugln("orchestrator missed an Ethereum event. Restarting block search from last attested claim...")
-		l.lastObservedEthHeight = lastClaim.EthereumEventHeight
-		return nil
-	}
+	log.Info("========================")
+	// if expected, actual := lastClaim.EthereumEventNonce+1, newEvents[0].Nonce(); expected != actual {
+	// 	log.Info("expected: ", expected, "actual: ", actual, "lastClaim.EthereumEventNonce: ", lastClaim.EthereumEventNonce)
+	// 	l.Log().WithFields(log.Fields{"expected": expected, "actual": actual, "last_claimed_event_nonce": lastClaim.EthereumEventNonce}).Debugln("orchestrator missed an Ethereum event. Restarting block search from last attested claim...")
+	// 	l.lastObservedEthHeight = lastClaim.EthereumEventHeight
+	// 	return nil
+	// }
+	log.Info("========================")
 
 	if err := l.sendNewEventClaims(ctx, newEvents); err != nil {
+		log.Info("err: ", err)
 		return err
 	}
 

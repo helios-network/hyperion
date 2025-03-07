@@ -2,7 +2,6 @@ package committer
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 

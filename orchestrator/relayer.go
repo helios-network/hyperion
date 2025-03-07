@@ -197,12 +197,12 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	}
 	log.Info("batches", batches)
 
-	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		log.Info("failed to get latest ethereum height", err)
 		return err
 	}
-	log.Info("latestEthHeight", latestEthHeight)
+	// log.Info("latestEthHeight", latestEthHeight)
 
 	var (
 		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
@@ -239,6 +239,10 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
 	// 	return nil
 	// }
+	if oldestConfirmedBatch == nil {
+		log.Info("no token batch to relay")
+		return nil
+	}
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash
