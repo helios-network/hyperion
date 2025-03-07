@@ -109,7 +109,7 @@ func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddre
 	tokenPriceUSDFloat, err := l.priceFeed.QueryUSDPrice(tokenAddress)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to query price feed", "token_addr", tokenAddress.String())
-		return false
+		return true
 	}
 
 	var (

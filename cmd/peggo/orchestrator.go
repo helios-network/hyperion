@@ -82,6 +82,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		orShutdown(errors.Wrap(err, "failed to initialize Helios keyring"))
 		log.Infoln("initialized Helios keyring", cosmosKeyring.Addr.String())
 
+		log.WithFields(log.Fields{"ethChainID": *cfg.ethChainID, "ethKeystoreDir": *cfg.ethKeystoreDir, "ethKeyFrom": *cfg.ethKeyFrom, "ethPassphrase": *cfg.ethPassphrase, "ethPrivKey": *cfg.ethPrivKey, "ethUseLedger": *cfg.ethUseLedger}).Infoln("initializing Ethereum keyring")
 		ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
 			uint64(*cfg.ethChainID),
 			cfg.ethKeystoreDir,
@@ -127,6 +128,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		// 2. Connect to ethereum network
 
+		log.Info("hyperionContractAddr", hyperionContractAddr)
 		ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
 		orShutdown(err)
 

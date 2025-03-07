@@ -44,6 +44,7 @@ func (c *tmClient) GetBlock(ctx context.Context, height int64) (*comettypes.Resu
 
 // GetLatestBlockHeight returns the latest block height on the active chain.
 func (c *tmClient) GetLatestBlockHeight(ctx context.Context) (int64, error) {
+	log.Info("GetLatestBlockHeight")
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()

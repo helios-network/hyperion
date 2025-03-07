@@ -153,6 +153,7 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 		EthSigner:     ethFrom.Hex(),
 		TokenContract: batch.TokenContract,
 	}
+	log.Info("start confirm batch, msg", msg)
 
 	if err = c.ChainClient.QueueBroadcastMsg(msg); err != nil {
 		metrics.ReportFuncError(c.svcTags)
