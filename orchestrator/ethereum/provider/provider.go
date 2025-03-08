@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	log "github.com/xlab/suplog"
+	// log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
 )
@@ -64,8 +64,8 @@ func (p *evmProviderWithRet) SendTransactionWithRet(ctx context.Context, tx *typ
 
 	data, err := rlp.EncodeToBytes(tx)
 	// convert data to hex
-	hexData := hexutil.Encode(data)
-	log.Info("hexData: ", hexData)
+	// hexData := hexutil.Encode(data)
+	// log.Info("hexData: ", hexData)
 	if err != nil {
 		metrics.ReportFuncError(p.svcTags)
 		return common.Hash{}, err

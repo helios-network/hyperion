@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	// "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
@@ -154,11 +154,11 @@ func (e *ethCommitter) SendTx(
 			opts.Context, _ = context.WithTimeout(ctx, e.committerOpts.RPCTimeout)
 
 			tx := types.NewTransaction(opts.Nonce.Uint64(), recipient, nil, opts.GasLimit, opts.GasPrice, txData)
-			log.Info("e.fromAddress: ", e.fromAddress)
-			log.Info("opts.From: ", opts.From)
-			log.Info("opts.Signer: ", opts.Signer)
-			txDataHex := hexutil.Encode(txData)
-			log.Info("txDataHex: ", txDataHex)
+			// log.Info("e.fromAddress: ", e.fromAddress)
+			// log.Info("opts.From: ", opts.From)
+			// log.Info("opts.Signer: ", opts.Signer)
+			// txDataHex := hexutil.Encode(txData)
+			// log.Info("txDataHex: ", txDataHex)
 			signedTx, err := opts.Signer(opts.From, tx)
 			if err != nil {
 				err := errors.Wrap(err, "failed to sign transaction")

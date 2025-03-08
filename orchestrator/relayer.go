@@ -195,7 +195,8 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		log.Info("failed to get latest transaction batches", err)
 		return err
 	}
-	log.Info("batches", batches)
+	log.Info("batches len: ", len(batches))
+	log.Info("batches: ", batches)
 
 	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
@@ -210,13 +211,14 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	)
 
 	for _, batch := range batches {
+		log.Info("batch details: ", batch)
 		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
 		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
 		// 	continue
 		// }
 
 		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
-		log.Info("sigs", sigs)
+		// log.Info("sigs", sigs)
 		if err != nil {
 			return err
 		}
@@ -227,6 +229,9 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 
 		oldestConfirmedBatch = batch
 		confirmations = sigs
+		if oldestConfirmedBatch != nil {
+			break
+		}
 	}
 
 	// if oldestConfirmedBatch == nil {
