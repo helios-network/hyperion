@@ -2,12 +2,15 @@ package orchestrator
 
 import (
 	"context"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -34,6 +37,11 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
 		return r.relay(ctx)
 	})
+}
+
+func (s *Orchestrator) testReplayTokenBatch(ctx context.Context) {
+	r := relayer{Orchestrator: s}
+	r.mockRelayTokenBatch(ctx, nil)
 }
 
 type relayer struct {
@@ -190,6 +198,12 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
+
 	batches, err := l.helios.LatestTransactionBatches(ctx)
 	if err != nil {
 		log.Info("failed to get latest transaction batches", err)
@@ -214,6 +228,96 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
 		// 	continue
 		// }
+
+		if batch.HyperionId != hyperionId {
+			continue
+		}
+
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		log.Info("sigs", sigs)
+		if err != nil {
+			return err
+		}
+
+		if len(sigs) == 0 {
+			continue
+		}
+
+		oldestConfirmedBatch = batch
+		confirmations = sigs
+		if oldestConfirmedBatch != nil {
+			break
+		}
+	}
+
+	if oldestConfirmedBatch == nil {
+		l.Log().Infoln("no token batch to relay")
+		return nil
+	}
+	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
+
+	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
+	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
+	// 	return nil
+	// }
+	
+	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
+	if err != nil {
+		// Returning an error here triggers retries which don't help much except risk a binary crash
+		// Better to warn the user and try again in the next loop interval
+		log.WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
+		return nil
+	}
+
+	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
+
+	return nil
+}
+
+func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+	metrics.ReportFuncCall(l.svcTags)
+	doneFn := metrics.ReportFuncTiming(l.svcTags)
+	defer doneFn()
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
+
+	batches := []*hyperiontypes.OutgoingTxBatch{
+		{
+			HyperionId: 2,
+			TokenContract: "0x0000000000000000000000000000000000000000",
+			BatchNonce: 1,
+			BatchTimeout: 1,
+		},
+	}
+
+
+	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		log.Info("failed to get latest ethereum height", err)
+		return err
+	}
+	// log.Info("latestEthHeight", latestEthHeight)
+
+	var (
+		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
+		confirmations        []*hyperiontypes.MsgConfirmBatch
+	)
+
+	for _, batch := range batches {
+		log.Info("batch details: ", batch)
+		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
+		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		// 	continue
+		// }
+
+		if batch.HyperionId != hyperionId {
+			log.Info("skipping batch with hyperion id: ", batch.HyperionId)
+			continue
+		}
 
 		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
 		log.Info("sigs", sigs)
