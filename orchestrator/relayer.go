@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
 	"os"
 	"sort"
 	"strconv"
@@ -288,10 +289,39 @@ func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hype
 
 	batches := []*hyperiontypes.OutgoingTxBatch{
 		{
-			HyperionId: 2,
-			TokenContract: "0x0000000000000000000000000000000000000000",
+			HyperionId: 1,
+			TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
 			BatchNonce: 1,
 			BatchTimeout: 1,
+			Block: 43,
+			Transactions: []*hyperiontypes.OutgoingTransferTx{
+				{
+					Id: 1,
+					Sender: "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					DestAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+					Erc20Token: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+					},
+					Erc20Fee: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+					},
+				},
+				{
+					Id: 2,
+					Sender: "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					DestAddress: "0x17267eB1FEC301848d4B5140eDDCFC48945427Ab",
+					Erc20Token: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+					},
+					Erc20Fee: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+					},
+				},
+			},
 		},
 	}
 

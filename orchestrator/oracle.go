@@ -103,8 +103,8 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	if l.lastObservedEthHeight < 	18947209 { // TODO by config
-		l.lastObservedEthHeight = 	18947209
+	if l.lastObservedEthHeight < 18952515 { // TODO by config
+		l.lastObservedEthHeight = 18952515
 	}
 
 	// ensure the block range is within defaultBlocksToSearch
@@ -360,9 +360,9 @@ type (
 
 func filterEvents(events []event, nonce uint64) (filtered []event) {
 	for _, e := range events {
-		if e.Nonce() > nonce {
-			filtered = append(filtered, e)
-		}
+		// if e.Nonce() > nonce {
+		filtered = append(filtered, e)
+		// }
 	}
 
 	return
