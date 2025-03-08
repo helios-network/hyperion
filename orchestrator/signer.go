@@ -97,7 +97,10 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 	}
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	getBatchFn := func() error {
-		oldestUnsignedBatch, _ = l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == hyperionId {
+			oldestUnsignedBatch = tmpOldestUnsignedBatch
+		}
 		return nil
 	}
 
