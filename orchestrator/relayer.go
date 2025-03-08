@@ -195,8 +195,6 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		log.Info("failed to get latest transaction batches", err)
 		return err
 	}
-	log.Info("batches len: ", len(batches))
-	log.Info("batches: ", batches)
 
 	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
@@ -218,14 +216,14 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		// }
 
 		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
-		// log.Info("sigs", sigs)
+		log.Info("sigs", sigs)
 		if err != nil {
 			return err
 		}
 
-		// if len(sigs) == 0 {
-		// 	continue
-		// }
+		if len(sigs) == 0 {
+			continue
+		}
 
 		oldestConfirmedBatch = batch
 		confirmations = sigs
@@ -234,20 +232,17 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		}
 	}
 
-	// if oldestConfirmedBatch == nil {
-	// 	l.Log().Infoln("no token batch to relay")
-	// 	return nil
-	// }
+	if oldestConfirmedBatch == nil {
+		l.Log().Infoln("no token batch to relay")
+		return nil
+	}
 	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
 
 	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
 	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
 	// 	return nil
 	// }
-	if oldestConfirmedBatch == nil {
-		log.Info("no token batch to relay")
-		return nil
-	}
+	
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash

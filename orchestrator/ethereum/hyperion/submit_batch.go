@@ -71,16 +71,16 @@ func (s *hyperionContract) SendTransactionBatch(
 		RewardToken:  common.HexToAddress(currentValset.RewardToken),
 	}
 
-	// log.Info("currentValsetArs", currentValsetArs)
-	// log.Info("sigV", sigV)
-	// log.Info("sigR", sigR)
-	// log.Info("sigS", sigS)
-	// log.Info("amounts", amounts)
-	// log.Info("destinations", destinations)
-	// log.Info("fees", fees)
-	// log.Info("batchNonce", batchNonce)
-	// log.Info("batchTimeout", batchTimeout)
-	// log.Info("batch.TokenContract", common.HexToAddress(batch.TokenContract))
+	log.Info("currentValsetArs", currentValsetArs)
+	log.Info("sigV", sigV)
+	log.Info("sigR", sigR)
+	log.Info("sigS", sigS)
+	log.Info("amounts", amounts)
+	log.Info("destinations", destinations)
+	log.Info("fees", fees)
+	log.Info("batchNonce", batchNonce)
+	log.Info("batchTimeout", batchTimeout)
+	log.Info("batch.TokenContract", common.HexToAddress(batch.TokenContract))
 	txData, err := hyperionABI.Pack("submitBatch",
 		currentValsetArs,
 		sigV, sigR, sigS,

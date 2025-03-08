@@ -103,8 +103,8 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	if l.lastObservedEthHeight < 	18918769 { // TODO by config
-		l.lastObservedEthHeight = 	18918769
+	if l.lastObservedEthHeight < 	18946468 { // TODO by config
+		l.lastObservedEthHeight = 	18946468
 	}
 
 	// ensure the block range is within defaultBlocksToSearch
