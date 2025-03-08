@@ -205,6 +205,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 
 	batches, err := l.helios.LatestTransactionBatches(ctx)
+	log.Info("batches: ", batches)
 	if err != nil {
 		log.Info("failed to get latest transaction batches", err)
 		return err
