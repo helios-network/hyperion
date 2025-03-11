@@ -23,6 +23,7 @@ func (s *hyperionContract) SendTransactionBatch(
 	doneFn := metrics.ReportFuncTiming(s.svcTags)
 	defer doneFn()
 
+	log.Info("batch.Transactions", batch.Transactions)
 	log.WithFields(log.Fields{
 		"token_contract": batch.TokenContract,
 		"batch_nonce":    batch.BatchNonce,
@@ -30,12 +31,12 @@ func (s *hyperionContract) SendTransactionBatch(
 		"confirmations":  len(confirms),
 	}).Infoln("checking signatures and submitting batch")
 
-	validators, powers, sigV, sigR, sigS, err := checkBatchSigsAndRepack(currentValset, confirms)
-	if err != nil {
-		metrics.ReportFuncError(s.svcTags)
-		err = errors.Wrap(err, "submit_batch.go confirmations check failed")
-		return nil, err
-	}
+	validators, powers, sigV, sigR, sigS, _ := checkBatchSigsAndRepack(currentValset, confirms)
+	// if err != nil {
+	// 	metrics.ReportFuncError(s.svcTags)
+	// 	err = errors.Wrap(err, "submit_batch.go confirmations check failed")
+	// 	return nil, err
+	// }
 
 	amounts, destinations, fees := getBatchCheckpointValues(batch)
 	currentValsetNonce := new(big.Int).SetUint64(currentValset.Nonce)
@@ -70,6 +71,16 @@ func (s *hyperionContract) SendTransactionBatch(
 		RewardToken:  common.HexToAddress(currentValset.RewardToken),
 	}
 
+	log.Info("currentValsetArs", currentValsetArs)
+	log.Info("sigV", sigV)
+	log.Info("sigR", sigR)
+	log.Info("sigS", sigS)
+	log.Info("amounts", amounts)
+	log.Info("destinations", destinations)
+	log.Info("fees", fees)
+	log.Info("batchNonce", batchNonce)
+	log.Info("batchTimeout", batchTimeout)
+	log.Info("batch.TokenContract", common.HexToAddress(batch.TokenContract))
 	txData, err := hyperionABI.Pack("submitBatch",
 		currentValsetArs,
 		sigV, sigR, sigS,

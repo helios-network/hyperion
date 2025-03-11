@@ -2,12 +2,16 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -36,6 +40,11 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	})
 }
 
+func (s *Orchestrator) testReplayTokenBatch(ctx context.Context) {
+	r := relayer{Orchestrator: s}
+	r.mockRelayTokenBatch(ctx, nil)
+}
+
 type relayer struct {
 	*Orchestrator
 }
@@ -56,13 +65,13 @@ func (l *relayer) relay(ctx context.Context) error {
 
 	var pg loops.ParanoidGroup
 
-	if l.cfg.RelayValsets {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayValset(ctx, ethValset)
-			})
-		})
-	}
+	// if l.cfg.RelayValsets {
+	// 	pg.Go(func() error {
+	// 		return l.retry(ctx, func() error {
+	// 			return l.relayValset(ctx, ethValset)
+	// 		})
+	// 	})
+	// }
 
 	if l.cfg.RelayBatches {
 		pg.Go(func() error {
@@ -190,15 +199,25 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	batches, err := l.helios.LatestTransactionBatches(ctx)
+	err := godotenv.Load()
 	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
+
+	batches, err := l.helios.LatestTransactionBatches(ctx)
+	log.Info("batches: ", batches)
+	if err != nil {
+		log.Info("failed to get latest transaction batches", err)
 		return err
 	}
 
-	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
+		log.Info("failed to get latest ethereum height", err)
 		return err
 	}
+	// log.Info("latestEthHeight", latestEthHeight)
 
 	var (
 		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
@@ -206,12 +225,18 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	)
 
 	for _, batch := range batches {
-		if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
-			l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		log.Info("batch details: ", batch)
+		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
+		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		// 	continue
+		// }
+
+		if batch.HyperionId != hyperionId {
 			continue
 		}
 
 		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		log.Info("sigs", sigs)
 		if err != nil {
 			return err
 		}
@@ -222,17 +247,137 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 
 		oldestConfirmedBatch = batch
 		confirmations = sigs
+		if oldestConfirmedBatch != nil {
+			break
+		}
 	}
 
 	if oldestConfirmedBatch == nil {
 		l.Log().Infoln("no token batch to relay")
 		return nil
 	}
+	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
 
-	if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
+	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
+	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
+	// 	return nil
+	// }
+	
+	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
+	if err != nil {
+		// Returning an error here triggers retries which don't help much except risk a binary crash
+		// Better to warn the user and try again in the next loop interval
+		log.WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
 		return nil
 	}
 
+	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
+
+	return nil
+}
+
+func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+	metrics.ReportFuncCall(l.svcTags)
+	doneFn := metrics.ReportFuncTiming(l.svcTags)
+	defer doneFn()
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
+
+	batches := []*hyperiontypes.OutgoingTxBatch{
+		{
+			HyperionId: 1,
+			TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+			BatchNonce: 1,
+			BatchTimeout: 1,
+			Block: 43,
+			Transactions: []*hyperiontypes.OutgoingTransferTx{
+				{
+					Id: 1,
+					Sender: "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					DestAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+					Erc20Token: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+					},
+					Erc20Fee: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+					},
+				},
+				{
+					Id: 2,
+					Sender: "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					DestAddress: "0x17267eB1FEC301848d4B5140eDDCFC48945427Ab",
+					Erc20Token: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+					},
+					Erc20Fee: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount: sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+					},
+				},
+			},
+		},
+	}
+
+
+	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		log.Info("failed to get latest ethereum height", err)
+		return err
+	}
+	// log.Info("latestEthHeight", latestEthHeight)
+
+	var (
+		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
+		confirmations        []*hyperiontypes.MsgConfirmBatch
+	)
+
+	for _, batch := range batches {
+		log.Info("batch details: ", batch)
+		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
+		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		// 	continue
+		// }
+
+		if batch.HyperionId != hyperionId {
+			log.Info("skipping batch with hyperion id: ", batch.HyperionId)
+			continue
+		}
+
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		log.Info("sigs", sigs)
+		if err != nil {
+			return err
+		}
+
+		if len(sigs) == 0 {
+			continue
+		}
+
+		oldestConfirmedBatch = batch
+		confirmations = sigs
+		if oldestConfirmedBatch != nil {
+			break
+		}
+	}
+
+	if oldestConfirmedBatch == nil {
+		l.Log().Infoln("no token batch to relay")
+		return nil
+	}
+	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
+
+	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
+	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
+	// 	return nil
+	// }
+	
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash

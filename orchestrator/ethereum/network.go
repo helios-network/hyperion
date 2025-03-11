@@ -75,6 +75,7 @@ func NewNetwork(
 		return nil, errors.Wrapf(err, "failed to connect to ethereum RPC: %s", cfg.EthNodeRPC)
 	}
 
+	log.Info("fromAddr: ", fromAddr)
 	ethCommitter, err := committer.NewEthCommitter(
 		fromAddr,
 		cfg.GasPriceAdjustment,

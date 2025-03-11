@@ -139,6 +139,7 @@ func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmo
 func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 	return retry.Do(fn,
 		retry.Context(ctx),
+		retry.Delay(200*time.Millisecond),
 		retry.Attempts(s.maxAttempts),
 		retry.OnRetry(func(n uint, err error) {
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)

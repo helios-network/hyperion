@@ -44,9 +44,9 @@ func (l *signer) sign(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	if err := l.signValidatorSets(ctx); err != nil {
-		return err
-	}
+	// if err := l.signValidatorSets(ctx); err != nil {
+	// 	return err
+	// }
 
 	if err := l.signNewBatch(ctx); err != nil {
 		return err
@@ -97,7 +97,10 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 	}
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	getBatchFn := func() error {
-		oldestUnsignedBatch, _ = l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == hyperionId {
+			oldestUnsignedBatch = tmpOldestUnsignedBatch
+		}
 		return nil
 	}
 

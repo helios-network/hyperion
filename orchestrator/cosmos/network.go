@@ -164,7 +164,10 @@ func HasRegisteredOrchestrator(n Network, ethAddr gethcommon.Address) (cosmostyp
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFn()
 
+	log.Info("ethAddr: ", ethAddr)
+
 	validator, err := n.GetValidatorAddress(ctx, ethAddr)
+	log.Info("validator: ", validator)
 	if err != nil {
 		return nil, false
 	}
