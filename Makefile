@@ -23,6 +23,9 @@ install:
 
 .PHONY: install image push test gen
 
+start:
+	hyperion orchestrator
+
 test:
 	# go clean -testcache
 	go test ./test/...
