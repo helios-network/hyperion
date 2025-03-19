@@ -41,12 +41,12 @@ else
 fi
 
 echo ""
-echo "3. Check latest event broadcasted by peggo is upto date"
+echo "3. Check latest event broadcasted by hyperion is upto date"
 echo "SLASHING_CONDITION - You will be slashed if  you don't broadcast an event within 25000 blocks and it's broadcasted by majority of validators.  This is disabled for now."
 lon=$(curl -s https://lcd.helios.network/hyperion/v1/module_state | jq '.state.last_observed_nonce')
 lce=$(curl -s https://lcd.helios.network/hyperion/v1/oracle/event/${YOUR_ORCHESTRATOR_INJ_ADDRESS} | jq '.last_claim_event.ethereum_event_nonce')
 if [ ${lon} == ${lce} ]; then
-        echo "(O) your peggo is upto date"
+        echo "(O) your hyperion is upto date"
 else
-        echo "(X) check peggo last_observed_nonce:${lon}, last_claim_event.ethereum_event_nonce:${lce}"
+        echo "(X) check hyperion last_observed_nonce:${lon}, last_claim_event.ethereum_event_nonce:${lce}"
 fi

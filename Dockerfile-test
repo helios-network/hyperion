@@ -32,7 +32,7 @@ COPY --from=builder /src/etherman/* /go/bin/
 
 #configure container
 VOLUME /apps/data
-WORKDIR /root/.helios/peggo
+WORKDIR /root/.helios/hyperion
 COPY . .
 
 #default command

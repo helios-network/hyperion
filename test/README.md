@@ -1,6 +1,6 @@
 ## Hyperion Testsuite
 
-Welcome to the PegGo testing framework. The goal of this suite is aligned with the overall project goal - to move stuff onto common ground and iterate faster.
+Welcome to the Hyperion testing framework. The goal of this suite is aligned with the overall project goal - to move stuff onto common ground and iterate faster.
 By using the same lang for module, orchestrator and test we can achieve the full test coverage of all logical branches.
 
 This is a special place where we don't care about things like:

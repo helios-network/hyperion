@@ -78,7 +78,7 @@ func (s *Orchestrator) Run(ctx context.Context, helios cosmos.Network, eth ether
 }
 
 // startValidatorMode runs all orchestrator processes. This is called
-// when peggo is run alongside a validator helios node.
+// when hyperion is run alongside a validator helios node.
 func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
 	log.Infoln("running orchestrator in validator mode")
 

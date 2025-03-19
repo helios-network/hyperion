@@ -16,7 +16,7 @@ import (
 // txCmdSubset contains actions that can sign and send messages to Cosmos module
 // as well as Ethereum transactions to Hyperion contract.
 //
-// $ peggo tx
+// $ hyperion tx
 func txCmdSubset(cmd *cli.Cmd) {
 	cmd.Command(
 		"register-eth-key",

@@ -113,7 +113,7 @@ func initCosmosKeyOptions(
 		Name:   "cosmos-keyring-app",
 		Desc:   "Specify Cosmos keyring app name.",
 		EnvVar: "HYPERION_COSMOS_KEYRING_APP",
-		Value:  "peggo",
+		Value:  "hyperion",
 	})
 
 	*cosmosKeyFrom = cmd.String(cli.StringOpt{
@@ -126,7 +126,7 @@ func initCosmosKeyOptions(
 		Name:   "cosmos-from-passphrase",
 		Desc:   "Specify keyring passphrase, otherwise Stdin will be used.",
 		EnvVar: "HYPERION_COSMOS_FROM_PASSPHRASE",
-		Value:  "peggo",
+		Value:  "hyperion",
 	})
 
 	*cosmosPrivKey = cmd.String(cli.StringOpt{
@@ -204,7 +204,7 @@ func initStatsdOptions(
 		Name:   "statsd-prefix",
 		Desc:   "Specify StatsD compatible metrics prefix.",
 		EnvVar: "HYPERION_STATSD_PREFIX",
-		Value:  "peggo",
+		Value:  "hyperion",
 	})
 
 	*statsdAddr = cmd.String(cli.StringOpt{
@@ -338,7 +338,7 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "cosmos-keyring-app",
 		Desc:   "Specify Cosmos keyring app name.",
 		EnvVar: "HYPERION_COSMOS_KEYRING_APP",
-		Value:  "peggo",
+		Value:  "hyperion",
 	})
 
 	cfg.cosmosKeyFrom = cmd.String(cli.StringOpt{
@@ -351,7 +351,7 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "cosmos-from-passphrase",
 		Desc:   "Specify keyring passphrase, otherwise Stdin will be used.",
 		EnvVar: "HYPERION_COSMOS_FROM_PASSPHRASE",
-		Value:  "peggo",
+		Value:  "hyperion",
 	})
 
 	cfg.cosmosPrivKey = cmd.String(cli.StringOpt{
