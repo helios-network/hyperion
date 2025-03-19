@@ -12,7 +12,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 
-	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
+	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
 func (s *hyperionContract) SendToCosmos(

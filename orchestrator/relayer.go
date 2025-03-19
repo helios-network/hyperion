@@ -15,10 +15,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
@@ -262,7 +262,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
 	// 	return nil
 	// }
-	
+
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash
@@ -289,42 +289,41 @@ func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hype
 
 	batches := []*hyperiontypes.OutgoingTxBatch{
 		{
-			HyperionId: 1,
+			HyperionId:    1,
 			TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-			BatchNonce: 1,
-			BatchTimeout: 1,
-			Block: 43,
+			BatchNonce:    1,
+			BatchTimeout:  1,
+			Block:         43,
 			Transactions: []*hyperiontypes.OutgoingTransferTx{
 				{
-					Id: 1,
-					Sender: "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					Id:          1,
+					Sender:      "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
 					DestAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
 					Erc20Token: &hyperiontypes.ERC20Token{
 						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount: sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
 					},
 					Erc20Fee: &hyperiontypes.ERC20Token{
 						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount: sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(10000)),
 					},
 				},
 				{
-					Id: 2,
-					Sender: "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					Id:          2,
+					Sender:      "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
 					DestAddress: "0x17267eB1FEC301848d4B5140eDDCFC48945427Ab",
 					Erc20Token: &hyperiontypes.ERC20Token{
 						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount: sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
 					},
 					Erc20Fee: &hyperiontypes.ERC20Token{
 						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount: sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(10000)),
 					},
 				},
 			},
 		},
 	}
-
 
 	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
@@ -377,7 +376,7 @@ func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hype
 	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
 	// 	return nil
 	// }
-	
+
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash

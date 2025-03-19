@@ -10,8 +10,8 @@ import (
 	"github.com/shopspring/decimal"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 

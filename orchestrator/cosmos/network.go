@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/hyperion"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/tendermint"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos/tendermint"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"

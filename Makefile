@@ -1,7 +1,7 @@
 APP_VERSION = $(shell git describe --abbrev=0 --tags)
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 BUILD_DATE = $(shell date -u "+%Y%m%d-%H%M")
-VERSION_PKG = github.com/Helios-Chain-Labs/peggo/orchestrator/version
+VERSION_PKG = github.com/Helios-Chain-Labs/hyperion/orchestrator/version
 IMAGE_NAME := gcr.io/helios-core/peggo
 DOCKER ?= false
 

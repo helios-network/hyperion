@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+
 	// "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
@@ -16,8 +17,8 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
 )
 
 // NewEthCommitter returns an instance of EVMCommitter, which

@@ -13,11 +13,12 @@ import (
 
 	// sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/pricefeed"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/version"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	chaintypes "github.com/Helios-Chain-Labs/sdk-go/chain/types"
 )
 
@@ -117,10 +118,24 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		// 	_, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
 		// 	orShutdown(err)
 		// }
+		counterpartyChainParamsCfg := &hyperiontypes.CounterpartyChainParams{
+			HyperionId:                0,
+			BridgeCounterpartyAddress: "",
+		}
+
+		for _, counterpartyChainParams := range hyperionParams.CounterpartyChainParams {
+			if counterpartyChainParams.HyperionId == uint64(*cfg.hyperionID) {
+				counterpartyChainParamsCfg = counterpartyChainParams
+			}
+		}
+
+		if counterpartyChainParamsCfg.BridgeCounterpartyAddress == "" {
+			log.Fatalln("Counterparty Chain Params not found for hyperionId =", *cfg.hyperionID)
+		}
 
 		var (
-			hyperionContractAddr = gethcommon.HexToAddress(hyperionParams.CounterpartyChainParams[*cfg.hyperionID].BridgeCounterpartyAddress)
-			heliosTokenAddr      = gethcommon.HexToAddress(hyperionParams.CounterpartyChainParams[*cfg.hyperionID].CosmosCoinErc20Contract)
+			hyperionContractAddr = gethcommon.HexToAddress(counterpartyChainParamsCfg.BridgeCounterpartyAddress)
+			heliosTokenAddr      = gethcommon.HexToAddress(counterpartyChainParamsCfg.CosmosCoinErc20Contract)
 			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 

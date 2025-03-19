@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos/hyperion"
 
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
 	log "github.com/xlab/suplog"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
 )
 
 // txCmdSubset contains actions that can sign and send messages to Cosmos module

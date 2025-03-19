@@ -15,8 +15,8 @@ import (
 	"github.com/Helios-Chain-Labs/etherman/deployer"
 
 	"github.com/Helios-Chain-Labs/etherman/sol"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/hyperion"
-	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
+	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
 var _ = Describe("Contract Tests", func() {

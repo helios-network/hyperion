@@ -10,10 +10,10 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
 )
 
 const (
@@ -83,10 +83,13 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 	log.Infoln("running orchestrator in validator mode")
 
 	// get hyperion ID from contract
-	hyperionID, err := eth.GetHyperionID(ctx)
+	hyperionIDHash, err := eth.GetHyperionID(ctx)
 	if err != nil {
 		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
 	}
+	hyperionID := hyperionIDHash.Big().Uint64()
+
+	s.logger.Info("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
 
 	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
 	if lastObservedEthBlock == 0 {
@@ -96,7 +99,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 		}
 
 		for _, params := range hyperionParams.CounterpartyChainParams {
-			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionID {
+			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionIDHash {
 				lastObservedEthBlock = params.BridgeContractStartHeight
 				break
 			}
@@ -106,7 +109,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
-	pg.Go(func() error { return s.runSigner(ctx, hyperionID) })
+	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
 

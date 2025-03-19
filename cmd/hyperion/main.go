@@ -7,7 +7,7 @@ import (
 	cli "github.com/jawher/mow.cli"
 	log "github.com/xlab/suplog"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/version"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 )
 
 var app = cli.App("hyperion", "Hyperion is a companion executable for orchestrating a Hyperion validator.")

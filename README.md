@@ -8,18 +8,18 @@ Hyperion is a Go implementation of the Hyperion Orchestrator for the Helios Chai
 
 Important Commands:
 
-* `peggo orchestrator` starts the orchestrator main loop.
-* `peggo tx register-eth-key` is a special command to submit an Ethereum key that will be used to sign messages on behalf of your Validator
+* `hyperion orchestrator` starts the orchestrator main loop.
+* `hyperion tx register-eth-key` is a special command to submit an Ethereum key that will be used to sign messages on behalf of your Validator
 
 ## Installation
 
 Get yourself `Go 1.22+` at <https://golang.org/dl/> first, then:
 
 ```
-go get github.com/Helios-Chain-Labs/peggo/orchestrator/cmd/...
+go get github.com/Helios-Chain-Labs/hyperion/orchestrator/cmd/...
 ```
 
-## peggo
+## hyperion
 
 Hyperion is a companion executable for orchestrating a Hyperion validator.
 
@@ -30,9 +30,9 @@ Use CLI args, flags or create `.env` with environment variables
 ### Usage
 
 ```
-$ peggo --help
+$ hyperion --help
 
-Usage: peggo [OPTIONS] COMMAND [arg...]
+Usage: hyperion [OPTIONS] COMMAND [arg...]
 
 Hyperion is a companion executable for orchestrating a Hyperion validator.
 
@@ -47,17 +47,17 @@ Commands:
   tx                       Transactions for Hyperion governance and maintenance.
   version                  Print the version information and exit.
 
-Run 'peggo COMMAND --help' for more information on a command.      
+Run 'hyperion COMMAND --help' for more information on a command.      
 ```
 
 ## Commands
 
-### peggo orchestrator
+### hyperion orchestrator
 
 ```
-$ peggo orchestrator -h
+$ hyperion orchestrator -h
 
-Usage: peggo orchestrator [OPTIONS]
+Usage: hyperion orchestrator [OPTIONS]
 
 Starts the orchestrator main loop.
 
@@ -68,9 +68,9 @@ Options:
       --cosmos-gas-prices                Specify Cosmos chain transaction fees as DecCoins gas prices (env $HYPERION_COSMOS_GAS_PRICES)
       --cosmos-keyring                   Specify Cosmos keyring backend (os|file|kwallet|pass|test) (env $HYPERION_COSMOS_KEYRING) (default "file")
       --cosmos-keyring-dir               Specify Cosmos keyring dir, if using file keyring. (env $HYPERION_COSMOS_KEYRING_DIR)
-      --cosmos-keyring-app               Specify Cosmos keyring app name. (env $HYPERION_COSMOS_KEYRING_APP) (default "peggo")
+      --cosmos-keyring-app               Specify Cosmos keyring app name. (env $HYPERION_COSMOS_KEYRING_APP) (default "hyperion")
       --cosmos-from                      Specify the Cosmos validator key name or address. If specified, must exist in keyring, ledger or match the privkey. (env $HYPERION_COSMOS_FROM)
-      --cosmos-from-passphrase           Specify keyring passphrase, otherwise Stdin will be used. (env $HYPERION_COSMOS_FROM_PASSPHRASE) (default "peggo")
+      --cosmos-from-passphrase           Specify keyring passphrase, otherwise Stdin will be used. (env $HYPERION_COSMOS_FROM_PASSPHRASE) (default "hyperion")
       --cosmos-pk                        Provide a raw Cosmos account private key of the validator in hex. USE FOR TESTING ONLY! (env $HYPERION_COSMOS_PK)
       --cosmos-use-ledger                Use the Cosmos app on hardware ledger to sign transactions. (env $HYPERION_COSMOS_USE_LEDGER)
       --eth-chain-id                     Specify Chain ID of the Ethereum network. (env $HYPERION_ETH_CHAIN_ID) (default 42)
@@ -92,12 +92,12 @@ Options:
 
 ```
 
-### peggo tx register-eth-key
+### hyperion tx register-eth-key
 
 ```
- peggo tx register-eth-key --help
+ hyperion tx register-eth-key --help
 
-Usage: peggo tx register-eth-key [OPTIONS]
+Usage: hyperion tx register-eth-key [OPTIONS]
 
 Submits an Ethereum key that will be used to sign messages on behalf of your Validator
 
@@ -108,9 +108,9 @@ Options:
       --cosmos-gas-prices        Specify Cosmos chain transaction fees as DecCoins gas prices (env $HYPERION_COSMOS_GAS_PRICES)
       --cosmos-keyring           Specify Cosmos keyring backend (os|file|kwallet|pass|test) (env $HYPERION_COSMOS_KEYRING) (default "file")
       --cosmos-keyring-dir       Specify Cosmos keyring dir, if using file keyring. (env $HYPERION_COSMOS_KEYRING_DIR)
-      --cosmos-keyring-app       Specify Cosmos keyring app name. (env $HYPERION_COSMOS_KEYRING_APP) (default "peggo")
+      --cosmos-keyring-app       Specify Cosmos keyring app name. (env $HYPERION_COSMOS_KEYRING_APP) (default "hyperion")
       --cosmos-from              Specify the Cosmos validator key name or address. If specified, must exist in keyring, ledger or match the privkey. (env $HYPERION_COSMOS_FROM)
-      --cosmos-from-passphrase   Specify keyring passphrase, otherwise Stdin will be used. (env $HYPERION_COSMOS_FROM_PASSPHRASE) (default "peggo")
+      --cosmos-from-passphrase   Specify keyring passphrase, otherwise Stdin will be used. (env $HYPERION_COSMOS_FROM_PASSPHRASE) (default "hyperion")
       --cosmos-pk                Provide a raw Cosmos account private key of the validator in hex. USE FOR TESTING ONLY! (env $HYPERION_COSMOS_PK)
       --cosmos-use-ledger        Use the Cosmos app on hardware ledger to sign transactions. (env $HYPERION_COSMOS_USE_LEDGER)
       --eth-keystore-dir         Specify Ethereum keystore dir (Geth-format) prefix. (env $HYPERION_ETH_KEYSTORE_DIR)

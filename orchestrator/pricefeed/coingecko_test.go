@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	cosmtypes "github.com/cosmos/cosmos-sdk/types"
+	cosmtypes "cosmossdk.io/math"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )

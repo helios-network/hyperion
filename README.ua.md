@@ -13,7 +13,7 @@ Hyperion - це впровадження Hyperion Orchestrator на мові п�
 Спочатку завантажте собі `Go 1.15+` на https://golang.org/dl/ а потім:
 
 ```
-$ go get github.com/Helios-Chain-Labs/peggo/orchestrator/cmd/...
+$ go get github.com/Helios-Chain-Labs/hyperion/orchestrator/cmd/...
 ```
 
 ## peggo

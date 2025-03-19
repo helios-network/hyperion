@@ -11,8 +11,8 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	log "github.com/xlab/suplog"
 
-	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
@@ -38,15 +38,15 @@ type MockCosmosNetwork struct {
 	UnbatchedTokensWithFeesFn             func(ctx context.Context) ([]*hyperiontypes.BatchFees, error)
 	TransactionBatchSignaturesFn          func(ctx context.Context, uint642 uint64, address gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
 	UpdateHyperionOrchestratorAddressesFn func(ctx context.Context, address gethcommon.Address, address2 cosmostypes.Address) error
-	SendValsetConfirmFn                   func(ctx context.Context, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
-	SendBatchConfirmFn                    func(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
-	SendRequestBatchFn                    func(ctx context.Context, denom string) error
+	SendValsetConfirmFn                   func(ctx context.Context, hyperionID uint64, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
+	SendBatchConfirmFn                    func(ctx context.Context, hyperionID2 uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
+	SendRequestBatchFn                    func(ctx context.Context, hyperionID uint64, denom string) error
 	SendToChainFn                         func(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendOldDepositClaimFn                 func(ctx context.Context, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
-	SendDepositClaimFn                    func(ctx context.Context, deposit *hyperionevents.HyperionSendToHeliosEvent) error
-	SendWithdrawalClaimFn                 func(ctx context.Context, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
-	SendValsetClaimFn                     func(ctx context.Context, vs *hyperionevents.HyperionValsetUpdatedEvent) error
-	SendERC20DeployedClaimFn              func(ctx context.Context, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
+	SendOldDepositClaimFn                 func(ctx context.Context, hyperionID uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
+	SendDepositClaimFn                    func(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
+	SendWithdrawalClaimFn                 func(ctx context.Context, hyperionID uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
+	SendValsetClaimFn                     func(ctx context.Context, hyperionID uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
+	SendERC20DeployedClaimFn              func(ctx context.Context, hyperionID uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
 	GetBlockFn                            func(ctx context.Context, height int64) (*cometrpc.ResultBlock, error)
 	GetLatestBlockHeightFn                func(ctx context.Context) (int64, error)
 }
@@ -103,40 +103,40 @@ func (n MockCosmosNetwork) UpdateHyperionOrchestratorAddresses(ctx context.Conte
 	return n.UpdateHyperionOrchestratorAddressesFn(ctx, ethFrom, orchAddr)
 }
 
-func (n MockCosmosNetwork) SendValsetConfirm(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error {
-	return n.SendValsetConfirmFn(ctx, ethFrom, hyperionID, valset)
+func (n MockCosmosNetwork) SendValsetConfirm(ctx context.Context, hyperionID uint64, ethFrom gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error {
+	return n.SendValsetConfirmFn(ctx, hyperionID, ethFrom, hash, valset)
 }
 
-func (n MockCosmosNetwork) SendBatchConfirm(ctx context.Context, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error {
-	return n.SendBatchConfirmFn(ctx, ethFrom, hyperionID, batch)
+func (n MockCosmosNetwork) SendBatchConfirm(ctx context.Context, hyperionID uint64, ethFrom gethcommon.Address, hash gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error {
+	return n.SendBatchConfirmFn(ctx, hyperionID, ethFrom, hash, batch)
 }
 
-func (n MockCosmosNetwork) SendRequestBatch(ctx context.Context, denom string) error {
-	return n.SendRequestBatchFn(ctx, denom)
+func (n MockCosmosNetwork) SendRequestBatch(ctx context.Context, hyperionID uint64, denom string) error {
+	return n.SendRequestBatchFn(ctx, hyperionID, denom)
 }
 
 func (n MockCosmosNetwork) SendToChain(ctx context.Context, hyperionID uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
 	return n.SendToChainFn(ctx, hyperionID, destination, amount, fee)
 }
 
-func (n MockCosmosNetwork) SendOldDepositClaim(ctx context.Context, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
-	return n.SendOldDepositClaimFn(ctx, deposit)
+func (n MockCosmosNetwork) SendOldDepositClaim(ctx context.Context, hyperionID uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
+	return n.SendOldDepositClaimFn(ctx, hyperionID, deposit)
 }
 
-func (n MockCosmosNetwork) SendDepositClaim(ctx context.Context, deposit *hyperionevents.HyperionSendToHeliosEvent) error {
-	return n.SendDepositClaimFn(ctx, deposit)
+func (n MockCosmosNetwork) SendDepositClaim(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error {
+	return n.SendDepositClaimFn(ctx, hyperionID, deposit)
 }
 
-func (n MockCosmosNetwork) SendWithdrawalClaim(ctx context.Context, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error {
-	return n.SendWithdrawalClaimFn(ctx, withdrawal)
+func (n MockCosmosNetwork) SendWithdrawalClaim(ctx context.Context, hyperionID uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error {
+	return n.SendWithdrawalClaimFn(ctx, hyperionID, withdrawal)
 }
 
-func (n MockCosmosNetwork) SendValsetClaim(ctx context.Context, vs *hyperionevents.HyperionValsetUpdatedEvent) error {
-	return n.SendValsetClaimFn(ctx, vs)
+func (n MockCosmosNetwork) SendValsetClaim(ctx context.Context, hyperionID uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error {
+	return n.SendValsetClaimFn(ctx, hyperionID, vs)
 }
 
-func (n MockCosmosNetwork) SendERC20DeployedClaim(ctx context.Context, erc20 *hyperionevents.HyperionERC20DeployedEvent) error {
-	return n.SendERC20DeployedClaimFn(ctx, erc20)
+func (n MockCosmosNetwork) SendERC20DeployedClaim(ctx context.Context, hyperionID uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error {
+	return n.SendERC20DeployedClaimFn(ctx, hyperionID, erc20)
 }
 
 func (n MockCosmosNetwork) GetBlock(ctx context.Context, height int64) (*cometrpc.ResultBlock, error) {

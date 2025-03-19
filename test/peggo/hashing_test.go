@@ -13,7 +13,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/etherman/deployer"
 	"github.com/Helios-Chain-Labs/etherman/sol"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
 )
 
 var _ = Describe("Contract Tests", func() {

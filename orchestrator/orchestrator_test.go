@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"cosmossdk.io/math"
 	cometrpc "github.com/cometbft/cometbft/rpc/core/types"
 	comettypes "github.com/cometbft/cometbft/types"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
@@ -14,9 +15,9 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/Helios-Chain-Labs/metrics"
-	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
@@ -72,9 +73,9 @@ func Test_BatchCreator(t *testing.T) {
 				},
 				priceFeed: MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
 				helios: MockCosmosNetwork{
-					SendRequestBatchFn: func(context.Context, string) error { return nil },
+					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },
 					UnbatchedTokensWithFeesFn: func(context.Context) ([]*hyperiontypes.BatchFees, error) {
-						fees, _ := cosmostypes.NewIntFromString("50000000000000000000")
+						fees, _ := math.NewIntFromString("50000000000000000000")
 						return []*hyperiontypes.BatchFees{
 							{
 								Token:     heliosTokenAddress.String(),
@@ -103,9 +104,9 @@ func Test_BatchCreator(t *testing.T) {
 					ERC20ContractMapping: map[gethcommon.Address]string{heliosTokenAddress: "helios"},
 				},
 				helios: MockCosmosNetwork{
-					SendRequestBatchFn: func(context.Context, string) error { return nil },
+					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },
 					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*hyperiontypes.BatchFees, error) {
-						fees, _ := cosmostypes.NewIntFromString("50000000000000000000")
+						fees, _ := math.NewIntFromString("50000000000000000000")
 						return []*hyperiontypes.BatchFees{{
 							Token:     heliosTokenAddress.String(),
 							TotalFees: fees,
@@ -449,7 +450,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					SendOldDepositClaimFn: func(_ context.Context, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
+					SendOldDepositClaimFn: func(_ context.Context, _ uint64, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
 						return nil
 					},
 				},
@@ -507,7 +508,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					SendOldDepositClaimFn: func(_ context.Context, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
+					SendOldDepositClaimFn: func(_ context.Context, _ uint64, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
 						return nil
 					},
 				},
@@ -1173,7 +1174,7 @@ func Test_Signer_Valsets(t *testing.T) {
 						return []*hyperiontypes.Valset{{}}, nil
 					},
 
-					SendValsetConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.Valset) error {
+					SendValsetConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.Valset) error {
 						return errors.New("oops")
 					},
 				},
@@ -1191,7 +1192,7 @@ func Test_Signer_Valsets(t *testing.T) {
 						return []*hyperiontypes.Valset{{}}, nil
 					},
 
-					SendValsetConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.Valset) error {
+					SendValsetConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.Valset) error {
 						return nil
 					},
 				},
@@ -1249,7 +1250,7 @@ func Test_Signer_Batches(t *testing.T) {
 						return &hyperiontypes.OutgoingTxBatch{}, nil
 					},
 
-					SendBatchConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.OutgoingTxBatch) error {
+					SendBatchConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.OutgoingTxBatch) error {
 						return errors.New("oops")
 					},
 				},
@@ -1267,7 +1268,7 @@ func Test_Signer_Batches(t *testing.T) {
 						return &hyperiontypes.OutgoingTxBatch{}, nil
 					},
 
-					SendBatchConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.OutgoingTxBatch) error {
+					SendBatchConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.OutgoingTxBatch) error {
 						return nil
 					},
 				},

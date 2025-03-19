@@ -21,7 +21,7 @@ import (
 	log "github.com/xlab/suplog"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 )
 
 var emptyEthAddress = ethcmn.Address{}

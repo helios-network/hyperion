@@ -2,6 +2,7 @@ package hyperion
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -16,9 +17,9 @@ import (
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/committer"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
-	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
+	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
 type HyperionContract interface {
@@ -80,6 +81,7 @@ func NewHyperionContract(
 	pendingTxInputList PendingTxInputList,
 	pendingTxWaitDuration time.Duration,
 ) (HyperionContract, error) {
+	fmt.Println("Contract hyperionAddress", hyperionAddress.String())
 	ethHyperion, err := wrappers.NewHyperion(hyperionAddress, ethCommitter.Provider())
 	if err != nil {
 		return nil, err

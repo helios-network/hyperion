@@ -2,6 +2,7 @@ package hyperion
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -35,6 +36,8 @@ func (s *hyperionContract) GetValsetNonce(
 	ctx context.Context,
 	callerAddress common.Address,
 ) (*big.Int, error) {
+
+	fmt.Println("call state_lastValsetNonce", callerAddress.String())
 
 	nonce, err := s.ethHyperion.StateLastValsetNonce(&bind.CallOpts{
 		From:    callerAddress,

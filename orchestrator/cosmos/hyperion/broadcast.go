@@ -16,10 +16,10 @@ import (
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/hyperion"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
-	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/HyperionSubgraph.sol"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/joho/godotenv"
 )
 
