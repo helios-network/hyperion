@@ -139,7 +139,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"gas_price_adjustment": *cfg.ethGasPriceAdjustment,
 		}).Infoln("connected to Ethereum network")
 
-		addr, isValidator := cosmos.HasRegisteredOrchestrator(cosmosNetwork, ethKeyFromAddress)
+		addr, isValidator := cosmos.HasRegisteredOrchestrator(cosmosNetwork, ethKeyFromAddress, uint64(*cfg.hyperionID))
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
 		}

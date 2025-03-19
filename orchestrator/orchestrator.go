@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultLoopDur = 60 * time.Second
+	defaultLoopDur = 30 * time.Second
 )
 
 // PriceFeed provides token price for a given contract address
@@ -105,10 +105,10 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 
 	var pg loops.ParanoidGroup
 
-	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
+	// pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
 	pg.Go(func() error { return s.runSigner(ctx, hyperionID) })
-	pg.Go(func() error { return s.runBatchCreator(ctx) })
-	pg.Go(func() error { return s.runRelayer(ctx) })
+	// pg.Go(func() error { return s.runBatchCreator(ctx) })
+	// pg.Go(func() error { return s.runRelayer(ctx) })
 
 	return pg.Wait()
 }

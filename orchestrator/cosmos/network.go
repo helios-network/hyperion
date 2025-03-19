@@ -94,6 +94,65 @@ func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg Networ
 	return net, nil
 }
 
+func NewNetworkV2(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg NetworkConfig) (Network, hyperiontypes.QueryClient, chain.ChainClient, error) {
+	clientCfg := cfg.loadClientConfig()
+
+	log.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
+
+	clientCtx, err := chain.NewClientContext(clientCfg.ChainId, cfg.ValidatorAddress, k)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	log.Infoln("Context OK")
+
+	log.Infoln("NodeURI", clientCfg.TmEndpoint)
+
+	clientCtx.WithNodeURI(clientCfg.TmEndpoint)
+
+	log.Infoln("Node URI OK")
+
+	tmRPC, err := comethttp.New(clientCfg.TmEndpoint, "/websocket")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	log.Infoln("RPC OK")
+
+	clientCtx = clientCtx.WithClient(tmRPC)
+
+	log.Infoln("WithClient OK")
+
+	log.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
+
+	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas("200000"))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	log.Infoln("NewChainClient OK")
+
+	time.Sleep(1 * time.Second)
+
+	conn := awaitConnection(chainClient, 1*time.Minute)
+
+	log.Infoln("CON OK")
+
+	net := struct {
+		hyperion.QueryClient
+		hyperion.BroadcastClient
+		tendermint.Client
+	}{
+		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+		hyperion.NewBroadcastClient(chainClient, ethSignFn),
+		tendermint.NewRPCClient(clientCfg.TmEndpoint),
+	}
+
+	log.Infoln("NET LOADED")
+
+	return net, hyperiontypes.NewQueryClient(conn), chainClient, nil
+}
+
 func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.ClientConn {
 	ctx, cancelWait := context.WithTimeout(context.Background(), timeout)
 	defer cancelWait()
@@ -160,13 +219,13 @@ func loadBalancedEndpoints(cfg NetworkConfig) clientcommon.Network {
 	return clientcommon.LoadNetwork(networkName, "lb")
 }
 
-func HasRegisteredOrchestrator(n Network, ethAddr gethcommon.Address) (cosmostypes.AccAddress, bool) {
+func HasRegisteredOrchestrator(n Network, ethAddr gethcommon.Address, hyperionId uint64) (cosmostypes.AccAddress, bool) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFn()
 
 	log.Info("ethAddr: ", ethAddr)
 
-	validator, err := n.GetValidatorAddress(ctx, ethAddr)
+	validator, err := n.GetValidatorAddress(ctx, ethAddr, hyperionId)
 	log.Info("validator: ", validator)
 	if err != nil {
 		return nil, false

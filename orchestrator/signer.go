@@ -97,7 +97,7 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 	}
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	getBatchFn := func() error {
-		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr, hyperionId)
 		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == hyperionId {
 			oldestUnsignedBatch = tmpOldestUnsignedBatch
 		}
@@ -107,6 +107,8 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 	if err := l.retry(ctx, getBatchFn); err != nil {
 		return err
 	}
+
+	log.Info("oldestUnsignedBatch: ", oldestUnsignedBatch)
 
 	if oldestUnsignedBatch == nil {
 		l.Log().Infoln("no token batch to confirm")

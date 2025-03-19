@@ -155,11 +155,12 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 	}
 	log.Info("start confirm batch, msg", msg)
 
-	if err = c.ChainClient.QueueBroadcastMsg(msg); err != nil {
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return errors.Wrap(err, "broadcasting MsgConfirmBatch failed")
 	}
-
+	log.Info("confirm batch, msg", resp)
 	return nil
 }
 

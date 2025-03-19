@@ -17,7 +17,7 @@ var ErrNotFound = errors.New("not found")
 type QueryClient interface {
 	HyperionParams(ctx context.Context) (*hyperiontypes.Params, error)
 	LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
-	GetValidatorAddress(ctx context.Context, addr gethcommon.Address) (cosmostypes.AccAddress, error)
+	GetValidatorAddress(ctx context.Context, addr gethcommon.Address, hyperionId uint64) (cosmostypes.AccAddress, error)
 
 	ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error)
 	CurrentValset(ctx context.Context) (*hyperiontypes.Valset, error)
@@ -25,10 +25,10 @@ type QueryClient interface {
 	LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset, error)
 	AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 
-	OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
-	LatestTransactionBatches(ctx context.Context) ([]*hyperiontypes.OutgoingTxBatch, error)
+	OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress, hyperionId uint64) (*hyperiontypes.OutgoingTxBatch, error)
+	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
 	UnbatchedTokensWithFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error)
-	TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
+	TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address, hyperionId uint64) ([]*hyperiontypes.MsgConfirmBatch, error)
 }
 
 type queryClient struct {
@@ -145,13 +145,14 @@ func (c queryClient) AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hy
 	return resp.Confirms, nil
 }
 
-func (c queryClient) OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
+func (c queryClient) OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress, hyperionId uint64) (*hyperiontypes.OutgoingTxBatch, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
 	req := &hyperiontypes.QueryLastPendingBatchRequestByAddrRequest{
-		Address: valAccountAddress.String(),
+		Address:   valAccountAddress.String(),
+		HyperionId: hyperionId,
 	}
 
 	resp, err := c.QueryClient.LastPendingBatchRequestByAddr(ctx, req)
@@ -168,12 +169,14 @@ func (c queryClient) OldestUnsignedTransactionBatch(ctx context.Context, valAcco
 	return resp.Batch, nil
 }
 
-func (c queryClient) LatestTransactionBatches(ctx context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+func (c queryClient) LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.OutgoingTxBatches(ctx, &hyperiontypes.QueryOutgoingTxBatchesRequest{})
+	resp, err := c.QueryClient.OutgoingTxBatches(ctx, &hyperiontypes.QueryOutgoingTxBatchesRequest{
+		HyperionId: hyperionId,
+	})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query OutgoingTxBatches from daemon")
@@ -206,7 +209,7 @@ func (c queryClient) UnbatchedTokensWithFees(ctx context.Context) ([]*hyperionty
 	return resp.BatchFees, nil
 }
 
-func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint64, tokenContract gethcommon.Address, hyperionId uint64) ([]*hyperiontypes.MsgConfirmBatch, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -214,6 +217,7 @@ func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint6
 	req := &hyperiontypes.QueryBatchConfirmsRequest{
 		Nonce:           nonce,
 		ContractAddress: tokenContract.String(),
+		HyperionId:      hyperionId,
 	}
 
 	resp, err := c.QueryClient.BatchConfirms(ctx, req)
@@ -273,14 +277,16 @@ func (c queryClient) HyperionParams(ctx context.Context) (*hyperiontypes.Params,
 	return &resp.Params, nil
 }
 
-func (c queryClient) GetValidatorAddress(ctx context.Context, addr gethcommon.Address) (cosmostypes.AccAddress, error) {
+func (c queryClient) GetValidatorAddress(ctx context.Context, addr gethcommon.Address, hyperionId uint64) (cosmostypes.AccAddress, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
 	req := &hyperiontypes.QueryDelegateKeysByEthAddress{
 		EthAddress: addr.Hex(),
+		HyperionId: hyperionId,
 	}
+	log.Info("req: ", req)
 
 	resp, err := c.QueryClient.GetDelegateKeyByEth(ctx, req)
 	if err != nil {

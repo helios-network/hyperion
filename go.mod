@@ -253,3 +253,5 @@ replace (
 	github.com/cosmos/cosmos-sdk => github.com/Helios-Chain-Labs/cosmos-sdk v0.50.10-helios-20
 	github.com/ethereum/go-ethereum => github.com/ethereum/go-ethereum v1.12.0
 )
+
+replace github.com/Helios-Chain-Labs/sdk-go => /Users/trancuong/Sotatek/Helios/sdk-go

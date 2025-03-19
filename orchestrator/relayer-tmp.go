@@ -16,88 +16,23 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	hyperionevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
-const (
-	defaultRelayerLoopDur    = 1 * time.Minute
-	findValsetBlocksToSearch = 2000
-)
-
-func (s *Orchestrator) runRelayer(ctx context.Context) error {
-	if noRelay := !s.cfg.RelayValsets && !s.cfg.RelayBatches; noRelay {
-		return nil
-	}
-
-	r := relayer{Orchestrator: s}
-	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
-
-	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
-		// return r.relay(ctx)
-		ethValset, err := r.getLatestEthValset(ctx)
-		if err != nil {
-			return err
-		}
-		log.Info("ethValset", ethValset)
-		return r.relayValset(ctx, ethValset)
-	})
-}
-
-func (s *Orchestrator) testReplayTokenBatch(ctx context.Context) {
-	r := relayer{Orchestrator: s}
-	r.mockRelayTokenBatch(ctx, nil)
-}
-
-type relayer struct {
-	*Orchestrator
-}
-
-func (l *relayer) Log() log.Logger {
-	return l.logger.WithField("loop", "Relayer")
-}
-
-func (l *relayer) relay(ctx context.Context) error {
-	metrics.ReportFuncCall(l.svcTags)
-	doneFn := metrics.ReportFuncTiming(l.svcTags)
-	defer doneFn()
-
+func (l *Orchestrator) GetLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
 	ethValset, err := l.getLatestEthValset(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var pg loops.ParanoidGroup
-
-	if l.cfg.RelayValsets {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayValset(ctx, ethValset)
-			})
-		})
-	}
-
-	if l.cfg.RelayBatches {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayTokenBatch(ctx, ethValset)
-			})
-		})
-	}
-
-	if pg.Initialized() {
-		if err := pg.Wait(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-
+	return ethValset, nil
 }
 
-func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *Orchestrator) Log() log.Logger {
+	return l.logger.WithField("loop", "Orchestrator")
+}
+
+func (l *Orchestrator) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -120,7 +55,7 @@ func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset
 	return latestEthValset, nil
 }
 
-func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+func (l *Orchestrator) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -169,7 +104,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	return nil
 }
 
-func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
+func (l *Orchestrator) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to get latest valset nonce from Ethereum")
@@ -200,7 +135,7 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valse
 	return true
 }
 
-func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+func (l *Orchestrator) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -282,7 +217,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	return nil
 }
 
-func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+func (l *Orchestrator) mockRelayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -397,7 +332,7 @@ func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hype
 	return nil
 }
 
-func (l *relayer) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.OutgoingTxBatch) bool {
+func (l *Orchestrator) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.OutgoingTxBatch) bool {
 	latestEthBatch, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(batch.TokenContract))
 	if err != nil {
 		l.Log().WithError(err).Warningf("unable to get latest batch nonce from Ethereum: token_contract=%s", gethcommon.HexToAddress(batch.TokenContract))
@@ -433,7 +368,7 @@ func (l *relayer) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.Out
 // as the latest update will be in recent blockchain history and the search moves from the present
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
-func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *Orchestrator) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
 	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get latest ethereum header")
@@ -498,95 +433,4 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 	}
 
 	return nil, ErrNotFound
-}
-
-var ErrNotFound = errors.New("not found")
-
-type HyperionValsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
-
-func (a HyperionValsetUpdatedEvents) Len() int { return len(a) }
-func (a HyperionValsetUpdatedEvents) Less(i, j int) bool {
-	return a[i].NewValsetNonce.Cmp(a[j].NewValsetNonce) < 0
-}
-func (a HyperionValsetUpdatedEvents) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// This function exists to provide a warning if Cosmos and Ethereum have different validator sets
-// for a given nonce. In the mundane version of this warning the validator sets disagree on sorting order
-// which can happen if some relayer uses an unstable sort, or in a case of a mild griefing attack.
-// The Hyperion contract validates signatures in order of highest to lowest power. That way it can exit
-// the loop early once a vote has enough power, if a relayer where to submit things in the reverse order
-// they could grief users of the contract into paying more in gas.
-// The other (and far worse) way a disagreement here could occur is if validators are colluding to steal
-// funds from the Hyperion contract and have submitted a hijacking update. If slashing for off Cosmos chain
-// Ethereum signatures is implemented you would put that handler here.
-func checkIfValsetsDiffer(cosmosValset, ethereumValset *hyperiontypes.Valset) {
-	if cosmosValset == nil && ethereumValset.Nonce == 0 {
-		// bootstrapping case
-		return
-	} else if cosmosValset == nil {
-		log.WithField(
-			"eth_valset_nonce",
-			ethereumValset.Nonce,
-		).Errorln("Cosmos does not have a valset for nonce from Ethereum chain. Possible bridge hijacking!")
-		return
-	}
-
-	if cosmosValset.Nonce != ethereumValset.Nonce {
-		log.WithFields(log.Fields{
-			"cosmos_valset_nonce": cosmosValset.Nonce,
-			"eth_valset_nonce":    ethereumValset.Nonce,
-		}).Errorln("Cosmos does have a wrong valset nonce, differs from Ethereum chain. Possible bridge hijacking!")
-		return
-	}
-
-	if len(cosmosValset.Members) != len(ethereumValset.Members) {
-		log.WithFields(log.Fields{
-			"cosmos_valset": len(cosmosValset.Members),
-			"eth_valset":    len(ethereumValset.Members),
-		}).Errorln("Cosmos and Ethereum Valsets have different length. Possible bridge hijacking!")
-		return
-	}
-
-	BridgeValidators(cosmosValset.Members).Sort()
-	BridgeValidators(ethereumValset.Members).Sort()
-
-	for idx, member := range cosmosValset.Members {
-		if ethereumValset.Members[idx].EthereumAddress != member.EthereumAddress {
-			log.Errorln("Valsets are different, a sorting error?")
-		}
-		if ethereumValset.Members[idx].Power != member.Power {
-			log.Errorln("Valsets are different, a sorting error?")
-		}
-	}
-}
-
-type BridgeValidators []*hyperiontypes.BridgeValidator
-
-// Sort sorts the validators by power
-func (b BridgeValidators) Sort() {
-	sort.Slice(b, func(i, j int) bool {
-		if b[i].Power == b[j].Power {
-			// Secondary sort on ethereum address in case powers are equal
-			return util.EthAddrLessThan(b[i].EthereumAddress, b[j].EthereumAddress)
-		}
-		return b[i].Power > b[j].Power
-	})
-}
-
-// HasDuplicates returns true if there are duplicates in the set
-func (b BridgeValidators) HasDuplicates() bool {
-	m := make(map[string]struct{}, len(b))
-	for i := range b {
-		m[b[i].EthereumAddress] = struct{}{}
-	}
-	return len(m) != len(b)
-}
-
-// GetPowers returns only the power values for all members
-func (b BridgeValidators) GetPowers() []uint64 {
-	r := make([]uint64, len(b))
-	for i := range b {
-		r[i] = b[i].Power
-	}
-	return r
 }
