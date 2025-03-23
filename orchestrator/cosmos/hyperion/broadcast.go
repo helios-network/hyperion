@@ -310,6 +310,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 	log.WithFields(log.Fields{
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
+		"data":         deposit.Data,
 	}).Infoln("EthOracle sending MsgDepositClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
@@ -318,10 +319,23 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 		return errors.Wrap(err, "broadcasting MsgDepositClaim failed")
 	}
 
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"event_nonce":  msg.EventNonce,
+			"event_height": msg.BlockHeight,
+			"tx_hash":      resp.TxResponse.TxHash,
+			"code":         resp.TxResponse.Code,
+			"Error":        "insufficient fee",
+		}).Infoln("EthOracle sent MsgDepositClaim")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgDepositClaim failed")
+	}
+
 	log.WithFields(log.Fields{
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
 		"tx_hash":      resp.TxResponse.TxHash,
+		"code":         resp.TxResponse.Code,
+		"GasUsed":      resp.TxResponse.GasUsed,
 	}).Infoln("EthOracle sent MsgDepositClaim")
 
 	return nil

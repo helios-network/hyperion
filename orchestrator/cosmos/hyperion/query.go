@@ -16,7 +16,7 @@ var ErrNotFound = errors.New("not found")
 
 type QueryClient interface {
 	HyperionParams(ctx context.Context) (*hyperiontypes.Params, error)
-	LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
+	LastClaimEventByAddr(ctx context.Context, hyperionId uint64, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddress(ctx context.Context, addr gethcommon.Address) (cosmostypes.AccAddress, error)
 
 	ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error)
@@ -230,14 +230,15 @@ func (c queryClient) TransactionBatchSignatures(ctx context.Context, nonce uint6
 	return resp.Confirms, nil
 }
 
-func (c queryClient) LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+func (c queryClient) LastClaimEventByAddr(ctx context.Context, hyperionId uint64, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 	log.Info("LastClaimEventByAddr", validatorAccountAddress)
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
 	req := &hyperiontypes.QueryLastEventByAddrRequest{
-		Address: validatorAccountAddress.String(),
+		Address:    validatorAccountAddress.String(),
+		HyperionId: hyperionId,
 	}
 
 	resp, err := c.QueryClient.LastEventByAddr(ctx, req)

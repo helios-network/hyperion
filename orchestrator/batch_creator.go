@@ -76,7 +76,7 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 	}
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
-	tokenDenom := l.getTokenDenom(tokenAddress)
+	tokenDenom := l.getTokenDenom(hyperionId, tokenAddress)
 
 	tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
 	if err != nil {
@@ -93,12 +93,12 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 	_ = l.helios.SendRequestBatch(ctx, hyperionId, tokenDenom)
 }
 
-func (l *batchCreator) getTokenDenom(tokenAddr gethcommon.Address) string {
+func (l *batchCreator) getTokenDenom(hyperionId uint64, tokenAddr gethcommon.Address) string {
 	if cosmosDenom, ok := l.cfg.ERC20ContractMapping[tokenAddr]; ok {
 		return cosmosDenom
 	}
 
-	return hyperiontypes.HyperionDenomString(tokenAddr)
+	return hyperiontypes.HyperionDenomString(hyperionId, tokenAddr)
 }
 
 func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {

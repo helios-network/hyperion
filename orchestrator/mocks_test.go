@@ -26,7 +26,7 @@ func (p MockPriceFeed) QueryUSDPrice(address gethcommon.Address) (float64, error
 
 type MockCosmosNetwork struct {
 	HyperionParamsFn                      func(ctx context.Context) (*hyperiontypes.Params, error)
-	LastClaimEventByAddrFn                func(ctx context.Context, address cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
+	LastClaimEventByAddrFn                func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddressFn                 func(ctx context.Context, address gethcommon.Address) (cosmostypes.AccAddress, error)
 	CurrentValsetFn                       func(ctx context.Context) (*hyperiontypes.Valset, error)
 	ValsetAtFn                            func(ctx context.Context, uint642 uint64) (*hyperiontypes.Valset, error)
@@ -55,8 +55,8 @@ func (n MockCosmosNetwork) HyperionParams(ctx context.Context) (*hyperiontypes.P
 	return n.HyperionParamsFn(ctx)
 }
 
-func (n MockCosmosNetwork) LastClaimEventByAddr(ctx context.Context, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
-	return n.LastClaimEventByAddrFn(ctx, validatorAccountAddress)
+func (n MockCosmosNetwork) LastClaimEventByAddr(ctx context.Context, hyperionId uint64, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+	return n.LastClaimEventByAddrFn(ctx, hyperionId, validatorAccountAddress)
 }
 
 func (n MockCosmosNetwork) GetValidatorAddress(ctx context.Context, addr gethcommon.Address) (cosmostypes.AccAddress, error) {

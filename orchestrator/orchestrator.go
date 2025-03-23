@@ -27,6 +27,7 @@ type PriceFeed interface {
 
 type Config struct {
 	CosmosAddr           cosmostypes.AccAddress
+	HyperionId           uint64
 	EthereumAddr         gethcommon.Address
 	MinBatchFeeUSD       float64
 	ERC20ContractMapping map[gethcommon.Address]string
@@ -104,6 +105,8 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 				break
 			}
 		}
+	} else {
+		lastObservedEthBlock = lastObservedEthBlock + 1
 	}
 
 	var pg loops.ParanoidGroup
@@ -131,10 +134,12 @@ func (s *Orchestrator) startRelayerMode(ctx context.Context, helios cosmos.Netwo
 }
 
 func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmos.Network) (uint64, error) {
-	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.CosmosAddr)
+	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.HyperionId, s.cfg.CosmosAddr)
 	if err != nil {
+		s.logger.Info("SSSSS", "err", err)
 		return 0, err
 	}
+	s.logger.Info("SSSSS2", "claim", claim.EthereumEventHeight)
 
 	return claim.EthereumEventHeight, nil
 }

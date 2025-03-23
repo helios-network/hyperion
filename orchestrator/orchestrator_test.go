@@ -284,7 +284,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -335,7 +335,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce: 101,
 						}, nil
@@ -388,7 +388,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce:  102,
 							EthereumEventHeight: 1000,
@@ -443,7 +443,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce:  102,
 							EthereumEventHeight: 1000,
@@ -501,7 +501,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce:  102,
 							EthereumEventHeight: 1000,

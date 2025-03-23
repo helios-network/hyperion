@@ -175,6 +175,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		}
 
 		orchestratorCfg := orchestrator.Config{
+			HyperionId:           uint64(*cfg.hyperionID),
 			CosmosAddr:           cosmosKeyring.Addr,
 			EthereumAddr:         ethKeyFromAddress,
 			MinBatchFeeUSD:       *cfg.minBatchFeeUSD,

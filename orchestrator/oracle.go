@@ -255,7 +255,7 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClaimEvent, error) {
 	var claim *hyperiontypes.LastClaimEvent
 	fn := func() (err error) {
-		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return
 	}
 
@@ -269,7 +269,7 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClai
 func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
-		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		if err != nil {
 			return err
 		}
