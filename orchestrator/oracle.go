@@ -37,7 +37,7 @@ const (
 
 // runOracle is responsible for making sure that Ethereum events are retrieved from the Ethereum blockchain
 // and ferried over to Cosmos where they will be used to issue tokens or process batches.
-func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) error {
+func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64, hyperionId uint64) error {
 	oracle := oracle{
 		Orchestrator:          s,
 		lastObservedEthHeight: lastObservedBlock,
@@ -47,7 +47,7 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		return oracle.observeEthEvents(ctx)
+		return oracle.observeEthEvents(ctx, hyperionId)
 	})
 }
 
@@ -61,13 +61,13 @@ func (l *oracle) Log() log.Logger {
 	return l.logger.WithField("loop", "Oracle")
 }
 
-func (l *oracle) observeEthEvents(ctx context.Context) error {
+func (l *oracle) observeEthEvents(ctx context.Context, hyperionId uint64) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
 	// check if validator is in the active set since claims will fail otherwise
-	vs, err := l.helios.CurrentValset(ctx)
+	vs, err := l.helios.CurrentValset(ctx, hyperionId)
 	if err != nil {
 		l.logger.WithError(err).Warningln("failed to get active validator set on Helios")
 		return err
@@ -103,8 +103,8 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	if l.lastObservedEthHeight < 19064921 { // TODO by config
-		l.lastObservedEthHeight = 19064921
+	if l.lastObservedEthHeight < 19627358 { // TODO by config
+		l.lastObservedEthHeight = 19627358
 	}
 
 	// ensure the block range is within defaultBlocksToSearch
@@ -120,7 +120,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	}
 	log.Info("events: ", events)
 
-	lastClaim, err := l.getLastClaimEvent(ctx)
+	lastClaim, err := l.getLastClaimEvent(ctx, hyperionId)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	// }
 	log.Info("========================")
 
-	if err := l.sendNewEventClaims(ctx, newEvents); err != nil {
+	if err := l.sendNewEventClaims(ctx, newEvents, hyperionId); err != nil {
 		log.Info("err: ", err)
 		return err
 	}
@@ -160,7 +160,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	l.lastObservedEthHeight = latestHeight
 
 	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
-		if err := l.autoResync(ctx); err != nil {
+		if err := l.autoResync(ctx, hyperionId); err != nil {
 			return err
 		}
 	}
@@ -252,10 +252,10 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	return latestHeight, nil
 }
 
-func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClaimEvent, error) {
+func (l *oracle) getLastClaimEvent(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastClaimEvent, error) {
 	var claim *hyperiontypes.LastClaimEvent
 	fn := func() (err error) {
-		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr, hyperionId)
 		return
 	}
 
@@ -266,10 +266,10 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClai
 	return claim, nil
 }
 
-func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
+func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, hyperionId uint64) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
-		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr, hyperionId)
 		if err != nil {
 			return err
 		}
@@ -299,10 +299,10 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 	return nil
 }
 
-func (l *oracle) autoResync(ctx context.Context) error {
+func (l *oracle) autoResync(ctx context.Context, hyperionId uint64) error {
 	var height uint64
 	fn := func() (err error) {
-		height, err = l.getLastClaimBlockHeight(ctx, l.helios)
+		height, err = l.getLastClaimBlockHeight(ctx, l.helios, hyperionId)
 		return
 	}
 

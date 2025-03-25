@@ -348,6 +348,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 		TokenContract: withdrawal.Token.Hex(),
 		Orchestrator:  c.FromAddress().String(),
 	}
+	log.Infoln("msg", msg)
 
 	log.WithFields(log.Fields{
 		"event_height": msg.BlockHeight,

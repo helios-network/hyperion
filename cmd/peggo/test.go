@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	// "math/big"
 	"time"
 
+	// sdkmath "cosmossdk.io/math"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	cli "github.com/jawher/mow.cli"
 	"github.com/pkg/errors"
@@ -206,32 +208,46 @@ func testCmd(cmd *cli.Cmd) {
 		// orShutdown(err)
 		// log.Infoln("latestEthValset", latestEthValset)
 
-		// for _, batch := range latestTxBatches {
-		// 	log.Infoln("batch", batch)
-		// 	sigs, err := cosmosNetwork.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract), uint64(*cfg.hyperionID))
-		// 	orShutdown(err)
-		// 	log.Infoln("sigs", sigs)
-		// 	hash, err := ethNetwork.SendTransactionBatch(ctx, latestEthValset, batch, sigs)
-		// 	orShutdown(err)
-		// 	log.Infoln("hash", hash)
-		// 	chainClient.SyncBroadcastMsg(&hyperiontypes.MsgWithdrawClaim{
-		// 		HyperionId:    uint64(*cfg.hyperionID),
-		// 		EventNonce:    batch.EventNonce.Uint64(),
-		// 		BatchNonce:    batch.BatchNonce.Uint64(),
-		// 		BlockHeight:   batch.Raw.BlockNumber,
-		// 		TokenContract: batch.Token.Hex(),
-		// 		Orchestrator:  cosmosKeyring.Addr.String(),
-		// 	})
-		// }
+		for _, batch := range latestTxBatches {
+			log.Infoln("batch", batch)
+			sigs, err := cosmosNetwork.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract), uint64(*cfg.hyperionID))
+			orShutdown(err)
+			log.Infoln("sigs", sigs)
+			// hash, err := ethNetwork.SendTransactionBatch(ctx, latestEthValset, batch, sigs)
+			// orShutdown(err)
+			// log.Infoln("hash", hash)
+			// chainClient.SyncBroadcastMsg(&hyperiontypes.MsgWithdrawClaim{
+			// 	HyperionId:    uint64(*cfg.hyperionID),
+			// 	EventNonce:    batch.EventNonce.Uint64(),
+			// 	BatchNonce:    batch.BatchNonce.Uint64(),
+			// 	BlockHeight:   batch.Raw.BlockNumber,
+			// 	TokenContract: batch.Token.Hex(),
+			// 	Orchestrator:  cosmosKeyring.Addr.String(),
+			// })
+		}
 
 		chainClient.SyncBroadcastMsg(&hyperiontypes.MsgWithdrawClaim{
 			HyperionId:    uint64(*cfg.hyperionID),
-			EventNonce:    1,
+			EventNonce:    3,
 			BatchNonce:    1,
-			BlockHeight:   19384013,
+			BlockHeight:   19588125,
 			TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
 			Orchestrator:  cosmosKeyring.Addr.String(),
 		})
+
+		// log.Infoln("ethKeyFromAddress", ethKeyFromAddress.String())
+		// log.Infoln("cosmosKeyring.Addr", cosmosKeyring.Addr.String())
+		// chainClient.SyncBroadcastMsg(&hyperiontypes.MsgDepositClaim{
+		// 	HyperionId:    uint64(*cfg.hyperionID),
+		// 	EventNonce:    9,
+		// 	BlockHeight:   19384013,
+		// 	TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+		// 	Orchestrator:  cosmosKeyring.Addr.String(),
+		// 	Amount:         sdkmath.NewIntFromBigInt(big.NewInt(100000)),
+		// 	EthereumSender: ethKeyFromAddress.String(),
+		// 	CosmosReceiver: cosmosKeyring.Addr.String(),
+		// 	Data:           "",
+		// })
 
 		// hash, err := ethNetwork.SendTransactionBatch(ctx, nil, latestTxBatches[0], batchConfirmReq.Confirms)
 		// orShutdown(err)

@@ -19,8 +19,8 @@ import (
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
-func (l *Orchestrator) GetLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
-	ethValset, err := l.getLatestEthValset(ctx)
+func (l *Orchestrator) GetLatestEthValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
+	ethValset, err := l.getLatestEthValset(ctx, hyperionId)
 	if err != nil {
 		return nil, err
 	}
@@ -32,14 +32,14 @@ func (l *Orchestrator) Log() log.Logger {
 	return l.logger.WithField("loop", "Orchestrator")
 }
 
-func (l *Orchestrator) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *Orchestrator) getLatestEthValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
 	var latestEthValset *hyperiontypes.Valset
 	fn := func() error {
-		vs, err := l.findLatestValsetOnEth(ctx)
+		vs, err := l.findLatestValsetOnEth(ctx, hyperionId)
 		if err != nil {
 			return err
 		}
@@ -55,12 +55,12 @@ func (l *Orchestrator) getLatestEthValset(ctx context.Context) (*hyperiontypes.V
 	return latestEthValset, nil
 }
 
-func (l *Orchestrator) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+func (l *Orchestrator) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset, hyperionId uint64) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	latestHeliosValsets, err := l.helios.LatestValsets(ctx)
+	latestHeliosValsets, err := l.helios.LatestValsets(ctx, hyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
 	}
@@ -71,7 +71,7 @@ func (l *Orchestrator) relayValset(ctx context.Context, latestEthValset *hyperio
 	)
 
 	for _, set := range latestHeliosValsets {
-		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce)
+		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce, hyperionId)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
@@ -368,7 +368,7 @@ func (l *Orchestrator) shouldRelayBatch(ctx context.Context, batch *hyperiontype
 // as the latest update will be in recent blockchain history and the search moves from the present
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
-func (l *Orchestrator) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *Orchestrator) findLatestValsetOnEth(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
 	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get latest ethereum header")
@@ -379,7 +379,7 @@ func (l *Orchestrator) findLatestValsetOnEth(ctx context.Context) (*hyperiontype
 		return nil, errors.Wrap(err, "failed to get latest valset nonce on Ethereum")
 	}
 
-	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64())
+	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64(), hyperionId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}

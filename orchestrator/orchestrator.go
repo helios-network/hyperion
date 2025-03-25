@@ -69,26 +69,26 @@ func NewOrchestrator(
 
 // Run starts all major loops required to make
 // up the Orchestrator, all of these are async loops.
-func (s *Orchestrator) Run(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
+func (s *Orchestrator) Run(ctx context.Context, helios cosmos.Network, eth ethereum.Network, hyperionID uint64) error {
 	if s.cfg.RelayerMode {
-		return s.startRelayerMode(ctx, helios, eth)
+		return s.startRelayerMode(ctx, helios, eth, hyperionID)
 	}
 
-	return s.startValidatorMode(ctx, helios, eth)
+	return s.startValidatorMode(ctx, helios, eth, hyperionID)
 }
 
 // startValidatorMode runs all orchestrator processes. This is called
 // when peggo is run alongside a validator helios node.
-func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
+func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network, hyperionID uint64) error {
 	log.Infoln("running orchestrator in validator mode")
 
 	// get hyperion ID from contract
-	hyperionID, err := eth.GetHyperionID(ctx)
+	hyperionIDHash, err := eth.GetHyperionID(ctx)
 	if err != nil {
 		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
 	}
 
-	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
+	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios, hyperionID)
 	if lastObservedEthBlock == 0 {
 		hyperionParams, err := helios.HyperionParams(ctx)
 		if err != nil {
@@ -96,7 +96,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 		}
 
 		for _, params := range hyperionParams.CounterpartyChainParams {
-			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionID {
+			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionIDHash {
 				lastObservedEthBlock = params.BridgeContractStartHeight
 				break
 			}
@@ -105,10 +105,10 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 
 	var pg loops.ParanoidGroup
 
-	// pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
-	pg.Go(func() error { return s.runSigner(ctx, hyperionID) })
-	// pg.Go(func() error { return s.runBatchCreator(ctx) })
-	// pg.Go(func() error { return s.runRelayer(ctx) })
+	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock, hyperionID) })
+	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
+	pg.Go(func() error { return s.runBatchCreator(ctx, hyperionID) })
+	pg.Go(func() error { return s.runRelayer(ctx, hyperionID) })
 
 	return pg.Wait()
 }
@@ -116,19 +116,19 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Net
 // startRelayerMode runs orchestrator processes that only relay specific
 // messages that do not require a validator's signature. This mode is run
 // alongside a non-validator helios node
-func (s *Orchestrator) startRelayerMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
+func (s *Orchestrator) startRelayerMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network, hyperionID uint64) error {
 	log.Infoln("running orchestrator in relayer mode")
 
 	var pg loops.ParanoidGroup
 
-	pg.Go(func() error { return s.runBatchCreator(ctx) })
-	pg.Go(func() error { return s.runRelayer(ctx) })
+	pg.Go(func() error { return s.runBatchCreator(ctx, hyperionID) })
+	pg.Go(func() error { return s.runRelayer(ctx, hyperionID) })
 
 	return pg.Wait()
 }
 
-func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmos.Network) (uint64, error) {
-	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.CosmosAddr)
+func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmos.Network, hyperionID uint64) (uint64, error) {
+	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.CosmosAddr, hyperionID)
 	if err != nil {
 		return 0, err
 	}

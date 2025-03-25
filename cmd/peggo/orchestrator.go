@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math/big"
 	"os"
 	"time"
 
@@ -67,6 +68,9 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		if *cfg.cosmosUseLedger || *cfg.ethUseLedger {
 			log.Fatalln("cannot use Ledger for orchestrator, since signatures must be realtime")
 		}
+
+		hyperionIDHash := gethcommon.BigToHash(new(big.Int).SetUint64(uint64(*cfg.hyperionID)))
+		log.Infoln("hyperionIDHash", hyperionIDHash)
 
 		log.WithFields(log.Fields{
 			"version":    version.AppVersion,
@@ -181,7 +185,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		orShutdown(err)
 
 		go func() {
-			if err := hyperion.Run(ctx, cosmosNetwork, ethNetwork); err != nil {
+			if err := hyperion.Run(ctx, cosmosNetwork, ethNetwork, uint64(*cfg.hyperionID)); err != nil {
 				log.Errorln(err)
 				os.Exit(1)
 			}

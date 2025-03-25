@@ -15,12 +15,12 @@ import (
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
-func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
+func (s *Orchestrator) runBatchCreator(ctx context.Context, hyperionId uint64) (err error) {
 	bc := batchCreator{Orchestrator: s}
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting BatchCreator...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		return bc.requestTokenBatches(ctx)
+		return bc.requestTokenBatches(ctx, hyperionId)
 	})
 }
 
@@ -32,12 +32,13 @@ func (l *batchCreator) Log() log.Logger {
 	return l.logger.WithField("loop", "BatchCreator")
 }
 
-func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
+func (l *batchCreator) requestTokenBatches(ctx context.Context, hyperionId uint64) error {
+	log.Infoln("requesting token batches")
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	fees, err := l.getUnbatchedTokenFees(ctx)
+	fees, err := l.getUnbatchedTokenFees(ctx, hyperionId)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to get withdrawal fees")
 		return nil
@@ -55,10 +56,10 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 	return nil
 }
 
-func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
+func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error) {
 	var fees []*hyperiontypes.BatchFees
 	fn := func() (err error) {
-		fees, err = l.helios.UnbatchedTokensWithFees(ctx)
+		fees, err = l.helios.UnbatchedTokensWithFees(ctx, hyperionId)
 		return
 	}
 

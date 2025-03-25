@@ -27,7 +27,7 @@ const (
 	findValsetBlocksToSearch = 2000
 )
 
-func (s *Orchestrator) runRelayer(ctx context.Context) error {
+func (s *Orchestrator) runRelayer(ctx context.Context, hyperionId uint64) error {
 	if noRelay := !s.cfg.RelayValsets && !s.cfg.RelayBatches; noRelay {
 		return nil
 	}
@@ -36,13 +36,13 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
-		// return r.relay(ctx)
-		ethValset, err := r.getLatestEthValset(ctx)
-		if err != nil {
-			return err
-		}
-		log.Info("ethValset", ethValset)
-		return r.relayValset(ctx, ethValset)
+		return r.relay(ctx, hyperionId)
+		// ethValset, err := r.getLatestEthValset(ctx)
+		// if err != nil {
+		// 	return err
+		// }
+		// log.Info("ethValset", ethValset)
+		// return r.relayValset(ctx, ethValset)
 	})
 }
 
@@ -59,25 +59,25 @@ func (l *relayer) Log() log.Logger {
 	return l.logger.WithField("loop", "Relayer")
 }
 
-func (l *relayer) relay(ctx context.Context) error {
+func (l *relayer) relay(ctx context.Context, hyperionId uint64) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	ethValset, err := l.getLatestEthValset(ctx)
+	ethValset, err := l.getLatestEthValset(ctx, hyperionId)
 	if err != nil {
 		return err
 	}
 
 	var pg loops.ParanoidGroup
 
-	if l.cfg.RelayValsets {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayValset(ctx, ethValset)
-			})
-		})
-	}
+	// if l.cfg.RelayValsets {
+	// 	pg.Go(func() error {
+	// 		return l.retry(ctx, func() error {
+	// 			return l.relayValset(ctx, ethValset, hyperionId)
+	// 		})
+	// 	})
+	// }
 
 	if l.cfg.RelayBatches {
 		pg.Go(func() error {
@@ -97,14 +97,14 @@ func (l *relayer) relay(ctx context.Context) error {
 
 }
 
-func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *relayer) getLatestEthValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
 	var latestEthValset *hyperiontypes.Valset
 	fn := func() error {
-		vs, err := l.findLatestValsetOnEth(ctx)
+		vs, err := l.findLatestValsetOnEth(ctx, hyperionId)
 		if err != nil {
 			return err
 		}
@@ -120,12 +120,12 @@ func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset
 	return latestEthValset, nil
 }
 
-func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset, hyperionId uint64) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	latestHeliosValsets, err := l.helios.LatestValsets(ctx)
+	latestHeliosValsets, err := l.helios.LatestValsets(ctx, hyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
 	}
@@ -136,7 +136,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	)
 
 	for _, set := range latestHeliosValsets {
-		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce)
+		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce, hyperionId)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
@@ -201,6 +201,7 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valse
 }
 
 func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+	log.Infoln("relaying token batch")
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
@@ -433,7 +434,7 @@ func (l *relayer) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.Out
 // as the latest update will be in recent blockchain history and the search moves from the present
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
-func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *relayer) findLatestValsetOnEth(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
 	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get latest ethereum header")
@@ -444,7 +445,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		return nil, errors.Wrap(err, "failed to get latest valset nonce on Ethereum")
 	}
 
-	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64())
+	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64(), hyperionId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}
