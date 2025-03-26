@@ -119,7 +119,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	latestHeliosValsets, err := l.helios.LatestValsets(ctx)
+	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
 	}
@@ -130,7 +130,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	)
 
 	for _, set := range latestHeliosValsets {
-		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce)
+		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
@@ -437,7 +437,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		return nil, errors.Wrap(err, "failed to get latest valset nonce on Ethereum")
 	}
 
-	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64())
+	cosmosValset, err := l.helios.ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}

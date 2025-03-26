@@ -153,7 +153,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -168,7 +168,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr1},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -191,7 +191,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -217,7 +217,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -244,7 +244,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -274,7 +274,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -325,7 +325,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -378,7 +378,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -433,7 +433,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -491,7 +491,7 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*hyperiontypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return &hyperiontypes.Valset{
 							Members: []*hyperiontypes.BridgeValidator{
 								{
@@ -577,7 +577,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -591,11 +591,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -610,11 +610,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return nil, nil
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return nil, nil
 					},
 				},
@@ -634,11 +634,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 					},
 				},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
@@ -658,11 +658,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 					},
 				},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
@@ -686,11 +686,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return nil, errors.New("oops")
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
@@ -719,11 +719,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 						}, nil
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
@@ -756,11 +756,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 						}, nil
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
@@ -793,11 +793,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 						}, nil
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*hyperiontypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
@@ -1142,7 +1142,7 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -1156,7 +1156,7 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 						return nil, nil
 					},
 				},
@@ -1170,7 +1170,7 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil
 					},
 
@@ -1188,7 +1188,7 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 						return []*hyperiontypes.Valset{{}}, nil
 					},
 

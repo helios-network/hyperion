@@ -28,11 +28,11 @@ type MockCosmosNetwork struct {
 	HyperionParamsFn                      func(ctx context.Context) (*hyperiontypes.Params, error)
 	LastClaimEventByAddrFn                func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddressFn                 func(ctx context.Context, address gethcommon.Address) (cosmostypes.AccAddress, error)
-	CurrentValsetFn                       func(ctx context.Context) (*hyperiontypes.Valset, error)
-	ValsetAtFn                            func(ctx context.Context, uint642 uint64) (*hyperiontypes.Valset, error)
-	OldestUnsignedValsetsFn               func(ctx context.Context, address cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
-	LatestValsetsFn                       func(ctx context.Context) ([]*hyperiontypes.Valset, error)
-	AllValsetConfirmsFn                   func(ctx context.Context, uint642 uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
+	CurrentValsetFn                       func(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error)
+	ValsetAtFn                            func(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error)
+	OldestUnsignedValsetsFn               func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
+	LatestValsetsFn                       func(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error)
+	AllValsetConfirmsFn                   func(ctx context.Context, hyperionId uint64, uint642 uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 	OldestUnsignedTransactionBatchFn      func(ctx context.Context, address cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatchesFn            func(ctx context.Context) ([]*hyperiontypes.OutgoingTxBatch, error)
 	UnbatchedTokensWithFeesFn             func(ctx context.Context) ([]*hyperiontypes.BatchFees, error)
@@ -63,24 +63,24 @@ func (n MockCosmosNetwork) GetValidatorAddress(ctx context.Context, addr gethcom
 	return n.GetValidatorAddressFn(ctx, addr)
 }
 
-func (n MockCosmosNetwork) ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error) {
-	return n.ValsetAtFn(ctx, nonce)
+func (n MockCosmosNetwork) ValsetAt(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error) {
+	return n.ValsetAtFn(ctx, hyperionId, nonce)
 }
 
-func (n MockCosmosNetwork) CurrentValset(ctx context.Context) (*hyperiontypes.Valset, error) {
-	return n.CurrentValsetFn(ctx)
+func (n MockCosmosNetwork) CurrentValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
+	return n.CurrentValsetFn(ctx, hyperionId)
 }
 
-func (n MockCosmosNetwork) OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
-	return n.OldestUnsignedValsetsFn(ctx, valAccountAddress)
+func (n MockCosmosNetwork) OldestUnsignedValsets(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+	return n.OldestUnsignedValsetsFn(ctx, hyperionId, valAccountAddress)
 }
 
-func (n MockCosmosNetwork) LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset, error) {
-	return n.LatestValsetsFn(ctx)
+func (n MockCosmosNetwork) LatestValsets(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error) {
+	return n.LatestValsetsFn(ctx, hyperionId)
 }
 
-func (n MockCosmosNetwork) AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
-	return n.AllValsetConfirmsFn(ctx, nonce)
+func (n MockCosmosNetwork) AllValsetConfirms(ctx context.Context, hyperionId uint64, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+	return n.AllValsetConfirmsFn(ctx, hyperionId, nonce)
 }
 
 func (n MockCosmosNetwork) OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {

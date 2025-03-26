@@ -19,11 +19,11 @@ type QueryClient interface {
 	LastClaimEventByAddr(ctx context.Context, hyperionId uint64, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddress(ctx context.Context, addr gethcommon.Address) (cosmostypes.AccAddress, error)
 
-	ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error)
-	CurrentValset(ctx context.Context) (*hyperiontypes.Valset, error)
-	OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
-	LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset, error)
-	AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
+	ValsetAt(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error)
+	CurrentValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error)
+	OldestUnsignedValsets(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
+	LatestValsets(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error)
+	AllValsetConfirms(ctx context.Context, hyperionId uint64, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 
 	OldestUnsignedTransactionBatch(ctx context.Context, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatches(ctx context.Context) ([]*hyperiontypes.OutgoingTxBatch, error)
@@ -44,12 +44,15 @@ func NewQueryClient(client hyperiontypes.QueryClient) QueryClient {
 	}
 }
 
-func (c queryClient) ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes.Valset, error) {
+func (c queryClient) ValsetAt(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &hyperiontypes.QueryValsetRequestRequest{Nonce: nonce}
+	req := &hyperiontypes.QueryValsetRequestRequest{
+		HyperionId: hyperionId,
+		Nonce:      nonce,
+	}
 
 	resp, err := c.QueryClient.ValsetRequest(ctx, req)
 	if err != nil {
@@ -65,12 +68,14 @@ func (c queryClient) ValsetAt(ctx context.Context, nonce uint64) (*hyperiontypes
 	return resp.Valset, nil
 }
 
-func (c queryClient) CurrentValset(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (c queryClient) CurrentValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.CurrentValset(ctx, &hyperiontypes.QueryCurrentValsetRequest{})
+	resp, err := c.QueryClient.CurrentValset(ctx, &hyperiontypes.QueryCurrentValsetRequest{
+		HyperionId: hyperionId,
+	})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query CurrentValset from client")
@@ -84,13 +89,14 @@ func (c queryClient) CurrentValset(ctx context.Context) (*hyperiontypes.Valset, 
 	return resp.Valset, nil
 }
 
-func (c queryClient) OldestUnsignedValsets(ctx context.Context, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+func (c queryClient) OldestUnsignedValsets(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
 	req := &hyperiontypes.QueryLastPendingValsetRequestByAddrRequest{
-		Address: valAccountAddress.String(),
+		HyperionId: hyperionId,
+		Address:    valAccountAddress.String(),
 	}
 
 	resp, err := c.QueryClient.LastPendingValsetRequestByAddr(ctx, req)
@@ -107,12 +113,14 @@ func (c queryClient) OldestUnsignedValsets(ctx context.Context, valAccountAddres
 	return resp.Valsets, nil
 }
 
-func (c queryClient) LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset, error) {
+func (c queryClient) LatestValsets(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.LastValsetRequests(ctx, &hyperiontypes.QueryLastValsetRequestsRequest{})
+	resp, err := c.QueryClient.LastValsetRequests(ctx, &hyperiontypes.QueryLastValsetRequestsRequest{
+		HyperionId: hyperionId,
+	})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query LastValsetRequests from daemon")
@@ -126,12 +134,15 @@ func (c queryClient) LatestValsets(ctx context.Context) ([]*hyperiontypes.Valset
 	return resp.Valsets, nil
 }
 
-func (c queryClient) AllValsetConfirms(ctx context.Context, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+func (c queryClient) AllValsetConfirms(ctx context.Context, hyperionId uint64, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.ValsetConfirmsByNonce(ctx, &hyperiontypes.QueryValsetConfirmsByNonceRequest{Nonce: nonce})
+	resp, err := c.QueryClient.ValsetConfirmsByNonce(ctx, &hyperiontypes.QueryValsetConfirmsByNonceRequest{
+		HyperionId: hyperionId,
+		Nonce:      nonce,
+	})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query ValsetConfirmsByNonce from daemon")

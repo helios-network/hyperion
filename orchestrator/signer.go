@@ -63,7 +63,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 	}
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	fn := func() error {
-		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.CosmosAddr)
+		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return nil
 	}
 
