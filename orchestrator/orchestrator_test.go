@@ -839,7 +839,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -854,13 +854,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchTimeout: 100,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -880,11 +880,11 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return nil, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 				},
@@ -904,11 +904,11 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 				},
@@ -931,13 +931,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 100,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 				},
@@ -960,13 +960,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
@@ -994,13 +994,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 10 * time.Second},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
@@ -1032,13 +1032,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 0},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
@@ -1075,13 +1075,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 0},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*hyperiontypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
@@ -1232,7 +1232,7 @@ func Test_Signer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
+					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
 						return nil, errors.New("ooops")
 					},
 				},
@@ -1246,7 +1246,7 @@ func Test_Signer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
+					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
 						return &hyperiontypes.OutgoingTxBatch{}, nil
 					},
 
@@ -1264,7 +1264,7 @@ func Test_Signer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
+					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
 						return &hyperiontypes.OutgoingTxBatch{}, nil
 					},
 

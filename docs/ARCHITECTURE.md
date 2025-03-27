@@ -165,47 +165,42 @@ The BatchCreator runs as a loop with a default duration (60 seconds) checking fo
 
 ## Helios Broadcast Client
 
-1. `UpdateHyperionOrchestratorAddresses`
-   * Allows validators to delegate voting responsibilities to a key
-   * Sets the Ethereum address that represents validators on the Ethereum side
-   * Validators must sign their Helios address using their submitted Ethereum address
-
-2. `SendValsetConfirm`
+1. `SendValsetConfirm`
    * Used by validators to submit signatures over validator set at a given block height
    * Requires validator to first set Ethereum address
    * When 66% of voting power submits signatures, they can be used to update validator set on Ethereum
 
-3. `SendBatchConfirm`
+2. `SendBatchConfirm`
    * Validators observe batch requests and form batches by ordering transactions by fee
    * Includes validator's Ethereum signature over the batch
    * Batches are cut off at max size or when transactions stop being profitable
 
-4. `SendToChain`
+3. `SendToChain`
    * User-initiated message to bridge assets
    * Removes tokens from user's balance immediately
    * Has two layers of fees: bridge fee and chain fee
 
-5. `SendRequestBatch`
+4. `SendRequestBatch`
    * Anyone can request creation of a transaction batch
    * Acts as coordination point for cross-chain transfers
    * Handler generates batch from pending transactions
    * Validators sign batch before relayer submits it
 
-6. `SendDepositClaim`
+5. `SendDepositClaim`
    * Claims deposits from Ethereum to Cosmos
    * When >66% validators confirm seeing deposit, coins are issued on Helios side
    * Includes event details like sender, receiver, amount and token contract
 
-7. `SendWithdrawalClaim`
+6. `SendWithdrawalClaim`
    * Claims execution of withdrawal batch on Ethereum
    * Confirms batch of withdrawal operations completed on bridge contract
 
-8. `SendValsetClaim`
+7. `SendValsetClaim`
    * Claims validator set updates on Ethereum
    * Includes new validator powers and addresses
    * Tracks reward distribution
 
-9. `SendERC20DeployedClaim`
+8. `SendERC20DeployedClaim`
    * Claims deployment of new ERC20 token contracts
    * Records token details like name, symbol, decimals
    * Maps Helios denoms to Ethereum token contracts

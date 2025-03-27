@@ -32,7 +32,6 @@ func main() {
 
 	app.Command("orchestrator", "Starts the orchestrator main loop.", orchestratorCmd)
 	app.Command("q query", "Query commands that can get state info from Hyperion.", queryCmdSubset)
-	app.Command("tx", "Transactions for Hyperion governance and maintenance.", txCmdSubset)
 	app.Command("version", "Print the version information and exit.", versionCmd)
 
 	_ = app.Run(os.Args)

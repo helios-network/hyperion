@@ -24,7 +24,6 @@ import (
 )
 
 type BroadcastClient interface {
-	UpdateHyperionOrchestratorAddresses(ctx context.Context, ethFrom gethcommon.Address, orchAddr cosmostypes.AccAddress) error
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
@@ -49,37 +48,6 @@ func NewBroadcastClient(client chain.ChainClient, signFn keystore.PersonalSignFn
 		ethSignFn:   signFn,
 		svcTags:     metrics.Tags{"svc": "hyperion_broadcast"},
 	}
-}
-
-func (c broadcastClient) UpdateHyperionOrchestratorAddresses(_ context.Context, ethFrom gethcommon.Address, orchAddr cosmostypes.AccAddress) error {
-	metrics.ReportFuncCall(c.svcTags)
-	doneFn := metrics.ReportFuncTiming(c.svcTags)
-	defer doneFn()
-	// SetOrchestratorAddresses
-
-	// This message allows validators to delegate their voting responsibilities
-	// to a given key. This key is then used as an optional authentication method
-	// for sigining oracle claims
-	// This is used by the validators to set the Ethereum address that represents
-	// them on the Ethereum side of the bridge. They must sign their Cosmos address
-	// using the Ethereum address they have submitted. Like ValsetResponse this
-	// message can in theory be submitted by anyone, but only the current validator
-	// sets submissions carry any weight.
-	// -------------
-	msg := &hyperiontypes.MsgSetOrchestratorAddresses{
-		Sender:       c.ChainClient.FromAddress().String(),
-		EthAddress:   ethFrom.Hex(),
-		Orchestrator: orchAddr.String(),
-	}
-
-	res, err := c.ChainClient.SyncBroadcastMsg(msg)
-	fmt.Println("Response of set eth address", "res", res)
-	if err != nil {
-		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgSetOrchestratorAddresses failed")
-	}
-
-	return nil
 }
 
 func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error {
@@ -225,7 +193,7 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64
 }
 
 func (c broadcastClient) SendOldDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
-	// EthereumBridgeDepositClaim
+	// MsgDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
 	// issued to the Cosmos address in question
@@ -353,6 +321,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 
 	// WithdrawClaim claims that a batch of withdrawal
 	// operations on the bridge contract was executed.
+	// -------------
 	msg := &hyperiontypes.MsgWithdrawClaim{
 		HyperionId:    hyperionId,
 		EventNonce:    withdrawal.EventNonce.Uint64(),
@@ -403,6 +372,10 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 		}
 	}
 
+	// MsgValsetUpdatedClaim this message permit to share to
+	// hyperion module the valset was updated on source blockchain
+	// this permit to insure the power is well share on both side
+	// -------------
 	msg := &hyperiontypes.MsgValsetUpdatedClaim{
 		HyperionId:   hyperionId,
 		EventNonce:   vs.EventNonce.Uint64(),
@@ -461,6 +434,10 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 		"decimals":       erc20.Decimals,
 	}).Debugln("observed ERC20DeployedEvent")
 
+	// MsgERC20DeployedClaim claims that new erc20 token
+	// was deployed on the source blockchain and will be linked
+	// as ERC20 to cosmosDenom in hyperion Module on HyperionId
+	// ----------
 	msg := &hyperiontypes.MsgERC20DeployedClaim{
 		HyperionId:    hyperionId,
 		EventNonce:    erc20.EventNonce.Uint64(),

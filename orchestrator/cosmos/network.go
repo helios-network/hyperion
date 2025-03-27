@@ -160,13 +160,13 @@ func loadBalancedEndpoints(cfg NetworkConfig) clientcommon.Network {
 	return clientcommon.LoadNetwork(networkName, "lb")
 }
 
-func HasRegisteredOrchestrator(n Network, ethAddr gethcommon.Address) (cosmostypes.AccAddress, bool) {
+func HasRegisteredOrchestrator(n Network, hyperionId uint64, ethAddr gethcommon.Address) (cosmostypes.AccAddress, bool) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFn()
 
 	log.Info("ethAddr: ", ethAddr)
 
-	validator, err := n.GetValidatorAddress(ctx, ethAddr)
+	validator, err := n.GetValidatorAddress(ctx, hyperionId, ethAddr)
 	log.Info("validator: ", validator)
 	if err != nil {
 		return nil, false

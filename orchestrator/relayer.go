@@ -3,9 +3,7 @@ package orchestrator
 import (
 	"context"
 	"math/big"
-	"os"
 	"sort"
-	"strconv"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
@@ -203,9 +201,8 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
-	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 
-	batches, err := l.helios.LatestTransactionBatches(ctx)
+	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
 	log.Info("batches: ", batches)
 	if err != nil {
 		log.Info("failed to get latest transaction batches", err)
@@ -231,11 +228,11 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		// 	continue
 		// }
 
-		if batch.HyperionId != hyperionId {
+		if batch.HyperionId != l.cfg.HyperionId {
 			continue
 		}
 
-		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
 		log.Info("sigs", sigs)
 		if err != nil {
 			return err
@@ -285,7 +282,6 @@ func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hype
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
-	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 
 	batches := []*hyperiontypes.OutgoingTxBatch{
 		{
@@ -344,12 +340,12 @@ func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hype
 		// 	continue
 		// }
 
-		if batch.HyperionId != hyperionId {
+		if batch.HyperionId != l.cfg.HyperionId {
 			log.Info("skipping batch with hyperion id: ", batch.HyperionId)
 			continue
 		}
 
-		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
 		log.Info("sigs", sigs)
 		if err != nil {
 			return err

@@ -96,7 +96,7 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
 	getBatchFn := func() error {
-		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == l.cfg.HyperionId {
 			oldestUnsignedBatch = tmpOldestUnsignedBatch
 		}
