@@ -19,7 +19,6 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/joho/godotenv"
 )
 
@@ -28,7 +27,6 @@ type BroadcastClient interface {
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
 	SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendOldDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
 	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
 	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
@@ -188,55 +186,6 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64
 		metrics.ReportFuncError(c.svcTags)
 		return errors.Wrap(err, "broadcasting MsgRequestBatch failed")
 	}
-
-	return nil
-}
-
-func (c broadcastClient) SendOldDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
-	// MsgDepositClaim
-	// When more than 66% of the active validator set has
-	// claimed to have seen the deposit enter the ethereum blockchain coins are
-	// issued to the Cosmos address in question
-	// -------------
-	metrics.ReportFuncCall(c.svcTags)
-	doneFn := metrics.ReportFuncTiming(c.svcTags)
-	defer doneFn()
-
-	log.WithFields(log.Fields{
-		"sender":      deposit.Sender.Hex(),
-		"destination": cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
-		"amount":      deposit.Amount.String(),
-		"event_nonce": deposit.EventNonce.String(),
-	}).Debugln("observed SendToCosmosEvent")
-
-	msg := &hyperiontypes.MsgDepositClaim{
-		HyperionId:     hyperionId,
-		EventNonce:     deposit.EventNonce.Uint64(),
-		BlockHeight:    deposit.Raw.BlockNumber,
-		TokenContract:  deposit.TokenContract.Hex(),
-		Amount:         sdkmath.NewIntFromBigInt(deposit.Amount),
-		EthereumSender: deposit.Sender.Hex(),
-		CosmosReceiver: cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
-		Orchestrator:   c.ChainClient.FromAddress().String(),
-		Data:           "",
-	}
-
-	log.WithFields(log.Fields{
-		"event_height": msg.BlockHeight,
-		"event_nonce":  msg.EventNonce,
-	}).Infoln("Oracle sending MsgDepositClaim")
-
-	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
-	if err != nil {
-		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgDepositClaim failed")
-	}
-
-	log.WithFields(log.Fields{
-		"event_height": msg.BlockHeight,
-		"event_nonce":  msg.EventNonce,
-		"tx_hash":      resp.TxResponse.TxHash,
-	}).Infoln("Oracle sent MsgDepositClaim")
 
 	return nil
 }

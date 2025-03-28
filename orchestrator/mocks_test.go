@@ -12,7 +12,6 @@ import (
 	log "github.com/xlab/suplog"
 
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
@@ -41,7 +40,6 @@ type MockCosmosNetwork struct {
 	SendBatchConfirmFn               func(ctx context.Context, hyperionID2 uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatchFn               func(ctx context.Context, hyperionID uint64, denom string) error
 	SendToChainFn                    func(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendOldDepositClaimFn            func(ctx context.Context, hyperionID uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
 	SendDepositClaimFn               func(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaimFn            func(ctx context.Context, hyperionID uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
 	SendValsetClaimFn                func(ctx context.Context, hyperionID uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
@@ -114,10 +112,6 @@ func (n MockCosmosNetwork) SendToChain(ctx context.Context, hyperionID uint64, d
 	return n.SendToChainFn(ctx, hyperionID, destination, amount, fee)
 }
 
-func (n MockCosmosNetwork) SendOldDepositClaim(ctx context.Context, hyperionID uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
-	return n.SendOldDepositClaimFn(ctx, hyperionID, deposit)
-}
-
 func (n MockCosmosNetwork) SendDepositClaim(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error {
 	return n.SendDepositClaimFn(ctx, hyperionID, deposit)
 }
@@ -156,7 +150,6 @@ func (n MockCosmosNetwork) GetValidatorSet(ctx context.Context, height int64) (*
 type MockEthereumNetwork struct {
 	GetHeaderByNumberFn                 func(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetHyperionIDFn                     func(ctx context.Context) (gethcommon.Hash, error)
-	GetSendToCosmosEventsFn             func(startBlock, endBlock uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error)
 	GetSendToHeliosEventsFn             func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEventsFn    func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
 	GetValsetUpdatedEventsFn            func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
@@ -178,10 +171,6 @@ func (n MockEthereumNetwork) TokenDecimals(ctx context.Context, tokenContract ge
 
 func (n MockEthereumNetwork) GetHyperionID(ctx context.Context) (gethcommon.Hash, error) {
 	return n.GetHyperionIDFn(ctx)
-}
-
-func (n MockEthereumNetwork) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-	return n.GetSendToCosmosEventsFn(startBlock, endBlock)
 }
 
 func (n MockEthereumNetwork) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {

@@ -18,7 +18,6 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
@@ -35,7 +34,6 @@ type Network interface {
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
 
-	GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error)
 	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
 	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
@@ -145,34 +143,6 @@ func (n *network) GetValsetNonce(ctx context.Context) (*big.Int, error) {
 
 func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error) {
 	return n.HyperionContract.GetTxBatchNonce(ctx, erc20ContractAddress, n.FromAddr)
-}
-
-func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-	_, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
-	}
-
-	// iter, err := hyperionFilterer.FilterSendToCosmosEvent(&bind.FilterOpts{
-	// 	Start: startBlock,
-	// 	End:   &endBlock,
-	// }, nil, nil, nil)
-	// if err != nil {
-	// 	if !isUnknownBlockErr(err) {
-	// 		return nil, errors.Wrap(err, "failed to scan past SendToCosmos events from Ethereum")
-	// 	} else if iter == nil {
-	// 		return nil, errors.New("no iterator returned")
-	// 	}
-	// }
-
-	// defer iter.Close()
-
-	var sendToCosmosEvents []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent
-	// for iter.Next() {
-	// 	sendToCosmosEvents = append(sendToCosmosEvents, iter.Event)
-	// }
-
-	return sendToCosmosEvents, nil
 }
 
 func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {

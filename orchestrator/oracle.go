@@ -13,7 +13,6 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
@@ -173,11 +172,6 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 	scanEthEventsFn := func() error {
 		events = nil // clear previous result in case a retry occurred
 
-		// oldDepositEvents, err := l.ethereum.GetSendToCosmosEvents(startBlock, endBlock)
-		// if err != nil {
-		// 	return errors.Wrap(err, "failed to get SendToCosmos events")
-		// }
-
 		depositEvents, err := l.ethereum.GetSendToHeliosEvents(startBlock, endBlock)
 		if err != nil {
 			return errors.Wrap(err, "failed to get SendToHelios events")
@@ -326,9 +320,6 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 
 	switch e := ev.(type) {
-	case *oldDeposit:
-		ev := hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent(*e)
-		return l.helios.SendOldDepositClaim(ctx, hyperionId, &ev)
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
 		return l.helios.SendDepositClaim(ctx, hyperionId, &ev)
@@ -347,7 +338,6 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 }
 
 type (
-	oldDeposit      hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent
 	deposit         hyperionevents.HyperionSendToHeliosEvent
 	valsetUpdate    hyperionevents.HyperionValsetUpdatedEvent
 	withdrawal      hyperionevents.HyperionTransactionBatchExecutedEvent
@@ -366,10 +356,6 @@ func filterEvents(events []event, nonce uint64) (filtered []event) {
 	}
 
 	return
-}
-
-func (o *oldDeposit) Nonce() uint64 {
-	return o.EventNonce.Uint64()
 }
 
 func (o *deposit) Nonce() uint64 {

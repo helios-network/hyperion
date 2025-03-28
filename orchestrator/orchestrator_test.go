@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
-	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
@@ -258,9 +257,6 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-						return nil, errors.New("oops")
-					},
 				},
 			},
 		},
@@ -291,13 +287,6 @@ func Test_Oracle(t *testing.T) {
 				ethereum: MockEthereumNetwork{
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
-					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
-							{
-								EventNonce: big.NewInt(100),
-							},
-						}, nil
 					},
 
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
@@ -344,13 +333,6 @@ func Test_Oracle(t *testing.T) {
 				ethereum: MockEthereumNetwork{
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
-					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
-							{
-								EventNonce: big.NewInt(100),
-							},
-						}, nil
 					},
 
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
@@ -399,13 +381,6 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
-							{
-								EventNonce: big.NewInt(104),
-							},
-						}, nil
-					},
 
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
 						return nil, nil
@@ -449,21 +424,10 @@ func Test_Oracle(t *testing.T) {
 							EthereumEventHeight: 1000,
 						}, nil
 					},
-
-					SendOldDepositClaimFn: func(_ context.Context, _ uint64, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
-						return nil
-					},
 				},
 				ethereum: MockEthereumNetwork{
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
-					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
-							{
-								EventNonce: big.NewInt(103),
-							},
-						}, nil
 					},
 
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
@@ -507,21 +471,10 @@ func Test_Oracle(t *testing.T) {
 							EthereumEventHeight: 1000,
 						}, nil
 					},
-
-					SendOldDepositClaimFn: func(_ context.Context, _ uint64, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
-						return nil
-					},
 				},
 				ethereum: MockEthereumNetwork{
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
-					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
-						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
-							{
-								EventNonce: big.NewInt(103),
-							},
-						}, nil
 					},
 
 					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {

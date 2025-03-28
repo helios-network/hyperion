@@ -79,7 +79,6 @@ Retrieves Ethereum events from the Ethereum blockchain and brodcasts event claim
 
 ### Types of Events Handled
 
-* Legacy Deposit Events (`SendToCosmos`)
 * Deposit Events (`SendToHelios`)
 * Withdrawal Events (`TransactionBatchExecuted`)
 * ERC20 Deployment Events

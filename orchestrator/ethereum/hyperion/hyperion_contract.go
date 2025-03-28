@@ -27,12 +27,13 @@ type HyperionContract interface {
 
 	Address() common.Address
 
-	SendToCosmos(
+	SendToHelios(
 		ctx context.Context,
 		erc20 common.Address,
 		amount *big.Int,
 		cosmosAccAddress sdk.AccAddress,
 		senderAddress common.Address,
+		data string,
 	) (*common.Hash, error)
 
 	SendTransactionBatch(

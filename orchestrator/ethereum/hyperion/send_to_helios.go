@@ -15,12 +15,13 @@ import (
 	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
-func (s *hyperionContract) SendToCosmos(
+func (s *hyperionContract) SendToHelios(
 	ctx context.Context,
 	erc20 common.Address,
 	amount *big.Int,
 	cosmosAccAddress sdk.AccAddress,
 	senderAddress common.Address,
+	data string,
 ) (*common.Hash, error) {
 	metrics.ReportFuncCall(s.svcTags)
 	doneFn := metrics.ReportFuncTiming(s.svcTags)
@@ -68,21 +69,21 @@ func (s *hyperionContract) SendToCosmos(
 		cosmosDestAddressBytes = append(cosmosDestAddressBytes, byte(0))
 	}
 
-	txData, err := hyperionABI.Pack("sendToCosmos", erc20, cosmosDestAddressBytes, amount)
+	txData, err := hyperionABI.Pack("sendToHelios", erc20, cosmosDestAddressBytes, amount, data)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).Errorln("ABI Pack (Hyperion sendToCosmos) method")
+		log.WithError(err).Errorln("ABI Pack (Hyperion sendToHelios) method")
 		return nil, err
 	}
 
 	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion sendToCosmos) to EVM")
+		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion sendToHelios) to EVM")
 		return nil, err
 	}
 
-	log.Infoln("Sent Tx (Hyperion sendToCosmos):", txHash.Hex())
+	log.Infoln("Sent Tx (Hyperion sendToHelios):", txHash.Hex())
 
 	return &txHash, nil
 }
