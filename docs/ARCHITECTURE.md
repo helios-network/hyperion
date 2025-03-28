@@ -1,7 +1,5 @@
 # Hyperion Architecture
 
-[<img alt="sketch" src="architecture_sketch.png" width="800px" />](./architecture_sketch.png)
-
 ## Orchestrator's Relayer Mode
 
 Runs orchestrator processes that only relay specific messages that do not require a validator's signature. This mode is run alongside a non-validator helios node.
