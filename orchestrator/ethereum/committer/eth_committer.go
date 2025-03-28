@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 
@@ -135,15 +136,27 @@ func (e *ethCommitter) SendTx(
 
 	opts.GasLimit = gasLimit
 
-	resyncNonces := func(from common.Address) {
-		e.nonceCache.Sync(from, func() (uint64, error) {
-			nonce, err := e.evmProvider.PendingNonceAt(context.TODO(), from)
+	resyncNonces := func(from common.Address) error {
+		var nonce uint64
+		var err error
+
+		done := make(chan struct{})
+		go func() {
+			nonce, err = e.evmProvider.PendingNonceAt(context.Background(), from)
 			if err != nil {
 				log.WithError(err).Warningln("unable to acquire nonce")
+			} else {
+				e.nonceCache.Set(from, int64(nonce))
 			}
+			close(done)
+		}()
 
-			return nonce, err
-		})
+		select {
+		case <-done:
+			return err
+		case <-time.After(10 * time.Second):
+			return errors.New("timeout while syncing nonce")
+		}
 	}
 
 	if err := e.nonceCache.Serialize(e.fromAddress, func() (err error) {
@@ -182,23 +195,35 @@ func (e *ethCommitter) SendTx(
 				}).WithError(err).Warningln("failed to send tx")
 			}
 
-			log.Info("err when sending tx", err)
 			switch {
 			case strings.Contains(err.Error(), "invalid sender"):
+				log.Info("err when sending tx", err)
 				err := errors.New("failed to sign transaction")
 				e.nonceCache.Incr(e.fromAddress)
 				return err
 			case strings.Contains(err.Error(), "nonce too low"),
 				strings.Contains(err.Error(), "nonce too high"),
 				strings.Contains(err.Error(), "the tx doesn't have the correct nonce"):
-
+				log.Info("warning when sending tx", err)
 				if resyncUsed {
 					log.Errorf("nonces synced, but still wrong nonce for %s: %d", e.fromAddress, nonce)
 					err = errors.Wrapf(err, "nonce %d mismatch", nonce)
 					return err
 				}
 
-				resyncNonces(e.fromAddress)
+				nonceCh := make(chan struct{})
+				go func() {
+					resyncNonces(e.fromAddress)
+					close(nonceCh)
+				}()
+
+				select {
+				case <-nonceCh:
+					log.Info("Nonce resynchronized successfully.")
+				case <-time.After(10 * time.Second):
+					log.Error("Nonce resynchronization timed out.")
+					return errors.New("nonce resynchronization timed out")
+				}
 
 				resyncUsed = true
 				// try again with updated nonce
@@ -208,6 +233,7 @@ func (e *ethCommitter) SendTx(
 				continue
 
 			default:
+				log.Info("err when sending tx", err)
 				if strings.Contains(err.Error(), "known transaction") {
 					// skip one nonce step, try to send again
 					nonce := e.nonceCache.Incr(e.fromAddress)

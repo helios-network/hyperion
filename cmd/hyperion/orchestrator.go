@@ -52,6 +52,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				HeliosGRPC:    *cfg.heliosGRPC,
 				TendermintRPC: *cfg.tendermintRPC,
 				GasPrice:      *cfg.heliosGasPrices,
+				Gas:           *cfg.heliosGas,
 			}
 			ethNetworkCfg = ethereum.NetworkConfig{
 				EthNodeRPC:            *cfg.ethNodeRPC,
