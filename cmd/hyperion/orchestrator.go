@@ -11,8 +11,6 @@ import (
 	"github.com/xlab/closer"
 	log "github.com/xlab/suplog"
 
-	// sdk "github.com/cosmos/cosmos-sdk/types"
-
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
