@@ -1,13 +1,13 @@
-package cosmos
+package helios
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos/hyperion"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos/tendermint"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/tendermint"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
@@ -23,7 +23,7 @@ import (
 type NetworkConfig struct {
 	ChainID,
 	ValidatorAddress,
-	CosmosGRPC,
+	HeliosGRPC,
 	TendermintRPC,
 	GasPrice string
 	Gas string
@@ -118,13 +118,13 @@ func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.Clie
 }
 
 func (cfg NetworkConfig) loadClientConfig() clientcommon.Network {
-	if custom := cfg.CosmosGRPC != "" && cfg.TendermintRPC != ""; custom {
-		log.WithFields(log.Fields{"cosmos_grpc": cfg.CosmosGRPC, "tendermint_rpc": cfg.TendermintRPC}).Debugln("using custom endpoints for Helios")
+	if custom := cfg.HeliosGRPC != "" && cfg.TendermintRPC != ""; custom {
+		log.WithFields(log.Fields{"helios_grpc": cfg.HeliosGRPC, "tendermint_rpc": cfg.TendermintRPC}).Debugln("using custom endpoints for Helios")
 		return customEndpoints(cfg)
 	}
 
 	c := loadBalancedEndpoints(cfg)
-	log.WithFields(log.Fields{"cosmos_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Helios")
+	log.WithFields(log.Fields{"Helios_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Helios")
 
 	return c
 }
@@ -135,7 +135,7 @@ func customEndpoints(cfg NetworkConfig) clientcommon.Network {
 	c.ChainId = cfg.ChainID
 	c.FeeDenom = "helios"
 	c.TmEndpoint = cfg.TendermintRPC
-	c.ChainGrpcEndpoint = cfg.CosmosGRPC
+	c.ChainGrpcEndpoint = cfg.HeliosGRPC
 	c.ExplorerGrpcEndpoint = ""
 	c.LcdEndpoint = ""
 	c.ExplorerGrpcEndpoint = ""
@@ -146,13 +146,12 @@ func customEndpoints(cfg NetworkConfig) clientcommon.Network {
 func loadBalancedEndpoints(cfg NetworkConfig) clientcommon.Network {
 	var networkName string
 	switch cfg.ChainID {
-	case "helios-1":
-	case "4242":
+	case "42000":
 		networkName = "mainnet"
-	case "helios-777":
-		networkName = "devnet"
-	case "helios-888":
+	case "42001":
 		networkName = "testnet"
+	case "42002":
+		networkName = "devnet"
 	default:
 		panic(fmt.Errorf("no provider for chain id %s", cfg.ChainID))
 	}

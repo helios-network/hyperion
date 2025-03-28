@@ -13,7 +13,6 @@ import (
 	ethcmn "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	log "github.com/xlab/suplog"
 	terminal "golang.org/x/term"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
@@ -27,7 +26,6 @@ func initEthereumAccountsManager(
 	ethKeyFrom *string,
 	ethPassphrase *string,
 	ethPrivKey *string,
-	_ *bool,
 ) (
 	ethKeyFromAddress ethcmn.Address,
 	signerFn bind.SignerFn,
@@ -37,8 +35,6 @@ func initEthereumAccountsManager(
 	switch {
 
 	case len(*ethPrivKey) > 0:
-		log.Info("fallback to this case")
-		log.Info("ethPrivKey: ", *ethPrivKey)
 		ethPk, err := ethcrypto.HexToECDSA(*ethPrivKey)
 		if err != nil {
 			err = errors.Wrap(err, "failed to hex-decode Ethereum ECDSA Private Key")
@@ -46,7 +42,6 @@ func initEthereumAccountsManager(
 		}
 
 		ethAddressFromPk := ethcrypto.PubkeyToAddress(ethPk.PublicKey)
-		log.Info("ethAddressFromPk", ethAddressFromPk)
 		if len(*ethKeyFrom) > 0 {
 			addr := ethcmn.HexToAddress(*ethKeyFrom)
 			if addr == (ethcmn.Address{}) {
@@ -63,8 +58,6 @@ func initEthereumAccountsManager(
 			err = errors.New("failed to init NewKeyedTransactorWithChainID")
 			return emptyEthAddress, nil, nil, err
 		}
-
-		log.Info("ethPk: ", *ethPk)
 
 		personalSignFn, err := keystore.PrivateKeyPersonalSignFn(ethPk)
 		if err != nil {

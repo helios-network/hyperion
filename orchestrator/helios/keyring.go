@@ -1,4 +1,4 @@
-package cosmos
+package helios
 
 import (
 	"bytes"
@@ -34,7 +34,6 @@ type KeyringConfig struct {
 	KeyFrom,
 	KeyPassphrase,
 	PrivateKey string
-	UseLedger bool
 }
 
 func (cfg KeyringConfig) withPrivateKey() bool {
@@ -86,15 +85,8 @@ func NewKeyring(cfg KeyringConfig) (Keyring, error) {
 // }
 
 func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
-	if cfg.UseLedger {
-		return Keyring{}, errors.New("cannot use both private key and Ledger")
-	}
 
-	pk := cfg.PrivateKey
-	if strings.HasPrefix(pk, "0x") {
-		pk = pk[2:]
-	}
-
+	pk := strings.TrimPrefix(cfg.PrivateKey, "0x")
 	pkRaw, err := hex.DecodeString(pk)
 	if err != nil {
 		return Keyring{}, errors.Wrap(err, "invalid private key")
@@ -129,10 +121,6 @@ func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 	kr := keyring.NewInMemory(Codec(), hd.EthSecp256k1Option())
 	if err := kr.ImportPrivKey(keyName, armored, tmpPhrase); err != nil {
 		return Keyring{}, errors.Wrap(err, "failed to import private key")
-	}
-
-	if err != nil {
-		return Keyring{}, errors.Wrap(err, "failed to initialize cosmos keyring")
 	}
 
 	k := Keyring{
@@ -199,25 +187,6 @@ func newKeyringFromDir(cfg KeyringConfig) (Keyring, error) {
 		addr, err := keyRecord.GetAddress()
 		if err != nil {
 			return Keyring{}, errors.Wrap(err, "failed to get address from key record")
-		}
-
-		k := Keyring{
-			Keyring: kr,
-			Addr:    addr,
-		}
-
-		return k, nil
-	case keyring.TypeLedger:
-		// the kb stores references to ledger keys, so we must explicitly
-		// check that. kb doesn't know how to scan HD keys - they must be added manually before
-		if !cfg.UseLedger {
-			return Keyring{}, errors.Errorf("key %s is a Ledger reference, enable Ledger option", keyRecord.Name)
-		}
-
-		addr, err := keyRecord.GetAddress()
-		if err != nil {
-			return Keyring{}, errors.Wrap(err, "failed to get address from key record")
-
 		}
 
 		k := Keyring{

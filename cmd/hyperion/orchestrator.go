@@ -12,8 +12,8 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -39,20 +39,19 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		var (
 			cfg              = initConfig(cmd)
-			cosmosKeyringCfg = cosmos.KeyringConfig{
-				KeyringDir:     *cfg.cosmosKeyringDir,
-				KeyringAppName: *cfg.cosmosKeyringAppName,
-				KeyringBackend: *cfg.cosmosKeyringBackend,
-				KeyFrom:        *cfg.cosmosKeyFrom,
-				KeyPassphrase:  *cfg.cosmosKeyPassphrase,
-				PrivateKey:     *cfg.cosmosPrivKey,
-				UseLedger:      *cfg.cosmosUseLedger,
+			heliosKeyringCfg = helios.KeyringConfig{
+				KeyringDir:     *cfg.heliosKeyringDir,
+				KeyringAppName: *cfg.heliosKeyringAppName,
+				KeyringBackend: *cfg.heliosKeyringBackend,
+				KeyFrom:        *cfg.heliosKeyFrom,
+				KeyPassphrase:  *cfg.heliosKeyPassphrase,
+				PrivateKey:     *cfg.heliosPrivKey,
 			}
-			cosmosNetworkCfg = cosmos.NetworkConfig{
-				ChainID:       *cfg.cosmosChainID,
-				CosmosGRPC:    *cfg.cosmosGRPC,
+			heliosNetworkCfg = helios.NetworkConfig{
+				ChainID:       *cfg.heliosChainID,
+				HeliosGRPC:    *cfg.heliosGRPC,
 				TendermintRPC: *cfg.tendermintRPC,
-				GasPrice:      *cfg.cosmosGasPrices,
+				GasPrice:      *cfg.heliosGasPrices,
 			}
 			ethNetworkCfg = ethereum.NetworkConfig{
 				EthNodeRPC:            *cfg.ethNodeRPC,
@@ -62,10 +61,6 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				EthNodeAlchemyWS:      *cfg.ethNodeAlchemyWS,
 			}
 		)
-		log.Println("cosmosKeyringCfg", cosmosKeyringCfg)
-		if *cfg.cosmosUseLedger || *cfg.ethUseLedger {
-			log.Fatalln("cannot use Ledger for orchestrator, since signatures must be realtime")
-		}
 
 		log.WithFields(log.Fields{
 			"version":    version.AppVersion,
@@ -77,45 +72,33 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		// 1. Connect to Helios network
 
-		cosmosKeyring, err := cosmos.NewKeyring(cosmosKeyringCfg)
+		heliosKeyring, err := helios.NewKeyring(heliosKeyringCfg)
 		orShutdown(errors.Wrap(err, "failed to initialize Helios keyring"))
-		log.Infoln("initialized Helios keyring", cosmosKeyring.Addr.String())
 
-		log.WithFields(log.Fields{"ethChainID": *cfg.ethChainID, "ethKeystoreDir": *cfg.ethKeystoreDir, "ethKeyFrom": *cfg.ethKeyFrom, "ethPassphrase": *cfg.ethPassphrase, "ethPrivKey": *cfg.ethPrivKey, "ethUseLedger": *cfg.ethUseLedger}).Infoln("initializing Ethereum keyring")
+		log.WithFields(log.Fields{"address": heliosKeyring.Addr.String()}).Infoln("Initialized Helios keyring")
 		ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
 			uint64(*cfg.ethChainID),
 			cfg.ethKeystoreDir,
 			cfg.ethKeyFrom,
 			cfg.ethPassphrase,
 			cfg.ethPrivKey,
-			cfg.ethUseLedger,
 		)
 		orShutdown(errors.Wrap(err, "failed to initialize Ethereum keyring"))
-		log.Infoln("initialized Ethereum keyring", ethKeyFromAddress.String())
+		log.WithFields(log.Fields{"address": ethKeyFromAddress.String()}).Infoln("Initialized Ethereum keyring")
 
-		cosmosNetworkCfg.ValidatorAddress = cosmosKeyring.Addr.String()
-		cosmosNetwork, err := cosmos.NewNetwork(cosmosKeyring, personalSignFn, cosmosNetworkCfg)
+		heliosNetworkCfg.ValidatorAddress = heliosKeyring.Addr.String()
+		heliosNetwork, err := helios.NewNetwork(heliosKeyring, personalSignFn, heliosNetworkCfg)
 		orShutdown(err)
-		log.WithFields(log.Fields{"chain_id": *cfg.cosmosChainID, "gas_price": *cfg.cosmosGasPrices}).Infoln("connected to Helios network")
+		log.WithFields(log.Fields{"chain_id": *cfg.heliosChainID, "gas_price": *cfg.heliosGasPrices}).Infoln("connected to Helios network")
 
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		hyperionParams, err := cosmosNetwork.HyperionParams(ctx)
+		hyperionParams, err := heliosNetwork.HyperionParams(ctx)
 		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
 
-		// for _, hyperionCounterpartyChainParams := range hyperionParams.CounterpartyChainParams {
-		// 	var (
-		// 		hyperionContractAddr = gethcommon.HexToAddress(hyperionCounterpartyChainParams.BridgeCounterpartyAddress)
-		// 		heliosTokenAddr      = gethcommon.HexToAddress(hyperionCounterpartyChainParams.CosmosCoinErc20Contract)
-		// 		// erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
-		// 	)
+		// 1.1 Search HyperionId into CounterpartyChainParams
 
-		// 	log.WithFields(log.Fields{"hyperion_id": hyperionCounterpartyChainParams.HyperionId, "hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
-
-		// 	_, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
-		// 	orShutdown(err)
-		// }
 		counterpartyChainParamsCfg := &hyperiontypes.CounterpartyChainParams{
 			HyperionId:                0,
 			BridgeCounterpartyAddress: "",
@@ -130,6 +113,8 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		if counterpartyChainParamsCfg.BridgeCounterpartyAddress == "" {
 			log.Fatalln("Counterparty Chain Params not found for hyperionId =", *cfg.hyperionID)
 		}
+
+		//------------
 
 		var (
 			hyperionContractAddr = gethcommon.HexToAddress(counterpartyChainParamsCfg.BridgeCounterpartyAddress)
@@ -152,7 +137,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"gas_price_adjustment": *cfg.ethGasPriceAdjustment,
 		}).Infoln("connected to Ethereum network")
 
-		addr, isValidator := cosmos.HasRegisteredOrchestrator(cosmosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
+		addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
 		}
@@ -174,7 +159,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		orchestratorCfg := orchestrator.Config{
 			HyperionId:           uint64(*cfg.hyperionID),
-			CosmosAddr:           cosmosKeyring.Addr,
+			CosmosAddr:           heliosKeyring.Addr,
 			EthereumAddr:         ethKeyFromAddress,
 			MinBatchFeeUSD:       *cfg.minBatchFeeUSD,
 			ERC20ContractMapping: erc20ContractMapping,
@@ -187,7 +172,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		// Create hyperion and run it
 		hyperion, err := orchestrator.NewOrchestrator(
-			cosmosNetwork,
+			heliosNetwork,
 			ethNetwork,
 			pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: *cfg.coingeckoApi}),
 			orchestratorCfg,
@@ -195,7 +180,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		orShutdown(err)
 
 		go func() {
-			if err := hyperion.Run(ctx, cosmosNetwork, ethNetwork); err != nil {
+			if err := hyperion.Run(ctx, heliosNetwork, ethNetwork); err != nil {
 				log.Errorln(err)
 				os.Exit(1)
 			}

@@ -86,21 +86,20 @@ func initStatsdOptions(
 
 type Config struct {
 	// Cosmos params
-	cosmosChainID   *string
-	cosmosGRPC      *string
+	heliosChainID   *string
+	heliosGRPC      *string
 	tendermintRPC   *string
-	cosmosGasPrices *string
-	cosmosGas       *string
+	heliosGasPrices *string
+	heliosGas       *string
 
 	// Cosmos Key Management
-	cosmosKeyringDir     *string
-	cosmosKeyringAppName *string
-	cosmosKeyringBackend *string
+	heliosKeyringDir     *string
+	heliosKeyringAppName *string
+	heliosKeyringBackend *string
 
-	cosmosKeyFrom       *string
-	cosmosKeyPassphrase *string
-	cosmosPrivKey       *string
-	cosmosUseLedger     *bool
+	heliosKeyFrom       *string
+	heliosKeyPassphrase *string
+	heliosPrivKey       *string
 
 	// Ethereum params
 	hyperionID            *int
@@ -115,7 +114,6 @@ type Config struct {
 	ethKeyFrom     *string
 	ethPassphrase  *string
 	ethPrivKey     *string
-	ethUseLedger   *bool
 
 	// Relayer config
 	relayValsets          *bool
@@ -135,17 +133,17 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	/** Helios **/
 
-	cfg.cosmosChainID = cmd.String(cli.StringOpt{
-		Name:   "cosmos-chain-id",
-		Desc:   "Specify Chain ID of the Cosmos network.",
-		EnvVar: "HYPERION_COSMOS_CHAIN_ID",
+	cfg.heliosChainID = cmd.String(cli.StringOpt{
+		Name:   "helios-chain-id",
+		Desc:   "Specify Chain ID of the Helios network.",
+		EnvVar: "HYPERION_HELIOS_CHAIN_ID",
 		Value:  "888",
 	})
 
-	cfg.cosmosGRPC = cmd.String(cli.StringOpt{
-		Name:   "cosmos-grpc",
-		Desc:   "Cosmos GRPC querying endpoint",
-		EnvVar: "HYPERION_COSMOS_GRPC",
+	cfg.heliosGRPC = cmd.String(cli.StringOpt{
+		Name:   "helios-grpc",
+		Desc:   "Helios GRPC querying endpoint",
+		EnvVar: "HYPERION_HELIOS_GRPC",
 	})
 
 	cfg.tendermintRPC = cmd.String(cli.StringOpt{
@@ -154,65 +152,58 @@ func initConfig(cmd *cli.Cmd) Config {
 		EnvVar: "HYPERION_TENDERMINT_RPC",
 	})
 
-	cfg.cosmosGasPrices = cmd.String(cli.StringOpt{
+	cfg.heliosGasPrices = cmd.String(cli.StringOpt{
 		Name:   "cosmos-gas-prices",
-		Desc:   "Specify Cosmos chain transaction fees as DecCoins gas prices",
-		EnvVar: "HYPERION_COSMOS_GAS_PRICES",
-		Value:  "", // example: 500000000helios
+		Desc:   "Specify Helios chain transaction fees as DecCoins gas prices",
+		EnvVar: "HYPERION_HELIOS_GAS_PRICES",
+		Value:  "", // example: 500000000ahelios
 	})
 
-	cfg.cosmosGas = cmd.String(cli.StringOpt{
-		Name:   "cosmos-gas",
-		Desc:   "Specify Cosmos chain transaction gas",
-		EnvVar: "HYPERION_COSMOS_GAS",
+	cfg.heliosGas = cmd.String(cli.StringOpt{
+		Name:   "helios-gas",
+		Desc:   "Specify Helios chain transaction gas",
+		EnvVar: "HYPERION_HELIOS_GAS",
 		Value:  "", // example: 2000000
 	})
 
-	cfg.cosmosKeyringBackend = cmd.String(cli.StringOpt{
-		Name:   "cosmos-keyring",
-		Desc:   "Specify Cosmos keyring backend (os|file|kwallet|pass|test)",
-		EnvVar: "HYPERION_COSMOS_KEYRING",
+	cfg.heliosKeyringBackend = cmd.String(cli.StringOpt{
+		Name:   "helios-keyring",
+		Desc:   "Specify Helios keyring backend (os|file|kwallet|pass|test)",
+		EnvVar: "HYPERION_HELIOS_KEYRING",
 		Value:  "file",
 	})
 
-	cfg.cosmosKeyringDir = cmd.String(cli.StringOpt{
-		Name:   "cosmos-keyring-dir",
-		Desc:   "Specify Cosmos keyring dir, if using file keyring.",
-		EnvVar: "HYPERION_COSMOS_KEYRING_DIR",
+	cfg.heliosKeyringDir = cmd.String(cli.StringOpt{
+		Name:   "helios-keyring-dir",
+		Desc:   "Specify Helios keyring dir, if using file keyring.",
+		EnvVar: "HYPERION_HELIOS_KEYRING_DIR",
 		Value:  "",
 	})
 
-	cfg.cosmosKeyringAppName = cmd.String(cli.StringOpt{
-		Name:   "cosmos-keyring-app",
-		Desc:   "Specify Cosmos keyring app name.",
-		EnvVar: "HYPERION_COSMOS_KEYRING_APP",
+	cfg.heliosKeyringAppName = cmd.String(cli.StringOpt{
+		Name:   "helios-keyring-app",
+		Desc:   "Specify Helios keyring app name.",
+		EnvVar: "HYPERION_HELIOS_KEYRING_APP",
 		Value:  "hyperion",
 	})
 
-	cfg.cosmosKeyFrom = cmd.String(cli.StringOpt{
-		Name:   "cosmos-from",
-		Desc:   "Specify the Cosmos validator key name or address. If specified, must exist in keyring, ledger or match the privkey.",
-		EnvVar: "HYPERION_COSMOS_FROM",
+	cfg.heliosKeyFrom = cmd.String(cli.StringOpt{
+		Name:   "helios-from",
+		Desc:   "Specify the Helios validator key name or address. If specified, must exist in keyring, ledger or match the privkey.",
+		EnvVar: "HYPERION_HELIOS_FROM",
 	})
 
-	cfg.cosmosKeyPassphrase = cmd.String(cli.StringOpt{
-		Name:   "cosmos-from-passphrase",
+	cfg.heliosKeyPassphrase = cmd.String(cli.StringOpt{
+		Name:   "helios-from-passphrase",
 		Desc:   "Specify keyring passphrase, otherwise Stdin will be used.",
-		EnvVar: "HYPERION_COSMOS_FROM_PASSPHRASE",
+		EnvVar: "HYPERION_HELIOS_FROM_PASSPHRASE",
 		Value:  "hyperion",
 	})
 
-	cfg.cosmosPrivKey = cmd.String(cli.StringOpt{
-		Name:   "cosmos-pk",
-		Desc:   "Provide a raw Cosmos account private key of the validator in hex. USE FOR TESTING ONLY!",
-		EnvVar: "HYPERION_COSMOS_PK",
-	})
-
-	cfg.cosmosUseLedger = cmd.Bool(cli.BoolOpt{
-		Name:   "cosmos-use-ledger",
-		Desc:   "Use the Cosmos app on hardware ledger to sign transactions.",
-		EnvVar: "HYPERION_COSMOS_USE_LEDGER",
-		Value:  false,
+	cfg.heliosPrivKey = cmd.String(cli.StringOpt{
+		Name:   "helios-pk",
+		Desc:   "Provide a raw Helios account private key of the validator in hex.",
+		EnvVar: "HYPERION_HELIOS_PK",
 	})
 
 	/** Ethereum **/
@@ -281,13 +272,6 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "eth-pk",
 		Desc:   "Provide a raw Ethereum private key of the validator in hex. USE FOR TESTING ONLY!",
 		EnvVar: "HYPERION_ETH_PK",
-	})
-
-	cfg.ethUseLedger = cmd.Bool(cli.BoolOpt{
-		Name:   "eth-use-ledger",
-		Desc:   "Use the Ethereum app on hardware ledger to sign transactions.",
-		EnvVar: "HYPERION_ETH_USE_LEDGER",
-		Value:  false,
 	})
 
 	/** Relayer **/
