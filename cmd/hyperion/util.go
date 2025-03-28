@@ -3,14 +3,10 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"encoding/hex"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 
-	ethcmn "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 	"google.golang.org/grpc"
 )
@@ -18,7 +14,7 @@ import (
 // readEnv is a special utility that reads `.env` file into actual environment variables
 // of the current app, similar to `dotenv` Node package.
 func readEnv() {
-	if envdata, _ := ioutil.ReadFile(".env"); len(envdata) > 0 {
+	if envdata, _ := os.ReadFile(".env"); len(envdata) > 0 {
 		s := bufio.NewScanner(bytes.NewReader(envdata))
 		for s.Scan() {
 			parts := strings.Split(s.Text(), "=")
@@ -31,45 +27,6 @@ func readEnv() {
 			}
 		}
 	}
-}
-
-// stdinConfirm checks the user's confirmation, if not forced to Yes
-func stdinConfirm(msg string) bool {
-	var response string
-
-	fmt.Print(msg)
-
-	if _, err := fmt.Scanln(&response); err != nil {
-		log.WithError(err).Errorln("failed to confirm the action")
-		return false
-	}
-
-	switch strings.ToLower(strings.TrimSpace(response)) {
-	case "y", "yes":
-		return true
-	default:
-		return false
-	}
-}
-
-// parseERC20ContractMapping converts list of address:denom pairs to a proper typed map.
-func parseERC20ContractMapping(items []string) map[ethcmn.Address]string {
-	res := make(map[ethcmn.Address]string)
-
-	for _, item := range items {
-		// item is a pair address:denom
-		parts := strings.Split(item, ":")
-		addr := ethcmn.HexToAddress(parts[0])
-
-		if len(parts) != 2 || len(parts[0]) == 0 || addr == (ethcmn.Address{}) {
-			log.Fatalln("failed to parse ERC20 mapping: check that all inputs contain valid denom:address pairs")
-		}
-
-		denom := parts[1]
-		res[addr] = denom
-	}
-
-	return res
 }
 
 // logLevel converts vague log level name into typed level.
@@ -114,19 +71,6 @@ func checkStatsdPrefix(s string) string {
 		return s + "."
 	}
 	return s
-}
-
-func hexToBytes(str string) ([]byte, error) {
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-	}
-
-	data, err := hex.DecodeString(str)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 // orShutdown fatals the app if there was an error.
