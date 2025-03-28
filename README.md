@@ -39,7 +39,7 @@ Hyperion is a companion executable for orchestrating a Hyperion validator.
 Options:
   -e, --env                The environment name this app runs in. Used for metrics and error reporting. (env $HYPERION_ENV) (default "local")
   -l, --log-level          Available levels: error, warn, info, debug. (env $HYPERION_LOG_LEVEL) (default "info")
-      --svc-wait-timeout   Standard wait timeout for external services (e.g. Cosmos daemon GRPC connection) (env $HYPERION_SERVICE_WAIT_TIMEOUT) (default "1m")
+      --svc-wait-timeout   Standard wait timeout for external services (e.g. Helios daemon GRPC connection) (env $HYPERION_SERVICE_WAIT_TIMEOUT) (default "1m")
 
 Commands:
   orchestrator             Starts the orchestrator main loop.
@@ -61,17 +61,17 @@ Usage: hyperion orchestrator [OPTIONS]
 Starts the orchestrator main loop.
 
 Options:
-      --cosmos-chain-id                  Specify Chain ID of the Cosmos network. (env $HYPERION_COSMOS_CHAIN_ID) (default "888")
-      --cosmos-grpc                      Cosmos GRPC querying endpoint (env $HYPERION_COSMOS_GRPC) (default "tcp://localhost:9900")
+      --helios-chain-id                  Specify Chain ID of the Helios network. (env $HYPERION_HELIOS_CHAIN_ID) (default "42000")
+      --helios-grpc                      Helios GRPC querying endpoint (env $HYPERION_HELIOS_GRPC) (default "tcp://localhost:9090")
       --tendermint-rpc                   Tendermint RPC endpoint (env $HYPERION_TENDERMINT_RPC) (default "http://localhost:26657")
-      --cosmos-gas-prices                Specify Cosmos chain transaction fees as DecCoins gas prices (env $HYPERION_COSMOS_GAS_PRICES)
-      --cosmos-keyring                   Specify Cosmos keyring backend (os|file|kwallet|pass|test) (env $HYPERION_COSMOS_KEYRING) (default "file")
-      --cosmos-keyring-dir               Specify Cosmos keyring dir, if using file keyring. (env $HYPERION_COSMOS_KEYRING_DIR)
-      --cosmos-keyring-app               Specify Cosmos keyring app name. (env $HYPERION_COSMOS_KEYRING_APP) (default "hyperion")
-      --cosmos-from                      Specify the Cosmos validator key name or address. If specified, must exist in keyring, ledger or match the privkey. (env $HYPERION_COSMOS_FROM)
-      --cosmos-from-passphrase           Specify keyring passphrase, otherwise Stdin will be used. (env $HYPERION_COSMOS_FROM_PASSPHRASE) (default "hyperion")
-      --cosmos-pk                        Provide a raw Cosmos account private key of the validator in hex. USE FOR TESTING ONLY! (env $HYPERION_COSMOS_PK)
-      --cosmos-use-ledger                Use the Cosmos app on hardware ledger to sign transactions. (env $HYPERION_COSMOS_USE_LEDGER)
+      --helios-gas-prices                Specify Helios chain transaction fees as DecCoins gas prices (env $HYPERION_HELIOS_GAS_PRICES)
+      --helios-gas                       Specify Helios chain transaction gas hyperion will pay maximally (env $HYPERION_HELIOS_GAS)
+      --helios-keyring                   Specify Helios keyring backend (os|file|pass|test|local) (env $HYPERION_HELIOS_KEYRING) (default "local")
+      --helios-keyring-dir               Specify Helios keyring dir, if using file keyring. (env $HYPERION_HELIOS_KEYRING_DIR)
+      --helios-keyring-app               Specify Helios keyring app name. (env $HYPERION_HELIOS_KEYRING_APP) (default "hyperion")
+      --helios-from                      Specify Helios validator hex address. (env $HYPERION_HELIOS_FROM)
+      --helios-from-passphrase           Specify keyring passphrase, otherwise Stdin will be used. (env $HYPERION_HELIOS_FROM_PASSPHRASE) (default "hyperion")
+      --helios-pk                        Provide a raw Helios account private key of the validator in hex. (env $HYPERION_HELIOS_PK)
       --eth-chain-id                     Specify Chain ID of the Ethereum network. (env $HYPERION_ETH_CHAIN_ID) (default 42)
       --eth-node-http                    Specify HTTP endpoint for an Ethereum node. (env $HYPERION_ETH_RPC) (default "http://localhost:1317")
       --eth-node-alchemy-ws              Specify websocket url for an Alchemy ethereum node. (env $HYPERION_ETH_ALCHEMY_WS)
@@ -80,7 +80,6 @@ Options:
       --eth-from                         Specify the from address. If specified, must exist in keystore, ledger or match the privkey. (env $HYPERION_ETH_FROM)
       --eth-passphrase                   Passphrase to unlock the private key from armor, if empty then stdin is used. (env $HYPERION_ETH_PASSPHRASE)
       --eth-pk                           Provide a raw Ethereum private key of the validator in hex. USE FOR TESTING ONLY! (env $HYPERION_ETH_PK)
-      --eth-use-ledger                   Use the Ethereum app on hardware ledger to sign transactions. (env $HYPERION_ETH_USE_LEDGER)
       --relay_valsets                    If enabled, relayer will relay valsets to ethereum (env $HYPERION_RELAY_VALSETS)
       --relay_valset_offset_dur          If set, relayer will broadcast valsetUpdate only after relayValsetOffsetDur has passed from time of valsetUpdate creation (env $HYPERION_RELAY_VALSET_OFFSET_DUR) (default "5m")
       --relay_batches                    If enabled, relayer will relay batches to ethereum (env $HYPERION_RELAY_BATCHES)
@@ -89,6 +88,30 @@ Options:
       --min_batch_fee_usd                If set, batch request will create batches only if fee threshold exceeds (env $HYPERION_MIN_BATCH_FEE_USD) (default 23.3)
       --coingecko_api                    Specify HTTP endpoint for coingecko api. (env $HYPERION_COINGECKO_API) (default "https://api.coingecko.com/api/v3")
       --hyperion-id                      Specify Hyperion ID ecosystem. (env $HYPERION_ID)
+```
+
+## Setup keys
+
+1 - Example of Keyring management with specifical directory
+
+```sh
+HYPERION_HELIOS_KEYRING="local"
+HYPERION_HELIOS_KEYRING_DIR="/Users/x/.heliades"
+HYPERION_HELIOS_KEYRING_APP="cosmos"
+HYPERION_HELIOS_FROM="0x17267eB1FEC301848d4B5140eDDCFC48945427Ab"
+HYPERION_HELIOS_FROM_PASSPHRASE=
+HYPERION_HELIOS_PK=
+```
+
+2 - Example of Keyring Private Key
+
+```sh
+HYPERION_HELIOS_KEYRING=
+HYPERION_HELIOS_KEYRING_DIR=
+HYPERION_HELIOS_KEYRING_APP=
+HYPERION_HELIOS_FROM=
+HYPERION_HELIOS_FROM_PASSPHRASE=
+HYPERION_HELIOS_PK="08373636333636366363...44344343"
 ```
 
 ## License

@@ -76,7 +76,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		heliosKeyring, err := helios.NewKeyring(heliosKeyringCfg)
 		orShutdown(errors.Wrap(err, "failed to initialize Helios keyring"))
 
-		log.WithFields(log.Fields{"address": heliosKeyring.Addr.String()}).Infoln("Initialized Helios keyring")
+		log.WithFields(log.Fields{"addr": heliosKeyring.Addr.String(), "hex": heliosKeyring.HexAddr.String()}).Infoln("Initialized Helios keyring")
 		ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
 			uint64(*cfg.ethChainID),
 			cfg.ethKeystoreDir,

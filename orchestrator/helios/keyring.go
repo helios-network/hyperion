@@ -13,6 +13,7 @@ import (
 	cosmoscdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cosmoscrypto "github.com/cosmos/cosmos-sdk/crypto"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/ethereum/go-ethereum/common"
 
 	//"github.com/cosmos/cosmos-sdk/types/bech32"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
@@ -43,7 +44,8 @@ func (cfg KeyringConfig) withPrivateKey() bool {
 type Keyring struct {
 	keyring.Keyring
 
-	Addr cosmostypes.AccAddress
+	Addr    cosmostypes.AccAddress
+	HexAddr common.Address
 }
 
 func NewKeyring(cfg KeyringConfig) (Keyring, error) {
@@ -53,36 +55,6 @@ func NewKeyring(cfg KeyringConfig) (Keyring, error) {
 
 	return newKeyringFromDir(cfg)
 }
-
-// func GetFromBech32(bech32str, prefix string) (cosmostypes.AccAddress, error) {
-// 	if len(bech32str) == 0 {
-// 		return nil, errors.New("KKKK")
-// 	}
-
-// 	hrp, bz, err := bech32.DecodeAndConvert(bech32str)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if hrp == "" {
-// 		return nil, errors.New("invalid hrp")
-// 	}
-
-// 	// bstr, err := bech32.ConvertAndEncode(prefix, bz)
-
-// 	// if err != nil {
-// 	// 	return nil, err
-// 	// }
-
-// 	// hrp2, bz2, err := bech32.DecodeAndConvert(bstr)
-// 	// if err != nil {
-// 	// 	return nil, err
-// 	// }
-// 	// if hrp2 == "" {
-// 	// 	return nil, errors.New("invalid hrp")
-// 	// }
-
-// 	return cosmostypes.AccAddress(bz), nil
-// }
 
 func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 
@@ -95,23 +67,8 @@ func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 	var (
 		cosmosPK   = &ethsecp256k1.PrivKey{Key: pkRaw}
 		cosmosAddr = cosmostypes.AccAddress(cosmosPK.PubKey().Address())
-		keyName    = DefaultKeyName
+		keyName    = cosmosAddr.String()
 	)
-
-	// cosmosAddr, err := GetFromBech32(cfg.KeyFrom, "helios")
-	// // cosmosAddr, err := cosmostypes.AccAddressFromBech32(cfg.KeyFrom)
-	// if err != nil {
-	// 	return Keyring{}, errors.Wrap(err, "failed to import private key")
-	// }
-
-	if len(cfg.KeyFrom) > 0 {
-		from, err := cosmostypes.AccAddressFromBech32(cfg.KeyFrom)
-		if err != nil {
-			keyName = cfg.KeyFrom // use it as key name
-		} else if !bytes.Equal(from.Bytes(), cosmosAddr.Bytes()) {
-			return Keyring{}, errors.Errorf("expected account address %s but got %s from the private key", from.String(), cosmosAddr.String())
-		}
-	}
 
 	// Create a temporary in-mem keyring for cosmosPK.
 	// Allows to init Context when the key has been provided in plaintext and parsed.
@@ -126,6 +83,7 @@ func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 	k := Keyring{
 		Keyring: kr,
 		Addr:    cosmosAddr,
+		HexAddr: common.BytesToAddress(cosmosAddr.Bytes()),
 	}
 
 	return k, nil
@@ -133,7 +91,7 @@ func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 
 func newKeyringFromDir(cfg KeyringConfig) (Keyring, error) {
 	if len(cfg.KeyFrom) == 0 {
-		return Keyring{}, errors.New("insufficient cosmos details provided")
+		return Keyring{}, errors.New("insufficient Helios KeyFrom details provided")
 	}
 
 	keyringDir := cfg.KeyringDir
@@ -164,23 +122,16 @@ func newKeyringFromDir(cfg KeyringConfig) (Keyring, error) {
 		return Keyring{}, errors.Wrap(err, "failed to initialize cosmos keyring")
 	}
 
+	// convert address to cosmos "internal helios" formatted
+	hexAddress := common.HexToAddress(cfg.KeyFrom)
+	cosmosAddr := cosmostypes.AccAddress(hexAddress.Bytes())
+
 	var keyRecord *keyring.Record
-	if cosmosAddr, err := cosmostypes.AccAddressFromBech32(cfg.KeyFrom); err != nil {
-		r, err := kr.Key(cfg.KeyFrom)
-		if err != nil {
-			return Keyring{}, err
-		}
-
-		keyRecord = r
-	} else {
-		r, err := kr.KeyByAddress(cosmosAddr)
-		if err != nil {
-			return Keyring{}, err
-		}
-
-		keyRecord = r
+	r, err := kr.KeyByAddress(cosmosAddr)
+	if err != nil {
+		return Keyring{}, err
 	}
-
+	keyRecord = r
 	switch keyRecord.GetType() {
 	case keyring.TypeLocal:
 		// kb has a key and it's totally usable
@@ -192,6 +143,7 @@ func newKeyringFromDir(cfg KeyringConfig) (Keyring, error) {
 		k := Keyring{
 			Keyring: kr,
 			Addr:    addr,
+			HexAddr: common.BytesToAddress(cosmosAddr.Bytes()),
 		}
 
 		return k, nil

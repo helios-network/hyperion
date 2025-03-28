@@ -137,13 +137,14 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "helios-chain-id",
 		Desc:   "Specify Chain ID of the Helios network.",
 		EnvVar: "HYPERION_HELIOS_CHAIN_ID",
-		Value:  "888",
+		Value:  "42000",
 	})
 
 	cfg.heliosGRPC = cmd.String(cli.StringOpt{
 		Name:   "helios-grpc",
 		Desc:   "Helios GRPC querying endpoint",
 		EnvVar: "HYPERION_HELIOS_GRPC",
+		Value:  "tcp://localhost:9090",
 	})
 
 	cfg.tendermintRPC = cmd.String(cli.StringOpt{
@@ -153,7 +154,7 @@ func initConfig(cmd *cli.Cmd) Config {
 	})
 
 	cfg.heliosGasPrices = cmd.String(cli.StringOpt{
-		Name:   "cosmos-gas-prices",
+		Name:   "helios-gas-prices",
 		Desc:   "Specify Helios chain transaction fees as DecCoins gas prices",
 		EnvVar: "HYPERION_HELIOS_GAS_PRICES",
 		Value:  "", // example: 500000000ahelios
@@ -168,9 +169,9 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	cfg.heliosKeyringBackend = cmd.String(cli.StringOpt{
 		Name:   "helios-keyring",
-		Desc:   "Specify Helios keyring backend (os|file|kwallet|pass|test)",
+		Desc:   "Specify Helios keyring backend (os|file|pass|test|local)",
 		EnvVar: "HYPERION_HELIOS_KEYRING",
-		Value:  "file",
+		Value:  "local",
 	})
 
 	cfg.heliosKeyringDir = cmd.String(cli.StringOpt{
