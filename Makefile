@@ -19,7 +19,8 @@ push:
 install: export GOPROXY=direct
 install: export VERSION_FLAGS="-X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).BuildDate=$(BUILD_DATE)"
 install:
-	$(DOCKER) && go install -tags muslc -ldflags $(VERSION_FLAGS) ./cmd/... || go install -ldflags $(VERSION_FLAGS) ./cmd/...
+	@$(DOCKER) && go install -tags muslc -ldflags $(VERSION_FLAGS) ./cmd/... || go install -ldflags $(VERSION_FLAGS) ./cmd/...
+	@echo "hyperion command line installed in your go path"
 
 .PHONY: install image push test gen
 
@@ -29,14 +30,3 @@ start:
 test:
 	# go clean -testcache
 	go test ./test/...
-
-gen: solidity-wrappers
-
-SOLIDITY_DIR = solidity
-solidity-wrappers: $(SOLIDITY_DIR)/contracts/*.sol
-	cd $(SOLIDITY_DIR)/contracts/ ; \
-	for file in $(^F) ; do \
-			mkdir -p ../wrappers/$${file} ; \
-			echo "Compiling and generating Go bindings for $${file}..."; \
-			solc --via-ir --optimize --combined-json abi,bin $${file} | abigen --type=hyperion --pkg=wrappers --out=../wrappers/$${file}/wrapper.go --combined-json -; \
-	done

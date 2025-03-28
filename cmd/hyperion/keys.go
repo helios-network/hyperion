@@ -9,12 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/usbwallet"
-	"github.com/ethereum/go-ethereum/common"
 	ethcmn "github.com/ethereum/go-ethereum/common"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
@@ -40,85 +36,85 @@ func initEthereumAccountsManager(
 	err error,
 ) {
 	switch {
-	case *ethUseLedger:
-		if ethKeyFrom == nil {
-			err := errors.New("cannot use Ledger without from address specified")
-			return emptyEthAddress, nil, nil, err
-		}
-		log.Infoln("initialized Ethereum keyring with ethKeyFrom", ethKeyFrom)
+	// case *ethUseLedger:
+	// 	if ethKeyFrom == nil {
+	// 		err := errors.New("cannot use Ledger without from address specified")
+	// 		return emptyEthAddress, nil, nil, err
+	// 	}
+	// 	log.Infoln("initialized Ethereum keyring with ethKeyFrom", ethKeyFrom)
 
-		ethKeyFromAddress = ethcmn.HexToAddress(*ethKeyFrom)
-		log.Infoln("after convert", ethKeyFrom)
-		if ethKeyFromAddress == (ethcmn.Address{}) {
-			err = errors.Wrap(err, "failed to parse Ethereum from address")
-			return emptyEthAddress, nil, nil, err
-		}
+	// 	ethKeyFromAddress = ethcmn.HexToAddress(*ethKeyFrom)
+	// 	log.Infoln("after convert", ethKeyFrom)
+	// 	if ethKeyFromAddress == (ethcmn.Address{}) {
+	// 		err = errors.Wrap(err, "failed to parse Ethereum from address")
+	// 		return emptyEthAddress, nil, nil, err
+	// 	}
 
-		ledgerBackend, err := usbwallet.NewLedgerHub()
-		if err != nil {
-			err = errors.Wrap(err, "failed to connect with Ethereum app on Ledger device")
-			return emptyEthAddress, nil, nil, err
-		}
+	// 	ledgerBackend, err := usbwallet.NewLedgerHub()
+	// 	if err != nil {
+	// 		err = errors.Wrap(err, "failed to connect with Ethereum app on Ledger device")
+	// 		return emptyEthAddress, nil, nil, err
+	// 	}
 
-		signerFn = func(from common.Address, tx *ethtypes.Transaction) (*ethtypes.Transaction, error) {
-			acc := accounts.Account{
-				Address: from,
-			}
+	// 	signerFn = func(from common.Address, tx *ethtypes.Transaction) (*ethtypes.Transaction, error) {
+	// 		acc := accounts.Account{
+	// 			Address: from,
+	// 		}
 
-			wallets := ledgerBackend.Wallets()
-			for _, w := range wallets {
-				if err := w.Open(""); err != nil {
-					err = errors.Wrap(err, "failed to connect to wallet on Ledger device")
-					return nil, err
-				}
+	// 		wallets := ledgerBackend.Wallets()
+	// 		for _, w := range wallets {
+	// 			if err := w.Open(""); err != nil {
+	// 				err = errors.Wrap(err, "failed to connect to wallet on Ledger device")
+	// 				return nil, err
+	// 			}
 
-				if !w.Contains(acc) {
-					if err := w.Close(); err != nil {
-						err = errors.Wrap(err, "failed to disconnect the wallet on Ledger device")
-						return nil, err
-					}
+	// 			if !w.Contains(acc) {
+	// 				if err := w.Close(); err != nil {
+	// 					err = errors.Wrap(err, "failed to disconnect the wallet on Ledger device")
+	// 					return nil, err
+	// 				}
 
-					continue
-				}
+	// 				continue
+	// 			}
 
-				tx, err = w.SignTx(acc, tx, new(big.Int).SetUint64(ethChainID))
-				_ = w.Close()
-				return tx, err
-			}
+	// 			tx, err = w.SignTx(acc, tx, new(big.Int).SetUint64(ethChainID))
+	// 			_ = w.Close()
+	// 			return tx, err
+	// 		}
 
-			return nil, errors.Errorf("account %s not found on Ledger", from.String())
-		}
+	// 		return nil, errors.Errorf("account %s not found on Ledger", from.String())
+	// 	}
 
-		personalSignFn = func(from common.Address, data []byte) (sig []byte, err error) {
-			acc := accounts.Account{
-				Address: from,
-			}
+	// 	personalSignFn = func(from common.Address, data []byte) (sig []byte, err error) {
+	// 		acc := accounts.Account{
+	// 			Address: from,
+	// 		}
 
-			wallets := ledgerBackend.Wallets()
-			for _, w := range wallets {
-				if err := w.Open(""); err != nil {
-					err = errors.Wrap(err, "failed to connect to wallet on Ledger device")
-					return nil, err
-				}
+	// 		wallets := ledgerBackend.Wallets()
+	// 		for _, w := range wallets {
+	// 			if err := w.Open(""); err != nil {
+	// 				err = errors.Wrap(err, "failed to connect to wallet on Ledger device")
+	// 				return nil, err
+	// 			}
 
-				if !w.Contains(acc) {
-					if err := w.Close(); err != nil {
-						err = errors.Wrap(err, "failed to disconnect the wallet on Ledger device")
-						return nil, err
-					}
+	// 			if !w.Contains(acc) {
+	// 				if err := w.Close(); err != nil {
+	// 					err = errors.Wrap(err, "failed to disconnect the wallet on Ledger device")
+	// 					return nil, err
+	// 				}
 
-					continue
-				}
+	// 				continue
+	// 			}
 
-				sig, err = w.SignText(acc, data)
-				_ = w.Close()
-				return sig, err
-			}
+	// 			sig, err = w.SignText(acc, data)
+	// 			_ = w.Close()
+	// 			return sig, err
+	// 		}
 
-			return nil, errors.Errorf("account %s not found on Ledger", from.String())
-		}
+	// 		return nil, errors.Errorf("account %s not found on Ledger", from.String())
+	// 	}
 
-		return ethKeyFromAddress, signerFn, personalSignFn, nil
+	// 	return ethKeyFromAddress, signerFn, personalSignFn, nil
 
 	case len(*ethPrivKey) > 0:
 		log.Info("fallback to this case")

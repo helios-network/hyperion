@@ -6,7 +6,6 @@ toolchain go1.22.4
 
 require (
 	cosmossdk.io/math v1.3.0
-	github.com/Helios-Chain-Labs/etherman v0.50.10-helios-1
 	github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2
 	github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-37
 	github.com/avast/retry-go v3.0.0+incompatible
@@ -15,8 +14,6 @@ require (
 	github.com/ethereum/go-ethereum v1.15.5
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jawher/mow.cli v1.2.0
-	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.27.10
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.2.0
 	github.com/stretchr/testify v1.9.0
@@ -25,6 +22,8 @@ require (
 	golang.org/x/crypto v0.25.0
 	google.golang.org/grpc v1.64.1
 )
+
+require github.com/onsi/gomega v1.27.10 // indirect
 
 require (
 	cosmossdk.io/api v0.7.5 // indirect
@@ -142,12 +141,9 @@ require (
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/itchyny/gojq v0.12.2 // indirect
-	github.com/itchyny/timefmt-go v0.1.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/joho/godotenv v1.5.1
-	github.com/karalabe/usb v0.0.2 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
@@ -161,7 +157,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mixpanel/mixpanel-go v1.2.1 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
@@ -198,10 +193,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
 	github.com/tidwall/btree v1.7.0 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
-	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
@@ -231,7 +222,6 @@ require (
 	gopkg.in/DataDog/dd-trace-go.v1 v1.62.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
