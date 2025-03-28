@@ -152,7 +152,9 @@ func (e *ethCommitter) SendTx(
 
 		for {
 			opts.Nonce = big.NewInt(nonce)
-			opts.Context, _ = context.WithTimeout(ctx, e.committerOpts.RPCTimeout)
+			ctxTimed, cancelFn := context.WithTimeout(ctx, e.committerOpts.RPCTimeout)
+			defer cancelFn()
+			opts.Context = ctxTimed
 
 			tx := types.NewTransaction(opts.Nonce.Uint64(), recipient, nil, opts.GasLimit, opts.GasPrice, txData)
 			// log.Info("e.fromAddress: ", e.fromAddress)

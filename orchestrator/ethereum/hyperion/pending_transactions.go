@@ -78,8 +78,8 @@ func (s *hyperionContract) SubscribeToPendingTxs(alchemyWebsocketURL string) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelFn()
 
 	// Subscribe to Transactions
 	ch := make(chan *RPCTransaction)

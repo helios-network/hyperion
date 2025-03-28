@@ -121,9 +121,5 @@ func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddre
 		"min_fee":    minFeeUSD.String() + "USD",
 	}).Debugln("checking total batch fees")
 
-	if totalFeeUSD.LessThan(minFeeUSD) {
-		return false
-	}
-
-	return true
+	return !totalFeeUSD.LessThan(minFeeUSD)
 }

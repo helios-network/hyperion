@@ -350,9 +350,9 @@ type (
 
 func filterEvents(events []event, nonce uint64) (filtered []event) {
 	for _, e := range events {
-		// if e.Nonce() > nonce {
-		filtered = append(filtered, e)
-		// }
+		if e.Nonce() > nonce {
+			filtered = append(filtered, e)
+		}
 	}
 
 	return
