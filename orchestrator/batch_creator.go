@@ -56,7 +56,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
 	var fees []*hyperiontypes.BatchFees
 	fn := func() (err error) {
-		fees, err = l.helios.UnbatchedTokensWithFees(ctx)
+		fees, err = l.helios.UnbatchedTokensWithFees(ctx, l.cfg.HyperionId)
 		return
 	}
 

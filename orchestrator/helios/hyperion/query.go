@@ -27,7 +27,7 @@ type QueryClient interface {
 
 	OldestUnsignedTransactionBatch(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
-	UnbatchedTokensWithFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error)
+	UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error)
 	TransactionBatchSignatures(ctx context.Context, hyperionId uint64, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
 }
 
@@ -201,12 +201,14 @@ func (c queryClient) LatestTransactionBatches(ctx context.Context, hyperionId ui
 	return resp.Batches, nil
 }
 
-func (c queryClient) UnbatchedTokensWithFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
+func (c queryClient) UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.QueryClient.BatchFees(ctx, &hyperiontypes.QueryBatchFeeRequest{})
+	resp, err := c.QueryClient.BatchFees(ctx, &hyperiontypes.QueryBatchFeeRequest{
+		HyperionId: hyperionId,
+	})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query BatchFees from daemon")

@@ -34,7 +34,7 @@ type MockCosmosNetwork struct {
 	AllValsetConfirmsFn              func(ctx context.Context, hyperionId uint64, uint642 uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 	OldestUnsignedTransactionBatchFn func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatchesFn       func(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
-	UnbatchedTokensWithFeesFn        func(ctx context.Context) ([]*hyperiontypes.BatchFees, error)
+	UnbatchedTokensWithFeesFn        func(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.BatchFees, error)
 	TransactionBatchSignaturesFn     func(ctx context.Context, hyperionID uint64, nonce uint64, address gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
 	SendValsetConfirmFn              func(ctx context.Context, hyperionID uint64, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirmFn               func(ctx context.Context, hyperionID2 uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
@@ -88,8 +88,8 @@ func (n MockCosmosNetwork) LatestTransactionBatches(ctx context.Context, hyperio
 	return n.LatestTransactionBatchesFn(ctx, hyperionID)
 }
 
-func (n MockCosmosNetwork) UnbatchedTokensWithFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
-	return n.UnbatchedTokensWithFeesFn(ctx)
+func (n MockCosmosNetwork) UnbatchedTokensWithFees(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.BatchFees, error) {
+	return n.UnbatchedTokensWithFeesFn(ctx, hyperionID)
 }
 
 func (n MockCosmosNetwork) TransactionBatchSignatures(ctx context.Context, hyperionID uint64, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {

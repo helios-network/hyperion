@@ -39,7 +39,7 @@ func Test_BatchCreator(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*hyperiontypes.BatchFees, error) {
+					UnbatchedTokensWithFeesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.BatchFees, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -53,7 +53,7 @@ func Test_BatchCreator(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					UnbatchedTokensWithFeesFn: func(context.Context) ([]*hyperiontypes.BatchFees, error) {
+					UnbatchedTokensWithFeesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.BatchFees, error) {
 						return nil, nil
 					},
 				},
@@ -73,7 +73,7 @@ func Test_BatchCreator(t *testing.T) {
 				priceFeed: MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
 				helios: MockCosmosNetwork{
 					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },
-					UnbatchedTokensWithFeesFn: func(context.Context) ([]*hyperiontypes.BatchFees, error) {
+					UnbatchedTokensWithFeesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.BatchFees, error) {
 						fees, _ := math.NewIntFromString("50000000000000000000")
 						return []*hyperiontypes.BatchFees{
 							{
@@ -104,7 +104,7 @@ func Test_BatchCreator(t *testing.T) {
 				},
 				helios: MockCosmosNetwork{
 					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },
-					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*hyperiontypes.BatchFees, error) {
+					UnbatchedTokensWithFeesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.BatchFees, error) {
 						fees, _ := math.NewIntFromString("50000000000000000000")
 						return []*hyperiontypes.BatchFees{{
 							Token:     heliosTokenAddress.String(),
