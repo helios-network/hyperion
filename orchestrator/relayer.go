@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"math/big"
 	"sort"
 	"time"
 
@@ -36,11 +35,6 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
 		return r.relay(ctx)
 	})
-}
-
-func (s *Orchestrator) testReplayTokenBatch(ctx context.Context) {
-	r := relayer{Orchestrator: s}
-	r.mockRelayTokenBatch(ctx, nil)
 }
 
 type relayer struct {
@@ -209,11 +203,11 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		return err
 	}
 
-	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
-	if err != nil {
-		log.Info("failed to get latest ethereum height", err)
-		return err
-	}
+	// latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	// if err != nil {
+	// 	log.Info("failed to get latest ethereum height", err)
+	// 	return err
+	// }
 	// log.Info("latestEthHeight", latestEthHeight)
 
 	var (
@@ -271,150 +265,6 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
 
 	return nil
-}
-
-func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
-	metrics.ReportFuncCall(l.svcTags)
-	doneFn := metrics.ReportFuncTiming(l.svcTags)
-	defer doneFn()
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Load Failed .env: %v", err)
-	}
-
-	batches := []*hyperiontypes.OutgoingTxBatch{
-		{
-			HyperionId:    1,
-			TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-			BatchNonce:    1,
-			BatchTimeout:  1,
-			Block:         43,
-			Transactions: []*hyperiontypes.OutgoingTransferTx{
-				{
-					Id:          1,
-					Sender:      "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
-					DestAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-					Erc20Token: &hyperiontypes.ERC20Token{
-						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
-					},
-					Erc20Fee: &hyperiontypes.ERC20Token{
-						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(10000)),
-					},
-				},
-				{
-					Id:          2,
-					Sender:      "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
-					DestAddress: "0x17267eB1FEC301848d4B5140eDDCFC48945427Ab",
-					Erc20Token: &hyperiontypes.ERC20Token{
-						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
-					},
-					Erc20Fee: &hyperiontypes.ERC20Token{
-						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
-						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(10000)),
-					},
-				},
-			},
-		},
-	}
-
-	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
-	if err != nil {
-		log.Info("failed to get latest ethereum height", err)
-		return err
-	}
-	// log.Info("latestEthHeight", latestEthHeight)
-
-	var (
-		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
-		confirmations        []*hyperiontypes.MsgConfirmBatch
-	)
-
-	for _, batch := range batches {
-		log.Info("batch details: ", batch)
-		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
-		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
-		// 	continue
-		// }
-
-		if batch.HyperionId != l.cfg.HyperionId {
-			log.Info("skipping batch with hyperion id: ", batch.HyperionId)
-			continue
-		}
-
-		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
-		log.Info("sigs", sigs)
-		if err != nil {
-			return err
-		}
-
-		if len(sigs) == 0 {
-			continue
-		}
-
-		oldestConfirmedBatch = batch
-		confirmations = sigs
-		if oldestConfirmedBatch != nil {
-			break
-		}
-	}
-
-	if oldestConfirmedBatch == nil {
-		l.Log().Infoln("no token batch to relay")
-		return nil
-	}
-	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
-
-	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
-	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
-	// 	return nil
-	// }
-
-	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
-	if err != nil {
-		// Returning an error here triggers retries which don't help much except risk a binary crash
-		// Better to warn the user and try again in the next loop interval
-		log.WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
-		return nil
-	}
-
-	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
-
-	return nil
-}
-
-func (l *relayer) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.OutgoingTxBatch) bool {
-	latestEthBatch, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(batch.TokenContract))
-	if err != nil {
-		l.Log().WithError(err).Warningf("unable to get latest batch nonce from Ethereum: token_contract=%s", gethcommon.HexToAddress(batch.TokenContract))
-		return false
-	}
-
-	// Check if ethereum batch was updated by other validators
-	if batch.BatchNonce <= latestEthBatch.Uint64() {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthBatch.Uint64(), "helios_nonce": batch.BatchNonce}).Debugln("batch already updated on Ethereum")
-		return false
-	}
-
-	// Check custom time delay offset
-	blockTime, err := l.helios.GetBlock(ctx, int64(batch.Block))
-	if err != nil {
-		l.Log().WithError(err).Warningln("unable to get latest block from Helios")
-		return false
-	}
-
-	if timeElapsed := time.Since(blockTime.Block.Time); timeElapsed <= l.cfg.RelayBatchOffsetDur {
-		timeRemaining := time.Duration(int64(l.cfg.RelayBatchOffsetDur) - int64(timeElapsed))
-		l.Log().WithField("time_remaining", timeRemaining.String()).Debugln("batch relay offset not reached yet")
-		return false
-	}
-
-	l.Log().WithFields(log.Fields{"helios_nonce": batch.BatchNonce, "eth_nonce": latestEthBatch.Uint64()}).Debugln("new batch update")
-
-	return true
 }
 
 // FindLatestValset finds the latest valset on the Hyperion contract by looking back through the event
