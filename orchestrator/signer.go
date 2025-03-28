@@ -2,8 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"os"
-	"strconv"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/joho/godotenv"
@@ -61,7 +59,6 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
-	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	fn := func() error {
 		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return nil
@@ -78,7 +75,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
-			return l.helios.SendValsetConfirm(ctx, hyperionId, l.cfg.EthereumAddr, l.hyperionID, vs)
+			return l.helios.SendValsetConfirm(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, vs)
 		}); err != nil {
 			return err
 		}

@@ -2,9 +2,7 @@ package orchestrator
 
 import (
 	"context"
-	"os"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -317,21 +315,20 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
-	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
-		return l.helios.SendDepositClaim(ctx, hyperionId, &ev)
+		return l.helios.SendDepositClaim(ctx, l.cfg.HyperionId, &ev)
 	case *valsetUpdate:
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaim(ctx, hyperionId, &ev)
+		return l.helios.SendValsetClaim(ctx, l.cfg.HyperionId, &ev)
 	case *withdrawal:
 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaim(ctx, hyperionId, &ev)
+		return l.helios.SendWithdrawalClaim(ctx, l.cfg.HyperionId, &ev)
 	case *erc20Deployment:
 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaim(ctx, hyperionId, &ev)
+		return l.helios.SendERC20DeployedClaim(ctx, l.cfg.HyperionId, &ev)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}
