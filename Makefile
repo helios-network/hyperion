@@ -29,4 +29,12 @@ start:
 
 test:
 	# go clean -testcache
-	go test ./test/...
+	go test ./orchestrator/...
+
+copy-wrappers:
+	@rm -rf ./solidity
+	@mkdir ./solidity
+	@cp -R ../Ethereum-Bridge-Contract/wrappers ./solidity/wrappers
+
+monitor:
+	(export $$(cat .env | xargs) && sh ./monitor/monitor_hyperion.sh)

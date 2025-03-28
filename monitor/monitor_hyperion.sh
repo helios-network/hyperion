@@ -8,18 +8,15 @@ then
     exit 1
 fi
 
-
-if [ -z "$1" ]
+if [ -z "$HYPERION_COSMOS_FROM" ]
   then
     echo "Run the script with valid orchestrator helios address as argument"
     exit 1
 fi
 
-YOUR_ORCHESTRATOR_INJ_ADDRESS=$1
-
 echo "1. Check pending batches to be confirmed"
 echo "SLASHING_CONDITION - You will be slashed if  a batch request is not confirmed within 25000 blocks upon creation."
-batch=$(curl -s https://lcd.helios.network/hyperion/v1/batch/last?address=${YOUR_ORCHESTRATOR_INJ_ADDRESS})
+batch=$(curl -s http://localhost:1317/hyperion/v1/batch/last?address=${HYPERION_COSMOS_FROM})
 result=$(echo ${batch} | jq '.batch | length')
 if [ ${result} -eq 0 ]; then
         echo "(O) No pending batches"
@@ -31,7 +28,7 @@ fi
 echo ""
 echo "2. Check pending valsets to be confirmed"
 echo "SLASHING_CONDITION - You will be slashed if  a batch request is not confirmed within 25000 blocks upon creation."
-valsets=$(curl -s https://lcd.helios.network/hyperion/v1/valset/last?address=${YOUR_ORCHESTRATOR_INJ_ADDRESS})
+valsets=$(curl -s http://localhost:1317/hyperion/v1/valset/last?address=${HYPERION_COSMOS_FROM})
 result=$(echo ${valsets} | jq '.valsets | length')
 if [ ${result} -eq 0 ]; then
         echo "(O) No Pending Valsets"
@@ -43,8 +40,8 @@ fi
 echo ""
 echo "3. Check latest event broadcasted by hyperion is upto date"
 echo "SLASHING_CONDITION - You will be slashed if  you don't broadcast an event within 25000 blocks and it's broadcasted by majority of validators.  This is disabled for now."
-lon=$(curl -s https://lcd.helios.network/hyperion/v1/module_state | jq '.state.last_observed_nonce')
-lce=$(curl -s https://lcd.helios.network/hyperion/v1/oracle/event/${YOUR_ORCHESTRATOR_INJ_ADDRESS} | jq '.last_claim_event.ethereum_event_nonce')
+lon=$(curl -s http://localhost:1317/hyperion/v1/module_state | jq '.state.last_observed_nonce')
+lce=$(curl -s http://localhost:1317/hyperion/v1/oracle/event/${HYPERION_COSMOS_FROM} | jq '.last_claim_event.ethereum_event_nonce')
 if [ ${lon} == ${lce} ]; then
         echo "(O) your hyperion is upto date"
 else
