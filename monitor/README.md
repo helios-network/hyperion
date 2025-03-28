@@ -1,6 +1,6 @@
-You can use `monitor_peggo.sh` script to check the status of your peggo.
+You can use `monitor_hyperion.sh` script to check the status of your hyperion.
 Steps to run
 1. Download the script. 
-2. Set permission to execute `chmod +x monitor_peggo.sh`
-3. Run the script with valid orchestrator helios address as argument `./monitor_peggo.sh YOUR_ORCHESTRATOR_INJ_ADDRESS`
+2. Set permission to execute `chmod +x monitor_hyperion.sh`
+3. Run the script with valid orchestrator helios address as argument `./monitor_hyperion.sh YOUR_ORCHESTRATOR_INJ_ADDRESS`
    

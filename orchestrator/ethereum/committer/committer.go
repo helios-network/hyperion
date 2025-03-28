@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 )
 
 // EVMCommitter defines an interface for submitting transactions

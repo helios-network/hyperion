@@ -1,4 +1,4 @@
-# Peggo Architecture
+# Hyperion Architecture
 
 [<img alt="sketch" src="architecture_sketch.png" width="800px" />](./architecture_sketch.png)
 
@@ -38,7 +38,7 @@ Runs orchestrator processes that only relay specific messages that do not requir
 
 This mode is specifically designed to run alongside a validator Helios node, as opposed to the more limited relayer mode which only runs the batch creator and relayer processes.
 
-Runs 4 key parallel processes for orchestrating the Peggy bridge:
+Runs 4 key parallel processes for orchestrating the Hyperion bridge:
 
 1. Oracle Process (`runOracle`):
    * Starts from `lastObservedEthHeight` height
@@ -46,7 +46,7 @@ Runs 4 key parallel processes for orchestrating the Peggy bridge:
    * See [Oracle Process](#oracle-process) for more details.
 
 2. Signer Process (`runSigner`):
-   * Takes `peggyContractID` as input
+   * Takes `hyperionContractID` as input
    * Handles signing of validator messages and transactions
    * See [Signer Process](#signer-process) for more details.
 
@@ -126,7 +126,7 @@ Implemented to handle cases where event nonce falls behind due to:
 * Takes input directly from a trusted Helios node
 * Assumes validity of batches and validator sets from the trusted node
 * Uses retry mechanisms for reliability
-* Requires both Ethereum address and Peggy ID for signing operations
+* Requires both Ethereum address and Hyperion ID for signing operations
 * Reports metrics for monitoring and timing
 * Operates as part of the main Orchestrator process
 
@@ -165,47 +165,42 @@ The BatchCreator runs as a loop with a default duration (60 seconds) checking fo
 
 ## Helios Broadcast Client
 
-1. `UpdatePeggyOrchestratorAddresses`
-   * Allows validators to delegate voting responsibilities to a key
-   * Sets the Ethereum address that represents validators on the Ethereum side
-   * Validators must sign their Helios address using their submitted Ethereum address
-
-2. `SendValsetConfirm`
+1. `SendValsetConfirm`
    * Used by validators to submit signatures over validator set at a given block height
    * Requires validator to first set Ethereum address
    * When 66% of voting power submits signatures, they can be used to update validator set on Ethereum
 
-3. `SendBatchConfirm`
+2. `SendBatchConfirm`
    * Validators observe batch requests and form batches by ordering transactions by fee
    * Includes validator's Ethereum signature over the batch
    * Batches are cut off at max size or when transactions stop being profitable
 
-4. `SendToEth`
+3. `SendToChain`
    * User-initiated message to bridge assets
    * Removes tokens from user's balance immediately
    * Has two layers of fees: bridge fee and chain fee
 
-5. `SendRequestBatch`
+4. `SendRequestBatch`
    * Anyone can request creation of a transaction batch
    * Acts as coordination point for cross-chain transfers
    * Handler generates batch from pending transactions
    * Validators sign batch before relayer submits it
 
-6. `SendDepositClaim`
+5. `SendDepositClaim`
    * Claims deposits from Ethereum to Cosmos
    * When >66% validators confirm seeing deposit, coins are issued on Helios side
    * Includes event details like sender, receiver, amount and token contract
 
-7. `SendWithdrawalClaim`
+6. `SendWithdrawalClaim`
    * Claims execution of withdrawal batch on Ethereum
    * Confirms batch of withdrawal operations completed on bridge contract
 
-8. `SendValsetClaim`
+7. `SendValsetClaim`
    * Claims validator set updates on Ethereum
    * Includes new validator powers and addresses
    * Tracks reward distribution
 
-9. `SendERC20DeployedClaim`
+8. `SendERC20DeployedClaim`
    * Claims deployment of new ERC20 token contracts
    * Records token details like name, symbol, decimals
    * Maps Helios denoms to Ethereum token contracts

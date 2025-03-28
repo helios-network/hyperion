@@ -4,6 +4,7 @@
 package wrappers
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
+	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
@@ -24,35 +26,34 @@ var (
 	_ = common.Big1
 	_ = types.BloomLookup
 	_ = event.NewSubscription
+	_ = abi.ConvertType
 )
 
-// HashingTestABI is the input ABI used to generate the binding from.
-const HashingTestABI = "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_peggyId\",\"type\":\"bytes32\"}],\"name\":\"ConcatHash\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_peggyId\",\"type\":\"bytes32\"}],\"name\":\"ConcatHash2\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_peggyId\",\"type\":\"bytes32\"}],\"name\":\"IterativeHash\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"}],\"name\":\"JustSaveEverything\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"}],\"name\":\"JustSaveEverythingAgain\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"lastCheckpoint\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"state_nonce\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"state_powers\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"state_validators\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]"
-
-// HashingTestFuncSigs maps the 4-byte function signature to its string representation.
-var HashingTestFuncSigs = map[string]string{
-	"6071cbd9": "ConcatHash(address[],uint256[],uint256,bytes32)",
-	"0caff28b": "ConcatHash2(address[],uint256[],uint256,bytes32)",
-	"74df6ae4": "IterativeHash(address[],uint256[],uint256,bytes32)",
-	"884403e2": "JustSaveEverything(address[],uint256[],uint256)",
-	"715dff7e": "JustSaveEverythingAgain(address[],uint256[],uint256)",
-	"d32e81a5": "lastCheckpoint()",
-	"ccf0e74c": "state_nonce()",
-	"2b939281": "state_powers(uint256)",
-	"2afbb62e": "state_validators(uint256)",
+// HashingTestMetaData contains all meta data concerning the HashingTest contract.
+var HashingTestMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_hyperionId\",\"type\":\"bytes32\"}],\"name\":\"ConcatHash\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_hyperionId\",\"type\":\"bytes32\"}],\"name\":\"ConcatHash2\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_hyperionId\",\"type\":\"bytes32\"}],\"name\":\"IterativeHash\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"}],\"name\":\"JustSaveEverything\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_validators\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"_powers\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"_valsetNonce\",\"type\":\"uint256\"}],\"name\":\"JustSaveEverythingAgain\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"lastCheckpoint\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"state_nonce\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"state_powers\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"state_validators\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	Bin: "0x608080604052346015576107da908161001a8239f35b5f80fdfe60806040526004361015610011575f80fd5b5f3560e01c80630caff28b146103b45780632afbb62e146103505780632b939281146102e25780636071cbd914610223578063715dff7e146100b957806374df6ae4146100be578063884403e2146100b9578063ccf0e74c1461009c5763d32e81a51461007c575f80fd5b34610098575f3660031901126100985760205f54604051908152f35b5f80fd5b34610098575f366003190112610098576020600354604051908152f35b610588565b34610098576100cc36610531565b9060405190602082019283526918da1958dadc1bda5b9d60b21b60408301526060820152606081526100ff608082610418565b519020905f915b835183101561021f5782610181575b6001600160a01b036101278486610790565b51166101338484610790565b5160405191602083019384526040830152606082015260608152610158608082610418565b519020916001810180911161016d5791610106565b634e487b7160e01b5f52601160045260245ffd5b61018b8383610790565b515f19840184811161016d576101a19084610790565b5110156101155760405162461bcd60e51b815260206004820152604360248201527f56616c696461746f7220706f776572206d757374206e6f74206265206869676860448201527f6572207468616e2070726576696f75732076616c696461746f7220696e2062616064820152620e8c6d60eb1b608482015260a490fd5b5f55005b346100985761023136610531565b9060405190602082019283526918da1958dadc1bda5b9d60b21b6040830152606082015260608152610264608082610418565b5190209160405161029381610285602082019460208652604083019061070b565b03601f198101835282610418565b519020906040516102b4816102856020820194602086526040830190610747565b519020604051916020830193845260408301526060820152606081526102db608082610418565b5190205f55005b34610098576020366003190112610098576004356002548110156100985760025481101561033c5760025f527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace0154604051908152602090f35b634e487b7160e01b5f52603260045260245ffd5b34610098576020366003190112610098576004356001548110156100985760015481101561033c5760015f527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf601546040516001600160a01b039091168152602090f35b34610098576102db6102856103c836610531565b9492939091610406604051958694602086019889526918da1958dadc1bda5b9d60b21b6040870152606086015260a0608086015260c085019061070b565b838103601f190160a085015290610747565b90601f8019910116810190811067ffffffffffffffff82111761043a57604052565b634e487b7160e01b5f52604160045260245ffd5b67ffffffffffffffff811161043a5760051b60200190565b9080601f830112156100985781359061047e8261044e565b9261048c6040519485610418565b82845260208085019360051b82010191821161009857602001915b8183106104b45750505090565b82356001600160a01b0381168103610098578152602092830192016104a7565b9080601f830112156100985781356104eb8161044e565b926104f96040519485610418565b81845260208085019260051b82010192831161009857602001905b8282106105215750505090565b8135815260209182019101610514565b9060806003198301126100985760043567ffffffffffffffff8111610098578261055d91600401610466565b916024359067ffffffffffffffff82116100985761057d916004016104d4565b906044359060643590565b346100985760603660031901126100985760043567ffffffffffffffff8111610098576105b9903690600401610466565b60243567ffffffffffffffff8111610098576105d99036906004016104d4565b81516044359267ffffffffffffffff821161043a57600160401b821161043a57602090600154836001558084106106ef575b500160015f525f5b8281106106b25750505080519067ffffffffffffffff821161043a57600160401b821161043a5760209060025483600255808410610696575b500160025f525f5b828110610662576003849055005b60019060208351930192817f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace015501610654565b6106ac9060025f5284845f20918201910161077a565b5f61064c565b81516001600160a01b03167fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6820155602090910190600101610613565b6107059060015f5284845f20918201910161077a565b5f61060b565b90602080835192838152019201905f5b8181106107285750505090565b82516001600160a01b031684526020938401939092019160010161071b565b90602080835192838152019201905f5b8181106107645750505090565b8251845260209384019390920191600101610757565b818110610785575050565b5f815560010161077a565b805182101561033c5760209160051b01019056fea2646970667358221220c6409085b0941c71856d5a00e0e7e59c5f049822a61bf835cb5f15f514e8e3a764736f6c634300081c0033",
 }
 
+// HashingTestABI is the input ABI used to generate the binding from.
+// Deprecated: Use HashingTestMetaData.ABI instead.
+var HashingTestABI = HashingTestMetaData.ABI
+
 // HashingTestBin is the compiled bytecode used for deploying new contracts.
-var HashingTestBin = "0x608060405234801561001057600080fd5b5061091b806100206000396000f3fe608060405234801561001057600080fd5b50600436106100935760003560e01c8063715dff7e11610066578063715dff7e1461011157806374df6ae414610124578063884403e214610111578063ccf0e74c14610137578063d32e81a51461014057600080fd5b80630caff28b146100985780632afbb62e146100ad5780632b939281146100dd5780636071cbd9146100fe575b600080fd5b6100ab6100a63660046106ca565b610149565b005b6100c06100bb36600461073b565b610197565b6040516001600160a01b0390911681526020015b60405180910390f35b6100f06100eb36600461073b565b6101c1565b6040519081526020016100d4565b6100ab61010c3660046106ca565b6101e2565b6100ab61011f366004610660565b6102b4565b6100ab6101323660046106ca565b6102e3565b6100f060035481565b6100f060005481565b6040516918da1958dadc1bda5b9d60b21b90600090610174908490849087908a908a906020016107f2565b60408051601f198184030181529190528051602090910120600055505050505050565b600181815481106101a757600080fd5b6000918252602090912001546001600160a01b0316905081565b600281815481106101d157600080fd5b600091825260209091200154905081565b60408051602081018390526918da1958dadc1bda5b9d60b21b9181018290526060810184905260009060800160405160208183030381529060405280519060200120905060008660405160200161023991906107c5565b60405160208183030381529060405280519060200120905060008660405160200161026491906107df565b60408051808303601f190181528282528051602091820120818401969096528282019490945260608083019590955280518083039095018552608090910190525081519101206000555050505050565b82516102c79060019060208601906104cb565b5081516102db906002906020850190610530565b506003555050565b60408051602081018390526918da1958dadc1bda5b9d60b21b9181018290526060810184905260009060800160405160208183030381529060405280519060200120905060005b86518110156104c057801561041757856103456001836108a2565b8151811061036357634e487b7160e01b600052603260045260246000fd5b602002602001015186828151811061038b57634e487b7160e01b600052603260045260246000fd5b602002602001015111156104175760405162461bcd60e51b815260206004820152604360248201527f56616c696461746f7220706f776572206d757374206e6f74206265206869676860448201527f6572207468616e2070726576696f75732076616c696461746f7220696e2062616064820152620e8c6d60eb1b608482015260a40160405180910390fd5b8187828151811061043857634e487b7160e01b600052603260045260246000fd5b602002602001015187838151811061046057634e487b7160e01b600052603260045260246000fd5b6020026020010151604051602001610494939291909283526001600160a01b03919091166020830152604082015260600190565b6040516020818303038152906040528051906020012091508060016104b9919061088a565b905061032a565b506000555050505050565b828054828255906000526020600020908101928215610520579160200282015b8281111561052057825182546001600160a01b0319166001600160a01b039091161782556020909201916001909101906104eb565b5061052c92915061056b565b5090565b828054828255906000526020600020908101928215610520579160200282015b82811115610520578251825591602001919060010190610550565b5b8082111561052c576000815560010161056c565b600082601f830112610590578081fd5b813560206105a56105a083610866565b610835565b80838252828201915082860187848660051b89010111156105c4578586fd5b855b858110156105f65781356001600160a01b03811681146105e4578788fd5b845292840192908401906001016105c6565b5090979650505050505050565b600082601f830112610613578081fd5b813560206106236105a083610866565b80838252828201915082860187848660051b8901011115610642578586fd5b855b858110156105f657813584529284019290840190600101610644565b600080600060608486031215610674578283fd5b833567ffffffffffffffff8082111561068b578485fd5b61069787838801610580565b945060208601359150808211156106ac578384fd5b506106b986828701610603565b925050604084013590509250925092565b600080600080608085870312156106df578081fd5b843567ffffffffffffffff808211156106f6578283fd5b61070288838901610580565b95506020870135915080821115610717578283fd5b5061072487828801610603565b949794965050505060408301359260600135919050565b60006020828403121561074c578081fd5b5035919050565b6000815180845260208085019450808401835b8381101561078b5781516001600160a01b031687529582019590820190600101610766565b509495945050505050565b6000815180845260208085019450808401835b8381101561078b578151875295820195908201906001016107a9565b6020815260006107d86020830184610753565b9392505050565b6020815260006107d86020830184610796565b85815284602082015283604082015260a06060820152600061081760a0830185610753565b82810360808401526108298185610796565b98975050505050505050565b604051601f8201601f1916810167ffffffffffffffff8111828210171561085e5761085e6108cf565b604052919050565b600067ffffffffffffffff821115610880576108806108cf565b5060051b60200190565b6000821982111561089d5761089d6108b9565b500190565b6000828210156108b4576108b46108b9565b500390565b634e487b7160e01b600052601160045260246000fd5b634e487b7160e01b600052604160045260246000fdfea264697066735822122092cdf7061a03b54ac577099a198adf70275108982f1e5e48a2ec4eeb0c0bda3c64736f6c63430008040033"
+// Deprecated: Use HashingTestMetaData.Bin instead.
+var HashingTestBin = HashingTestMetaData.Bin
 
 // DeployHashingTest deploys a new Ethereum contract, binding an instance of HashingTest to it.
 func DeployHashingTest(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *HashingTest, error) {
-	parsed, err := abi.JSON(strings.NewReader(HashingTestABI))
+	parsed, err := HashingTestMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
 
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(HashingTestBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(HashingTestBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -156,11 +157,11 @@ func NewHashingTestFilterer(address common.Address, filterer bind.ContractFilter
 
 // bindHashingTest binds a generic wrapper to an already deployed contract.
 func bindHashingTest(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(HashingTestABI))
+	parsed, err := HashingTestMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
 }
 
 // Call invokes the (constant) contract method with params as input values and
@@ -327,65 +328,65 @@ func (_HashingTest *HashingTestCallerSession) StateValidators(arg0 *big.Int) (co
 
 // ConcatHash is a paid mutator transaction binding the contract method 0x6071cbd9.
 //
-// Solidity: function ConcatHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestTransactor) ConcatHash(opts *bind.TransactOpts, _validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.contract.Transact(opts, "ConcatHash", _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function ConcatHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestTransactor) ConcatHash(opts *bind.TransactOpts, _validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.contract.Transact(opts, "ConcatHash", _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // ConcatHash is a paid mutator transaction binding the contract method 0x6071cbd9.
 //
-// Solidity: function ConcatHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestSession) ConcatHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.Contract.ConcatHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function ConcatHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestSession) ConcatHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.Contract.ConcatHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // ConcatHash is a paid mutator transaction binding the contract method 0x6071cbd9.
 //
-// Solidity: function ConcatHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestTransactorSession) ConcatHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.Contract.ConcatHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function ConcatHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestTransactorSession) ConcatHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.Contract.ConcatHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // ConcatHash2 is a paid mutator transaction binding the contract method 0x0caff28b.
 //
-// Solidity: function ConcatHash2(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestTransactor) ConcatHash2(opts *bind.TransactOpts, _validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.contract.Transact(opts, "ConcatHash2", _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function ConcatHash2(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestTransactor) ConcatHash2(opts *bind.TransactOpts, _validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.contract.Transact(opts, "ConcatHash2", _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // ConcatHash2 is a paid mutator transaction binding the contract method 0x0caff28b.
 //
-// Solidity: function ConcatHash2(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestSession) ConcatHash2(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.Contract.ConcatHash2(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function ConcatHash2(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestSession) ConcatHash2(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.Contract.ConcatHash2(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // ConcatHash2 is a paid mutator transaction binding the contract method 0x0caff28b.
 //
-// Solidity: function ConcatHash2(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestTransactorSession) ConcatHash2(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.Contract.ConcatHash2(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function ConcatHash2(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestTransactorSession) ConcatHash2(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.Contract.ConcatHash2(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // IterativeHash is a paid mutator transaction binding the contract method 0x74df6ae4.
 //
-// Solidity: function IterativeHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestTransactor) IterativeHash(opts *bind.TransactOpts, _validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.contract.Transact(opts, "IterativeHash", _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function IterativeHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestTransactor) IterativeHash(opts *bind.TransactOpts, _validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.contract.Transact(opts, "IterativeHash", _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // IterativeHash is a paid mutator transaction binding the contract method 0x74df6ae4.
 //
-// Solidity: function IterativeHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestSession) IterativeHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.Contract.IterativeHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function IterativeHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestSession) IterativeHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.Contract.IterativeHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // IterativeHash is a paid mutator transaction binding the contract method 0x74df6ae4.
 //
-// Solidity: function IterativeHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _peggyId) returns()
-func (_HashingTest *HashingTestTransactorSession) IterativeHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _peggyId [32]byte) (*types.Transaction, error) {
-	return _HashingTest.Contract.IterativeHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _peggyId)
+// Solidity: function IterativeHash(address[] _validators, uint256[] _powers, uint256 _valsetNonce, bytes32 _hyperionId) returns()
+func (_HashingTest *HashingTestTransactorSession) IterativeHash(_validators []common.Address, _powers []*big.Int, _valsetNonce *big.Int, _hyperionId [32]byte) (*types.Transaction, error) {
+	return _HashingTest.Contract.IterativeHash(&_HashingTest.TransactOpts, _validators, _powers, _valsetNonce, _hyperionId)
 }
 
 // JustSaveEverything is a paid mutator transaction binding the contract method 0x884403e2.

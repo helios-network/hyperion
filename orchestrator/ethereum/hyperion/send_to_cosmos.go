@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -12,10 +12,10 @@ import (
 
 	"github.com/Helios-Chain-Labs/metrics"
 
-	wrappers "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
-func (s *peggyContract) SendToCosmos(
+func (s *hyperionContract) SendToCosmos(
 	ctx context.Context,
 	erc20 common.Address,
 	amount *big.Int,
@@ -36,13 +36,13 @@ func (s *peggyContract) SendToCosmos(
 	if allowance, err := erc20Wrapper.Allowance(&bind.CallOpts{
 		From:    common.Address{},
 		Context: ctx,
-	}, senderAddress, s.peggyAddress); err != nil {
+	}, senderAddress, s.hyperionAddress); err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		err = errors.Wrap(err, "failed to get ERC20 allowance for peggy contract")
+		err = errors.Wrap(err, "failed to get ERC20 allowance for hyperion contract")
 		return nil, err
 	} else if allowance.Cmp(maxUintAllowance) != 0 {
 		// allowance not set or not max (a.k.a. unlocked token)
-		txData, err := erc20ABI.Pack("approve", s.peggyAddress, maxUintAllowance)
+		txData, err := erc20ABI.Pack("approve", s.hyperionAddress, maxUintAllowance)
 		if err != nil {
 			metrics.ReportFuncError(s.svcTags)
 			log.WithError(err).Errorln("ABI Pack (ERC20 approve) method")
@@ -68,21 +68,21 @@ func (s *peggyContract) SendToCosmos(
 		cosmosDestAddressBytes = append(cosmosDestAddressBytes, byte(0))
 	}
 
-	txData, err := peggyABI.Pack("sendToCosmos", erc20, cosmosDestAddressBytes, amount)
+	txData, err := hyperionABI.Pack("sendToCosmos", erc20, cosmosDestAddressBytes, amount)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).Errorln("ABI Pack (Peggy sendToCosmos) method")
+		log.WithError(err).Errorln("ABI Pack (Hyperion sendToCosmos) method")
 		return nil, err
 	}
 
-	txHash, err := s.SendTx(ctx, s.peggyAddress, txData)
+	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Peggy sendToCosmos) to EVM")
+		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion sendToCosmos) to EVM")
 		return nil, err
 	}
 
-	log.Infoln("Sent Tx (Peggy sendToCosmos):", txHash.Hex())
+	log.Infoln("Sent Tx (Hyperion sendToCosmos):", txHash.Hex())
 
 	return &txHash, nil
 }

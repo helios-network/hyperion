@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -9,10 +10,10 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
 )
 
 const (
@@ -26,6 +27,7 @@ type PriceFeed interface {
 
 type Config struct {
 	CosmosAddr           cosmostypes.AccAddress
+	HyperionId           uint64
 	EthereumAddr         gethcommon.Address
 	MinBatchFeeUSD       float64
 	ERC20ContractMapping map[gethcommon.Address]string
@@ -42,7 +44,7 @@ type Orchestrator struct {
 	cfg         Config
 	maxAttempts uint
 
-	helios cosmos.Network
+	helios    cosmos.Network
 	ethereum  ethereum.Network
 	priceFeed PriceFeed
 }
@@ -55,7 +57,7 @@ func NewOrchestrator(
 ) (*Orchestrator, error) {
 	o := &Orchestrator{
 		logger:      log.DefaultLogger,
-		svcTags:     metrics.Tags{"svc": "peggy_orchestrator"},
+		svcTags:     metrics.Tags{"svc": "hyperion_orchestrator"},
 		helios:      helios,
 		ethereum:    eth,
 		priceFeed:   priceFeed,
@@ -77,30 +79,40 @@ func (s *Orchestrator) Run(ctx context.Context, helios cosmos.Network, eth ether
 }
 
 // startValidatorMode runs all orchestrator processes. This is called
-// when peggo is run alongside a validator helios node.
+// when hyperion is run alongside a validator helios node.
 func (s *Orchestrator) startValidatorMode(ctx context.Context, helios cosmos.Network, eth ethereum.Network) error {
 	log.Infoln("running orchestrator in validator mode")
 
+	// get hyperion ID from contract
+	hyperionIDHash, err := eth.GetHyperionID(ctx)
+	if err != nil {
+		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+	}
+	hyperionID := hyperionIDHash.Big().Uint64()
+
+	s.logger.Info("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
+
 	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
 	if lastObservedEthBlock == 0 {
-		peggyParams, err := helios.PeggyParams(ctx)
+		hyperionParams, err := helios.HyperionParams(ctx)
 		if err != nil {
-			s.logger.WithError(err).Fatalln("unable to query peggy module params, is heliades running?")
+			s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
 		}
 
-		lastObservedEthBlock = peggyParams.BridgeContractStartHeight
-	}
-
-	// get peggy ID from contract
-	peggyContractID, err := eth.GetPeggyID(ctx)
-	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query peggy ID from contract")
+		for _, params := range hyperionParams.CounterpartyChainParams {
+			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionIDHash {
+				lastObservedEthBlock = params.BridgeContractStartHeight
+				break
+			}
+		}
+	} else {
+		lastObservedEthBlock = lastObservedEthBlock + 1
 	}
 
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
-	pg.Go(func() error { return s.runSigner(ctx, peggyContractID) })
+	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
 
@@ -122,10 +134,12 @@ func (s *Orchestrator) startRelayerMode(ctx context.Context, helios cosmos.Netwo
 }
 
 func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmos.Network) (uint64, error) {
-	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.CosmosAddr)
+	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.HyperionId, s.cfg.CosmosAddr)
 	if err != nil {
+		s.logger.Info("SSSSS", "err", err)
 		return 0, err
 	}
+	s.logger.Info("SSSSS2", "claim", claim.EthereumEventHeight)
 
 	return claim.EthereumEventHeight, nil
 }
@@ -133,6 +147,7 @@ func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios cosmo
 func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 	return retry.Do(fn,
 		retry.Context(ctx),
+		retry.Delay(200*time.Millisecond),
 		retry.Attempts(s.maxAttempts),
 		retry.OnRetry(func(n uint, err error) {
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)

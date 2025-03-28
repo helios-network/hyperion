@@ -14,11 +14,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/committer"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/provider"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type NetworkConfig struct {
@@ -32,39 +33,39 @@ type NetworkConfig struct {
 // Network is the orchestrator's reference endpoint to the Ethereum network
 type Network interface {
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
-	GetPeggyID(ctx context.Context) (gethcommon.Hash, error)
+	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
 
-	GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToCosmosEvent, error)
-	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error)
-	GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error)
-	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error)
-	GetTransactionBatchExecutedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error)
+	GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error)
+	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
+	GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
+	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
+	GetTransactionBatchExecutedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error)
 
 	GetValsetNonce(ctx context.Context) (*big.Int, error)
 	SendEthValsetUpdate(ctx context.Context,
-		oldValset *peggytypes.Valset,
-		newValset *peggytypes.Valset,
-		confirms []*peggytypes.MsgValsetConfirm,
+		oldValset *hyperiontypes.Valset,
+		newValset *hyperiontypes.Valset,
+		confirms []*hyperiontypes.MsgValsetConfirm,
 	) (*gethcommon.Hash, error)
 
 	GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
 	SendTransactionBatch(ctx context.Context,
-		currentValset *peggytypes.Valset,
-		batch *peggytypes.OutgoingTxBatch,
-		confirms []*peggytypes.MsgConfirmBatch,
+		currentValset *hyperiontypes.Valset,
+		batch *hyperiontypes.OutgoingTxBatch,
+		confirms []*hyperiontypes.MsgConfirmBatch,
 	) (*gethcommon.Hash, error)
 
 	TokenDecimals(ctx context.Context, tokenContract gethcommon.Address) (uint8, error)
 }
 
 type network struct {
-	peggy.PeggyContract
+	hyperion.HyperionContract
 
 	FromAddr gethcommon.Address
 }
 
 func NewNetwork(
-	peggyContractAddr,
+	hyperionContractAddr,
 	fromAddr gethcommon.Address,
 	signerFn bind.SignerFn,
 	cfg NetworkConfig,
@@ -74,6 +75,7 @@ func NewNetwork(
 		return nil, errors.Wrapf(err, "failed to connect to ethereum RPC: %s", cfg.EthNodeRPC)
 	}
 
+	log.Info("fromAddr: ", fromAddr)
 	ethCommitter, err := committer.NewEthCommitter(
 		fromAddr,
 		cfg.GasPriceAdjustment,
@@ -90,22 +92,22 @@ func NewNetwork(
 		return nil, err
 	}
 
-	peggyContract, err := peggy.NewPeggyContract(ethCommitter, peggyContractAddr, peggy.PendingTxInputList{}, pendingTxDuration)
+	hyperionContract, err := hyperion.NewHyperionContract(ethCommitter, hyperionContractAddr, hyperion.PendingTxInputList{}, pendingTxDuration)
 	if err != nil {
 		return nil, err
 	}
 
-	// If Alchemy Websocket URL is set, then Subscribe to Pending Transaction of Peggy Contract.
+	// If Alchemy Websocket URL is set, then Subscribe to Pending Transaction of Hyperion Contract.
 	if cfg.EthNodeAlchemyWS != "" {
 		log.WithFields(log.Fields{
 			"url": cfg.EthNodeAlchemyWS,
 		}).Infoln("subscribing to Alchemy websocket")
-		go peggyContract.SubscribeToPendingTxs(cfg.EthNodeAlchemyWS)
+		go hyperionContract.SubscribeToPendingTxs(cfg.EthNodeAlchemyWS)
 	}
 
 	n := &network{
-		PeggyContract: peggyContract,
-		FromAddr:      fromAddr,
+		HyperionContract: hyperionContract,
+		FromAddr:         fromAddr,
 	}
 
 	return n, nil
@@ -133,25 +135,25 @@ func (n *network) GetHeaderByNumber(ctx context.Context, number *big.Int) (*geth
 	return n.Provider().HeaderByNumber(ctx, number)
 }
 
-func (n *network) GetPeggyID(ctx context.Context) (gethcommon.Hash, error) {
-	return n.PeggyContract.GetPeggyID(ctx, n.FromAddr)
+func (n *network) GetHyperionID(ctx context.Context) (gethcommon.Hash, error) {
+	return n.HyperionContract.GetHyperionID(ctx, n.FromAddr)
 }
 
 func (n *network) GetValsetNonce(ctx context.Context) (*big.Int, error) {
-	return n.PeggyContract.GetValsetNonce(ctx, n.FromAddr)
+	return n.HyperionContract.GetValsetNonce(ctx, n.FromAddr)
 }
 
 func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error) {
-	return n.PeggyContract.GetTxBatchNonce(ctx, erc20ContractAddress, n.FromAddr)
+	return n.HyperionContract.GetTxBatchNonce(ctx, erc20ContractAddress, n.FromAddr)
 }
 
-func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-	_, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
+func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
+	_, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
 	}
 
-	// iter, err := peggyFilterer.FilterSendToCosmosEvent(&bind.FilterOpts{
+	// iter, err := hyperionFilterer.FilterSendToCosmosEvent(&bind.FilterOpts{
 	// 	Start: startBlock,
 	// 	End:   &endBlock,
 	// }, nil, nil, nil)
@@ -165,7 +167,7 @@ func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyev
 
 	// defer iter.Close()
 
-	var sendToCosmosEvents []*peggyevents.PeggySendToCosmosEvent
+	var sendToCosmosEvents []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent
 	// for iter.Next() {
 	// 	sendToCosmosEvents = append(sendToCosmosEvents, iter.Event)
 	// }
@@ -173,15 +175,15 @@ func (n *network) GetSendToCosmosEvents(startBlock, endBlock uint64) ([]*peggyev
 	return sendToCosmosEvents, nil
 }
 
-func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
-	peggyFilterer, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
+func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
+	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
 	}
 
 	log.Infof("GetSendToHeliosEvents %d %d", startBlock, endBlock)
 
-	iter, err := peggyFilterer.FilterSendToHeliosEvent(&bind.FilterOpts{
+	iter, err := hyperionFilterer.FilterSendToHeliosEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
 	}, nil, nil, nil)
@@ -195,7 +197,7 @@ func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyev
 
 	defer iter.Close()
 
-	var sendToHeliosEvents []*peggyevents.PeggySendToHeliosEvent
+	var sendToHeliosEvents []*hyperionevents.HyperionSendToHeliosEvent
 	for iter.Next() {
 		log.Infof("NEW EVENTS OF SEND TO HELIOS FILTERED")
 		sendToHeliosEvents = append(sendToHeliosEvents, iter.Event)
@@ -204,13 +206,13 @@ func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*peggyev
 	return sendToHeliosEvents, nil
 }
 
-func (n *network) GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {
-	peggyFilterer, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
+func (n *network) GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
+	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
 	}
 
-	iter, err := peggyFilterer.FilterERC20DeployedEvent(&bind.FilterOpts{
+	iter, err := hyperionFilterer.FilterERC20DeployedEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
 	}, nil)
@@ -224,7 +226,7 @@ func (n *network) GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*p
 
 	defer iter.Close()
 
-	var transactionBatchExecutedEvents []*peggyevents.PeggyERC20DeployedEvent
+	var transactionBatchExecutedEvents []*hyperionevents.HyperionERC20DeployedEvent
 	for iter.Next() {
 		transactionBatchExecutedEvents = append(transactionBatchExecutedEvents, iter.Event)
 	}
@@ -232,13 +234,13 @@ func (n *network) GetPeggyERC20DeployedEvents(startBlock, endBlock uint64) ([]*p
 	return transactionBatchExecutedEvents, nil
 }
 
-func (n *network) GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
-	peggyFilterer, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
+func (n *network) GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
+	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
 	}
 
-	iter, err := peggyFilterer.FilterValsetUpdatedEvent(&bind.FilterOpts{
+	iter, err := hyperionFilterer.FilterValsetUpdatedEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
 	}, nil)
@@ -252,7 +254,7 @@ func (n *network) GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*peggye
 
 	defer iter.Close()
 
-	var valsetUpdatedEvents []*peggyevents.PeggyValsetUpdatedEvent
+	var valsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
 	for iter.Next() {
 		valsetUpdatedEvents = append(valsetUpdatedEvents, iter.Event)
 	}
@@ -260,13 +262,13 @@ func (n *network) GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*peggye
 	return valsetUpdatedEvents, nil
 }
 
-func (n *network) GetTransactionBatchExecutedEvents(startBlock, endBlock uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
-	peggyFilterer, err := peggyevents.NewPeggyFilterer(n.Address(), n.Provider())
+func (n *network) GetTransactionBatchExecutedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error) {
+	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init Peggy events filterer")
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
 	}
 
-	iter, err := peggyFilterer.FilterTransactionBatchExecutedEvent(&bind.FilterOpts{
+	iter, err := hyperionFilterer.FilterTransactionBatchExecutedEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
 	}, nil, nil)
@@ -280,7 +282,7 @@ func (n *network) GetTransactionBatchExecutedEvents(startBlock, endBlock uint64)
 
 	defer iter.Close()
 
-	var transactionBatchExecutedEvents []*peggyevents.PeggyTransactionBatchExecutedEvent
+	var transactionBatchExecutedEvents []*hyperionevents.HyperionTransactionBatchExecutedEvent
 	for iter.Next() {
 		transactionBatchExecutedEvents = append(transactionBatchExecutedEvents, iter.Event)
 	}

@@ -2,22 +2,25 @@ package orchestrator
 
 import (
 	"context"
+	"os"
+	"strconv"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 // runSigner simply signs off on any batches or validator sets provided by the validator
 // since these are provided directly by a trusted Helios node they can simply be assumed to be
 // valid and signed off on.
-func (s *Orchestrator) runSigner(ctx context.Context, peggyID gethcommon.Hash) error {
+func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash) error {
 	signer := signer{
 		Orchestrator: s,
-		peggyID:      peggyID,
+		hyperionID:   hyperionID,
 	}
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Signer...")
@@ -29,7 +32,7 @@ func (s *Orchestrator) runSigner(ctx context.Context, peggyID gethcommon.Hash) e
 
 type signer struct {
 	*Orchestrator
-	peggyID gethcommon.Hash
+	hyperionID gethcommon.Hash
 }
 
 func (l *signer) Log() log.Logger {
@@ -41,9 +44,9 @@ func (l *signer) sign(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	if err := l.signValidatorSets(ctx); err != nil {
-		return err
-	}
+	// if err := l.signValidatorSets(ctx); err != nil {
+	// 	return err
+	// }
 
 	if err := l.signNewBatch(ctx); err != nil {
 		return err
@@ -53,9 +56,14 @@ func (l *signer) sign(ctx context.Context) error {
 }
 
 func (l *signer) signValidatorSets(ctx context.Context) error {
-	var valsets []*peggytypes.Valset
+	var valsets []*hyperiontypes.Valset
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
 	fn := func() error {
-		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.CosmosAddr)
+		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return nil
 	}
 
@@ -70,7 +78,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
-			return l.helios.SendValsetConfirm(ctx, l.cfg.EthereumAddr, l.peggyID, vs)
+			return l.helios.SendValsetConfirm(ctx, hyperionId, l.cfg.EthereumAddr, l.hyperionID, vs)
 		}); err != nil {
 			return err
 		}
@@ -82,9 +90,16 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 }
 
 func (l *signer) signNewBatch(ctx context.Context) error {
-	var oldestUnsignedBatch *peggytypes.OutgoingTxBatch
+	var oldestUnsignedBatch *hyperiontypes.OutgoingTxBatch
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
 	getBatchFn := func() error {
-		oldestUnsignedBatch, _ = l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.CosmosAddr)
+		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
+		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == l.cfg.HyperionId {
+			oldestUnsignedBatch = tmpOldestUnsignedBatch
+		}
 		return nil
 	}
 
@@ -99,8 +114,9 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 
 	if err := l.retry(ctx, func() error {
 		return l.helios.SendBatchConfirm(ctx,
+			l.cfg.HyperionId,
 			l.cfg.EthereumAddr,
-			l.peggyID,
+			l.hyperionID,
 			oldestUnsignedBatch,
 		)
 	}); err != nil {

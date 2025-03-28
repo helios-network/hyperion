@@ -4,12 +4,13 @@ import (
 	"context"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	"github.com/shopspring/decimal"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
@@ -52,8 +53,8 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 	return nil
 }
 
-func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*peggytypes.BatchFees, error) {
-	var fees []*peggytypes.BatchFees
+func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
+	var fees []*hyperiontypes.BatchFees
 	fn := func() (err error) {
 		fees, err = l.helios.UnbatchedTokensWithFees(ctx)
 		return
@@ -66,9 +67,13 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*peggytypes
 	return fees, nil
 }
 
-func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *peggytypes.BatchFees) {
+func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
-	tokenDenom := l.getTokenDenom(tokenAddress)
+	tokenDenom := l.getTokenDenom(l.cfg.HyperionId, tokenAddress)
 
 	tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
 	if err != nil {
@@ -82,18 +87,18 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *peggytypes.Ba
 
 	l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
 
-	_ = l.helios.SendRequestBatch(ctx, tokenDenom)
+	_ = l.helios.SendRequestBatch(ctx, l.cfg.HyperionId, tokenDenom)
 }
 
-func (l *batchCreator) getTokenDenom(tokenAddr gethcommon.Address) string {
+func (l *batchCreator) getTokenDenom(hyperionId uint64, tokenAddr gethcommon.Address) string {
 	if cosmosDenom, ok := l.cfg.ERC20ContractMapping[tokenAddr]; ok {
 		return cosmosDenom
 	}
 
-	return peggytypes.PeggyDenomString(tokenAddr)
+	return hyperiontypes.HyperionDenomString(hyperionId, tokenAddr)
 }
 
-func (l *batchCreator) checkMinBatchFee(fee *peggytypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
+func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
 	if l.cfg.MinBatchFeeUSD == 0 {
 		return true
 	}
@@ -101,7 +106,7 @@ func (l *batchCreator) checkMinBatchFee(fee *peggytypes.BatchFees, tokenAddress 
 	tokenPriceUSDFloat, err := l.priceFeed.QueryUSDPrice(tokenAddress)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to query price feed", "token_addr", tokenAddress.String())
-		return false
+		return true
 	}
 
 	var (

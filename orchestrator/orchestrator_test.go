@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"cosmossdk.io/math"
 	cometrpc "github.com/cometbft/cometbft/rpc/core/types"
 	comettypes "github.com/cometbft/cometbft/types"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
@@ -14,9 +15,10 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/Helios-Chain-Labs/metrics"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 const maxLoopRetries = 1
@@ -38,7 +40,7 @@ func Test_BatchCreator(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*peggytypes.BatchFees, error) {
+					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*hyperiontypes.BatchFees, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -52,7 +54,7 @@ func Test_BatchCreator(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					UnbatchedTokensWithFeesFn: func(context.Context) ([]*peggytypes.BatchFees, error) {
+					UnbatchedTokensWithFeesFn: func(context.Context) ([]*hyperiontypes.BatchFees, error) {
 						return nil, nil
 					},
 				},
@@ -71,10 +73,10 @@ func Test_BatchCreator(t *testing.T) {
 				},
 				priceFeed: MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
 				helios: MockCosmosNetwork{
-					SendRequestBatchFn: func(context.Context, string) error { return nil },
-					UnbatchedTokensWithFeesFn: func(context.Context) ([]*peggytypes.BatchFees, error) {
-						fees, _ := cosmostypes.NewIntFromString("50000000000000000000")
-						return []*peggytypes.BatchFees{
+					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },
+					UnbatchedTokensWithFeesFn: func(context.Context) ([]*hyperiontypes.BatchFees, error) {
+						fees, _ := math.NewIntFromString("50000000000000000000")
+						return []*hyperiontypes.BatchFees{
 							{
 								Token:     heliosTokenAddress.String(),
 								TotalFees: fees,
@@ -102,10 +104,10 @@ func Test_BatchCreator(t *testing.T) {
 					ERC20ContractMapping: map[gethcommon.Address]string{heliosTokenAddress: "helios"},
 				},
 				helios: MockCosmosNetwork{
-					SendRequestBatchFn: func(context.Context, string) error { return nil },
-					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*peggytypes.BatchFees, error) {
-						fees, _ := cosmostypes.NewIntFromString("50000000000000000000")
-						return []*peggytypes.BatchFees{{
+					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },
+					UnbatchedTokensWithFeesFn: func(_ context.Context) ([]*hyperiontypes.BatchFees, error) {
+						fees, _ := math.NewIntFromString("50000000000000000000")
+						return []*hyperiontypes.BatchFees{{
 							Token:     heliosTokenAddress.String(),
 							TotalFees: fees,
 						}}, nil
@@ -138,11 +140,11 @@ func Test_Oracle(t *testing.T) {
 	ethAddr2 := gethcommon.HexToAddress("0x3959f5246c452463279F690301D923D5a75bbD88")
 
 	testTable := []struct {
-		name                    string
-		expected                error
-		orch                    *Orchestrator
-		lastResyncWithHelios time.Time
-		lastObservedEthHeight   uint64
+		name                  string
+		expected              error
+		orch                  *Orchestrator
+		lastResyncWithHelios  time.Time
+		lastObservedEthHeight uint64
 	}{
 		{
 			name:     "failed to get current validator set",
@@ -151,7 +153,7 @@ func Test_Oracle(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -166,9 +168,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr1},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -177,8 +179,8 @@ func Test_Oracle(t *testing.T) {
 					},
 				},
 			},
-			lastResyncWithHelios: time.Time{},
-			lastObservedEthHeight:   0,
+			lastResyncWithHelios:  time.Time{},
+			lastObservedEthHeight: 0,
 		},
 
 		{
@@ -189,9 +191,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -215,9 +217,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -242,9 +244,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -256,7 +258,7 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
+					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -272,9 +274,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -282,7 +284,7 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error) {
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -290,24 +292,24 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-						return []*peggyevents.PeggySendToCosmosEvent{
+					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
+						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
 							{
 								EventNonce: big.NewInt(100),
 							},
 						}, nil
 					},
 
-					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
+					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
 						return nil, nil
 					},
-					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
+					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error) {
 						return nil, nil
 					},
-					GetPeggyERC20DeployedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {
+					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
 					},
 				},
@@ -323,9 +325,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -333,8 +335,8 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error) {
-						return &peggytypes.LastClaimEvent{
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce: 101,
 						}, nil
 					},
@@ -343,24 +345,24 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-						return []*peggyevents.PeggySendToCosmosEvent{
+					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
+						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
 							{
 								EventNonce: big.NewInt(100),
 							},
 						}, nil
 					},
 
-					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
+					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
 						return nil, nil
 					},
-					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
+					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error) {
 						return nil, nil
 					},
-					GetPeggyERC20DeployedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {
+					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
 					},
 				},
@@ -376,9 +378,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -386,8 +388,8 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error) {
-						return &peggytypes.LastClaimEvent{
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce:  102,
 							EthereumEventHeight: 1000,
 						}, nil
@@ -397,24 +399,24 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-						return []*peggyevents.PeggySendToCosmosEvent{
+					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
+						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
 							{
 								EventNonce: big.NewInt(104),
 							},
 						}, nil
 					},
 
-					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
+					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
 						return nil, nil
 					},
-					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
+					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error) {
 						return nil, nil
 					},
-					GetPeggyERC20DeployedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {
+					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
 					},
 				},
@@ -422,18 +424,18 @@ func Test_Oracle(t *testing.T) {
 		},
 
 		{
-			name:                    "sent new event claim",
-			expected:                nil,
-			lastObservedEthHeight:   100,
-			lastResyncWithHelios: time.Now(), // skip auto resync
+			name:                  "sent new event claim",
+			expected:              nil,
+			lastObservedEthHeight: 100,
+			lastResyncWithHelios:  time.Now(), // skip auto resync
 			orch: &Orchestrator{
 				logger:      DummyLog,
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -441,14 +443,14 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error) {
-						return &peggytypes.LastClaimEvent{
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce:  102,
 							EthereumEventHeight: 1000,
 						}, nil
 					},
 
-					SendOldDepositClaimFn: func(_ context.Context, _ *peggyevents.PeggySendToCosmosEvent) error {
+					SendOldDepositClaimFn: func(_ context.Context, _ uint64, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
 						return nil
 					},
 				},
@@ -456,24 +458,24 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-						return []*peggyevents.PeggySendToCosmosEvent{
+					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
+						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
 							{
 								EventNonce: big.NewInt(103),
 							},
 						}, nil
 					},
 
-					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
+					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
 						return nil, nil
 					},
-					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
+					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error) {
 						return nil, nil
 					},
-					GetPeggyERC20DeployedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {
+					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
 					},
 				},
@@ -489,9 +491,9 @@ func Test_Oracle(t *testing.T) {
 				cfg:         Config{EthereumAddr: ethAddr2},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					CurrentValsetFn: func(_ context.Context) (*peggytypes.Valset, error) {
-						return &peggytypes.Valset{
-							Members: []*peggytypes.BridgeValidator{
+					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
+						return &hyperiontypes.Valset{
+							Members: []*hyperiontypes.BridgeValidator{
 								{
 									EthereumAddress: ethAddr2.String(),
 								},
@@ -499,14 +501,14 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-					LastClaimEventByAddrFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.LastClaimEvent, error) {
-						return &peggytypes.LastClaimEvent{
+					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
+						return &hyperiontypes.LastClaimEvent{
 							EthereumEventNonce:  102,
 							EthereumEventHeight: 1000,
 						}, nil
 					},
 
-					SendOldDepositClaimFn: func(_ context.Context, _ *peggyevents.PeggySendToCosmosEvent) error {
+					SendOldDepositClaimFn: func(_ context.Context, _ uint64, _ *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
 						return nil
 					},
 				},
@@ -514,24 +516,24 @@ func Test_Oracle(t *testing.T) {
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(2100)}, nil
 					},
-					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToCosmosEvent, error) {
-						return []*peggyevents.PeggySendToCosmosEvent{
+					GetSendToCosmosEventsFn: func(_, _ uint64) ([]*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent, error) {
+						return []*hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent{
 							{
 								EventNonce: big.NewInt(103),
 							},
 						}, nil
 					},
 
-					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyValsetUpdatedEvent, error) {
+					GetValsetUpdatedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
 						return nil, nil
 					},
-					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*peggyevents.PeggySendToHeliosEvent, error) {
+					GetSendToHeliosEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
 						return nil, nil
 					},
-					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyTransactionBatchExecutedEvent, error) {
+					GetTransactionBatchExecutedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error) {
 						return nil, nil
 					},
-					GetPeggyERC20DeployedEventsFn: func(_, _ uint64) ([]*peggyevents.PeggyERC20DeployedEvent, error) {
+					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
 					},
 				},
@@ -545,9 +547,9 @@ func Test_Oracle(t *testing.T) {
 			t.Parallel()
 
 			o := oracle{
-				Orchestrator:            tt.orch,
-				lastResyncWithHelios: tt.lastResyncWithHelios,
-				lastObservedEthHeight:   tt.lastObservedEthHeight,
+				Orchestrator:          tt.orch,
+				lastResyncWithHelios:  tt.lastResyncWithHelios,
+				lastObservedEthHeight: tt.lastObservedEthHeight,
 			}
 
 			err := o.observeEthEvents(context.Background())
@@ -575,7 +577,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -589,11 +591,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -608,11 +610,11 @@ func Test_Relayer_Valsets(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
 						return nil, nil
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
 						return nil, nil
 					},
 				},
@@ -632,12 +634,12 @@ func Test_Relayer_Valsets(t *testing.T) {
 					},
 				},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
-						return []*peggytypes.MsgValsetConfirm{{}}, nil // non-empty will do
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
 			},
@@ -656,12 +658,12 @@ func Test_Relayer_Valsets(t *testing.T) {
 					},
 				},
 				helios: MockCosmosNetwork{
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
-						return []*peggytypes.MsgValsetConfirm{{}}, nil // non-empty will do
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
 			},
@@ -684,12 +686,12 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return nil, errors.New("oops")
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
-						return []*peggytypes.MsgValsetConfirm{{}}, nil // non-empty will do
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
 			},
@@ -717,12 +719,12 @@ func Test_Relayer_Valsets(t *testing.T) {
 						}, nil
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
-						return []*peggytypes.MsgValsetConfirm{{}}, nil // non-empty will do
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
 			},
@@ -741,7 +743,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return big.NewInt(99), nil
 					},
 
-					SendEthValsetUpdateFn: func(_ context.Context, _ *peggytypes.Valset, _ *peggytypes.Valset, _ []*peggytypes.MsgValsetConfirm) (*gethcommon.Hash, error) {
+					SendEthValsetUpdateFn: func(_ context.Context, _ *hyperiontypes.Valset, _ *hyperiontypes.Valset, _ []*hyperiontypes.MsgValsetConfirm) (*gethcommon.Hash, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -754,12 +756,12 @@ func Test_Relayer_Valsets(t *testing.T) {
 						}, nil
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
-						return []*peggytypes.MsgValsetConfirm{{}}, nil // non-empty will do
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
 			},
@@ -778,7 +780,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 						return big.NewInt(99), nil
 					},
 
-					SendEthValsetUpdateFn: func(_ context.Context, _ *peggytypes.Valset, _ *peggytypes.Valset, _ []*peggytypes.MsgValsetConfirm) (*gethcommon.Hash, error) {
+					SendEthValsetUpdateFn: func(_ context.Context, _ *hyperiontypes.Valset, _ *hyperiontypes.Valset, _ []*hyperiontypes.MsgValsetConfirm) (*gethcommon.Hash, error) {
 						return &gethcommon.Hash{}, nil
 					},
 				},
@@ -791,12 +793,12 @@ func Test_Relayer_Valsets(t *testing.T) {
 						}, nil
 					},
 
-					LatestValsetsFn: func(_ context.Context) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil // non-empty will do
+					LatestValsetsFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil // non-empty will do
 					},
 
-					AllValsetConfirmsFn: func(_ context.Context, _ uint64) ([]*peggytypes.MsgValsetConfirm, error) {
-						return []*peggytypes.MsgValsetConfirm{{}}, nil // non-empty will do
+					AllValsetConfirmsFn: func(_ context.Context, _ uint64, _ uint64) ([]*hyperiontypes.MsgValsetConfirm, error) {
+						return []*hyperiontypes.MsgValsetConfirm{{}}, nil // non-empty will do
 					},
 				},
 			},
@@ -810,7 +812,7 @@ func Test_Relayer_Valsets(t *testing.T) {
 
 			r := relayer{tt.orch}
 
-			err := r.relayValset(context.Background(), &peggytypes.Valset{Nonce: 101})
+			err := r.relayValset(context.Background(), &hyperiontypes.Valset{Nonce: 101})
 			if tt.expected == nil {
 				assert.NoError(t, err)
 			} else {
@@ -837,7 +839,7 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -852,13 +854,13 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchTimeout: 100,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -878,12 +880,12 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
 						return nil, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 				},
 				ethereum: MockEthereumNetwork{
@@ -902,12 +904,12 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{}}, nil
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 				},
 				ethereum: MockEthereumNetwork{
@@ -929,14 +931,14 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 100,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 				},
 				ethereum: MockEthereumNetwork{
@@ -958,14 +960,14 @@ func Test_Relayer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
@@ -992,14 +994,14 @@ func Test_Relayer_Batches(t *testing.T) {
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 10 * time.Second},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
@@ -1030,14 +1032,14 @@ func Test_Relayer_Batches(t *testing.T) {
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 0},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
@@ -1057,7 +1059,7 @@ func Test_Relayer_Batches(t *testing.T) {
 						return &gethtypes.Header{Number: big.NewInt(10)}, nil
 					},
 
-					SendTransactionBatchFn: func(_ context.Context, _ *peggytypes.Valset, _ *peggytypes.OutgoingTxBatch, _ []*peggytypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
+					SendTransactionBatchFn: func(_ context.Context, _ *hyperiontypes.Valset, _ *hyperiontypes.OutgoingTxBatch, _ []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -1073,14 +1075,14 @@ func Test_Relayer_Batches(t *testing.T) {
 				svcTags:     metrics.Tags{"svc": "relayer"},
 				cfg:         Config{RelayBatchOffsetDur: 0},
 				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context) ([]*peggytypes.OutgoingTxBatch, error) {
-						return []*peggytypes.OutgoingTxBatch{{
+					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+						return []*hyperiontypes.OutgoingTxBatch{{
 							BatchNonce: 101,
 						}}, nil
 					},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ gethcommon.Address) ([]*peggytypes.MsgConfirmBatch, error) {
-						return []*peggytypes.MsgConfirmBatch{{}}, nil
+					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
 					},
 
 					GetBlockFn: func(_ context.Context, _ int64) (*cometrpc.ResultBlock, error) {
@@ -1100,7 +1102,7 @@ func Test_Relayer_Batches(t *testing.T) {
 						return &gethtypes.Header{Number: big.NewInt(10)}, nil
 					},
 
-					SendTransactionBatchFn: func(_ context.Context, _ *peggytypes.Valset, _ *peggytypes.OutgoingTxBatch, _ []*peggytypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
+					SendTransactionBatchFn: func(_ context.Context, _ *hyperiontypes.Valset, _ *hyperiontypes.OutgoingTxBatch, _ []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
 						return &gethcommon.Hash{}, nil
 					},
 				},
@@ -1114,7 +1116,7 @@ func Test_Relayer_Batches(t *testing.T) {
 			t.Parallel()
 
 			r := relayer{Orchestrator: tt.orch}
-			err := r.relayTokenBatch(context.Background(), &peggytypes.Valset{Nonce: 101})
+			err := r.relayTokenBatch(context.Background(), &hyperiontypes.Valset{Nonce: 101})
 
 			if tt.expected == nil {
 				assert.NoError(t, err)
@@ -1140,7 +1142,7 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
 				},
@@ -1154,7 +1156,7 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
 						return nil, nil
 					},
 				},
@@ -1168,11 +1170,11 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil
 					},
 
-					SendValsetConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *peggytypes.Valset) error {
+					SendValsetConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.Valset) error {
 						return errors.New("oops")
 					},
 				},
@@ -1186,11 +1188,11 @@ func Test_Signer_Valsets(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedValsetsFn: func(_ context.Context, _ cosmostypes.AccAddress) ([]*peggytypes.Valset, error) {
-						return []*peggytypes.Valset{{}}, nil
+					OldestUnsignedValsetsFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error) {
+						return []*hyperiontypes.Valset{{}}, nil
 					},
 
-					SendValsetConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *peggytypes.Valset) error {
+					SendValsetConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.Valset) error {
 						return nil
 					},
 				},
@@ -1230,7 +1232,7 @@ func Test_Signer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
+					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
 						return nil, errors.New("ooops")
 					},
 				},
@@ -1244,11 +1246,11 @@ func Test_Signer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
-						return &peggytypes.OutgoingTxBatch{}, nil
+					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
+						return &hyperiontypes.OutgoingTxBatch{}, nil
 					},
 
-					SendBatchConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *peggytypes.OutgoingTxBatch) error {
+					SendBatchConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.OutgoingTxBatch) error {
 						return errors.New("oops")
 					},
 				},
@@ -1262,11 +1264,11 @@ func Test_Signer_Batches(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
-					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ cosmostypes.AccAddress) (*peggytypes.OutgoingTxBatch, error) {
-						return &peggytypes.OutgoingTxBatch{}, nil
+					OldestUnsignedTransactionBatchFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error) {
+						return &hyperiontypes.OutgoingTxBatch{}, nil
 					},
 
-					SendBatchConfirmFn: func(_ context.Context, _ gethcommon.Address, _ gethcommon.Hash, _ *peggytypes.OutgoingTxBatch) error {
+					SendBatchConfirmFn: func(_ context.Context, _ uint64, _ gethcommon.Address, _ gethcommon.Hash, _ *hyperiontypes.OutgoingTxBatch) error {
 						return nil
 					},
 				},

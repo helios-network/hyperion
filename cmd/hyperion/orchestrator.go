@@ -13,18 +13,19 @@ import (
 
 	// sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/cosmos"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/pricefeed"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/version"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/cosmos"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	chaintypes "github.com/Helios-Chain-Labs/sdk-go/chain/types"
 )
 
 // startOrchestrator action runs an infinite loop,
 // listening for events and performing hooks.
 //
-// $ peggo orchestrator
+// $ hyperion orchestrator
 func orchestratorCmd(cmd *cli.Cmd) {
 	cmd.Before = func() {
 		initMetrics(cmd)
@@ -63,7 +64,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				EthNodeAlchemyWS:      *cfg.ethNodeAlchemyWS,
 			}
 		)
-
+		log.Println("cosmosKeyringCfg", cosmosKeyringCfg)
 		if *cfg.cosmosUseLedger || *cfg.ethUseLedger {
 			log.Fatalln("cannot use Ledger for orchestrator, since signatures must be realtime")
 		}
@@ -74,7 +75,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"build_date": version.BuildDate,
 			"go_version": version.GoVersion,
 			"go_arch":    version.GoArch,
-		}).Infoln("Peggo - Peggy module companion binary for bridging assets between Helios and Ethereum")
+		}).Infoln("Hyperion - Hyperion module companion binary for bridging assets between Helios and Ethereum")
 
 		// 1. Connect to Helios network
 
@@ -82,6 +83,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		orShutdown(errors.Wrap(err, "failed to initialize Helios keyring"))
 		log.Infoln("initialized Helios keyring", cosmosKeyring.Addr.String())
 
+		log.WithFields(log.Fields{"ethChainID": *cfg.ethChainID, "ethKeystoreDir": *cfg.ethKeystoreDir, "ethKeyFrom": *cfg.ethKeyFrom, "ethPassphrase": *cfg.ethPassphrase, "ethPrivKey": *cfg.ethPrivKey, "ethUseLedger": *cfg.ethUseLedger}).Infoln("initializing Ethereum keyring")
 		ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
 			uint64(*cfg.ethChainID),
 			cfg.ethKeystoreDir,
@@ -101,20 +103,48 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		peggyParams, err := cosmosNetwork.PeggyParams(ctx)
-		orShutdown(errors.Wrap(err, "failed to query peggy params, is heliades running?"))
+		hyperionParams, err := cosmosNetwork.HyperionParams(ctx)
+		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
+
+		// for _, hyperionCounterpartyChainParams := range hyperionParams.CounterpartyChainParams {
+		// 	var (
+		// 		hyperionContractAddr = gethcommon.HexToAddress(hyperionCounterpartyChainParams.BridgeCounterpartyAddress)
+		// 		heliosTokenAddr      = gethcommon.HexToAddress(hyperionCounterpartyChainParams.CosmosCoinErc20Contract)
+		// 		// erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
+		// 	)
+
+		// 	log.WithFields(log.Fields{"hyperion_id": hyperionCounterpartyChainParams.HyperionId, "hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
+
+		// 	_, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
+		// 	orShutdown(err)
+		// }
+		counterpartyChainParamsCfg := &hyperiontypes.CounterpartyChainParams{
+			HyperionId:                0,
+			BridgeCounterpartyAddress: "",
+		}
+
+		for _, counterpartyChainParams := range hyperionParams.CounterpartyChainParams {
+			if counterpartyChainParams.HyperionId == uint64(*cfg.hyperionID) {
+				counterpartyChainParamsCfg = counterpartyChainParams
+			}
+		}
+
+		if counterpartyChainParamsCfg.BridgeCounterpartyAddress == "" {
+			log.Fatalln("Counterparty Chain Params not found for hyperionId =", *cfg.hyperionID)
+		}
 
 		var (
-			peggyContractAddr    = gethcommon.HexToAddress(peggyParams.BridgeEthereumAddress)
-			heliosTokenAddr         = gethcommon.HexToAddress(peggyParams.CosmosCoinErc20Contract)
+			hyperionContractAddr = gethcommon.HexToAddress(counterpartyChainParamsCfg.BridgeCounterpartyAddress)
+			heliosTokenAddr      = gethcommon.HexToAddress(counterpartyChainParamsCfg.CosmosCoinErc20Contract)
 			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 
-		log.WithFields(log.Fields{"peggy_contract": peggyContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Peggy module params")
+		log.WithFields(log.Fields{"hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
 
 		// 2. Connect to ethereum network
 
-		ethNetwork, err := ethereum.NewNetwork(peggyContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
+		log.Info("hyperionContractAddr", hyperionContractAddr)
+		ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
 		orShutdown(err)
 
 		log.WithFields(log.Fields{
@@ -124,7 +154,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"gas_price_adjustment": *cfg.ethGasPriceAdjustment,
 		}).Infoln("connected to Ethereum network")
 
-		addr, isValidator := cosmos.HasRegisteredOrchestrator(cosmosNetwork, ethKeyFromAddress)
+		addr, isValidator := cosmos.HasRegisteredOrchestrator(cosmosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
 		}
@@ -145,6 +175,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		}
 
 		orchestratorCfg := orchestrator.Config{
+			HyperionId:           uint64(*cfg.hyperionID),
 			CosmosAddr:           cosmosKeyring.Addr,
 			EthereumAddr:         ethKeyFromAddress,
 			MinBatchFeeUSD:       *cfg.minBatchFeeUSD,
@@ -156,8 +187,8 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			RelayerMode:          !isValidator,
 		}
 
-		// Create peggo and run it
-		peggo, err := orchestrator.NewOrchestrator(
+		// Create hyperion and run it
+		hyperion, err := orchestrator.NewOrchestrator(
 			cosmosNetwork,
 			ethNetwork,
 			pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: *cfg.coingeckoApi}),
@@ -166,7 +197,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		orShutdown(err)
 
 		go func() {
-			if err := peggo.Run(ctx, cosmosNetwork, ethNetwork); err != nil {
+			if err := hyperion.Run(ctx, cosmosNetwork, ethNetwork); err != nil {
 				log.Errorln(err)
 				os.Exit(1)
 			}

@@ -2,19 +2,22 @@ package orchestrator
 
 import (
 	"context"
-	sdkmath "cosmossdk.io/math"
+	"math/big"
 	"sort"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/util"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 const (
@@ -33,6 +36,11 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
 		return r.relay(ctx)
 	})
+}
+
+func (s *Orchestrator) testReplayTokenBatch(ctx context.Context) {
+	r := relayer{Orchestrator: s}
+	r.mockRelayTokenBatch(ctx, nil)
 }
 
 type relayer struct {
@@ -55,13 +63,13 @@ func (l *relayer) relay(ctx context.Context) error {
 
 	var pg loops.ParanoidGroup
 
-	if l.cfg.RelayValsets {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayValset(ctx, ethValset)
-			})
-		})
-	}
+	// if l.cfg.RelayValsets {
+	// 	pg.Go(func() error {
+	// 		return l.retry(ctx, func() error {
+	// 			return l.relayValset(ctx, ethValset)
+	// 		})
+	// 	})
+	// }
 
 	if l.cfg.RelayBatches {
 		pg.Go(func() error {
@@ -81,12 +89,12 @@ func (l *relayer) relay(ctx context.Context) error {
 
 }
 
-func (l *relayer) getLatestEthValset(ctx context.Context) (*peggytypes.Valset, error) {
+func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	var latestEthValset *peggytypes.Valset
+	var latestEthValset *hyperiontypes.Valset
 	fn := func() error {
 		vs, err := l.findLatestValsetOnEth(ctx)
 		if err != nil {
@@ -104,23 +112,23 @@ func (l *relayer) getLatestEthValset(ctx context.Context) (*peggytypes.Valset, e
 	return latestEthValset, nil
 }
 
-func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.Valset) error {
+func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	latestHeliosValsets, err := l.helios.LatestValsets(ctx)
+	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
 	}
 
 	var (
-		latestConfirmedValset *peggytypes.Valset
-		confirmations         []*peggytypes.MsgValsetConfirm
+		latestConfirmedValset *hyperiontypes.Valset
+		confirmations         []*hyperiontypes.MsgValsetConfirm
 	)
 
 	for _, set := range latestHeliosValsets {
-		sigs, err := l.helios.AllValsetConfirms(ctx, set.Nonce)
+		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
@@ -153,7 +161,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *peggytypes.V
 	return nil
 }
 
-func (l *relayer) shouldRelayValset(ctx context.Context, vs *peggytypes.Valset) bool {
+func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to get latest valset nonce from Ethereum")
@@ -184,33 +192,48 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *peggytypes.Valset) 
 	return true
 }
 
-func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytypes.Valset) error {
+func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	batches, err := l.helios.LatestTransactionBatches(ctx)
+	err := godotenv.Load()
 	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+
+	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
+	log.Info("batches: ", batches)
+	if err != nil {
+		log.Info("failed to get latest transaction batches", err)
 		return err
 	}
 
-	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
+		log.Info("failed to get latest ethereum height", err)
 		return err
 	}
+	// log.Info("latestEthHeight", latestEthHeight)
 
 	var (
-		oldestConfirmedBatch *peggytypes.OutgoingTxBatch
-		confirmations        []*peggytypes.MsgConfirmBatch
+		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
+		confirmations        []*hyperiontypes.MsgConfirmBatch
 	)
 
 	for _, batch := range batches {
-		if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
-			l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		log.Info("batch details: ", batch)
+		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
+		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		// 	continue
+		// }
+
+		if batch.HyperionId != l.cfg.HyperionId {
 			continue
 		}
 
-		sigs, err := l.helios.TransactionBatchSignatures(ctx, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		log.Info("sigs", sigs)
 		if err != nil {
 			return err
 		}
@@ -221,16 +244,21 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytyp
 
 		oldestConfirmedBatch = batch
 		confirmations = sigs
+		if oldestConfirmedBatch != nil {
+			break
+		}
 	}
 
 	if oldestConfirmedBatch == nil {
 		l.Log().Infoln("no token batch to relay")
 		return nil
 	}
+	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
 
-	if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
-		return nil
-	}
+	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
+	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
+	// 	return nil
+	// }
 
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
@@ -245,7 +273,120 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *peggytyp
 	return nil
 }
 
-func (l *relayer) shouldRelayBatch(ctx context.Context, batch *peggytypes.OutgoingTxBatch) bool {
+func (l *relayer) mockRelayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+	metrics.ReportFuncCall(l.svcTags)
+	doneFn := metrics.ReportFuncTiming(l.svcTags)
+	defer doneFn()
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+
+	batches := []*hyperiontypes.OutgoingTxBatch{
+		{
+			HyperionId:    1,
+			TokenContract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+			BatchNonce:    1,
+			BatchTimeout:  1,
+			Block:         43,
+			Transactions: []*hyperiontypes.OutgoingTransferTx{
+				{
+					Id:          1,
+					Sender:      "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					DestAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+					Erc20Token: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+					},
+					Erc20Fee: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+					},
+				},
+				{
+					Id:          2,
+					Sender:      "helios1q0d2nv8xpf9qy22djzgrkgrrcst9frcs34fqra",
+					DestAddress: "0x17267eB1FEC301848d4B5140eDDCFC48945427Ab",
+					Erc20Token: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(3322222)),
+					},
+					Erc20Fee: &hyperiontypes.ERC20Token{
+						Contract: "0x1ae1cf7d011589e552E26f7F34A7716A4b4B6Ff8",
+						Amount:   sdkmath.NewIntFromBigInt(big.NewInt(10000)),
+					},
+				},
+			},
+		},
+	}
+
+	_, err = l.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		log.Info("failed to get latest ethereum height", err)
+		return err
+	}
+	// log.Info("latestEthHeight", latestEthHeight)
+
+	var (
+		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
+		confirmations        []*hyperiontypes.MsgConfirmBatch
+	)
+
+	for _, batch := range batches {
+		log.Info("batch details: ", batch)
+		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
+		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
+		// 	continue
+		// }
+
+		if batch.HyperionId != l.cfg.HyperionId {
+			log.Info("skipping batch with hyperion id: ", batch.HyperionId)
+			continue
+		}
+
+		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+		log.Info("sigs", sigs)
+		if err != nil {
+			return err
+		}
+
+		if len(sigs) == 0 {
+			continue
+		}
+
+		oldestConfirmedBatch = batch
+		confirmations = sigs
+		if oldestConfirmedBatch != nil {
+			break
+		}
+	}
+
+	if oldestConfirmedBatch == nil {
+		l.Log().Infoln("no token batch to relay")
+		return nil
+	}
+	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
+
+	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
+	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
+	// 	return nil
+	// }
+
+	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
+	if err != nil {
+		// Returning an error here triggers retries which don't help much except risk a binary crash
+		// Better to warn the user and try again in the next loop interval
+		log.WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
+		return nil
+	}
+
+	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
+
+	return nil
+}
+
+func (l *relayer) shouldRelayBatch(ctx context.Context, batch *hyperiontypes.OutgoingTxBatch) bool {
 	latestEthBatch, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(batch.TokenContract))
 	if err != nil {
 		l.Log().WithError(err).Warningf("unable to get latest batch nonce from Ethereum: token_contract=%s", gethcommon.HexToAddress(batch.TokenContract))
@@ -276,12 +417,12 @@ func (l *relayer) shouldRelayBatch(ctx context.Context, batch *peggytypes.Outgoi
 	return true
 }
 
-// FindLatestValset finds the latest valset on the Peggy contract by looking back through the event
+// FindLatestValset finds the latest valset on the Hyperion contract by looking back through the event
 // history and finding the most recent ValsetUpdatedEvent. Most of the time this will be very fast
 // as the latest update will be in recent blockchain history and the search moves from the present
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
-func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset, error) {
+func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
 	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get latest ethereum header")
@@ -292,7 +433,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 		return nil, errors.Wrap(err, "failed to get latest valset nonce on Ethereum")
 	}
 
-	cosmosValset, err := l.helios.ValsetAt(ctx, latestEthereumValsetNonce.Uint64())
+	cosmosValset, err := l.helios.ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}
@@ -316,7 +457,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 		//
 		// TODO(xlab): this follows the original impl, but sort might be skipped there:
 		// we could access just the latest element later.
-		sort.Sort(sort.Reverse(PeggyValsetUpdatedEvents(valsetUpdatedEvents)))
+		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
 
 		if len(valsetUpdatedEvents) == 0 {
 			currentBlock = startSearchBlock
@@ -325,15 +466,15 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 
 		// we take only the first event if we find any at all.
 		event := valsetUpdatedEvents[0]
-		valset := &peggytypes.Valset{
+		valset := &hyperiontypes.Valset{
 			Nonce:        event.NewValsetNonce.Uint64(),
-			Members:      make([]*peggytypes.BridgeValidator, 0, len(event.Powers)),
+			Members:      make([]*hyperiontypes.BridgeValidator, 0, len(event.Powers)),
 			RewardAmount: sdkmath.NewIntFromBigInt(event.RewardAmount),
 			RewardToken:  event.RewardToken.Hex(),
 		}
 
 		for idx, p := range event.Powers {
-			valset.Members = append(valset.Members, &peggytypes.BridgeValidator{
+			valset.Members = append(valset.Members, &hyperiontypes.BridgeValidator{
 				Power:           p.Uint64(),
 				EthereumAddress: event.Validators[idx].Hex(),
 			})
@@ -350,24 +491,24 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*peggytypes.Valset
 
 var ErrNotFound = errors.New("not found")
 
-type PeggyValsetUpdatedEvents []*peggyevents.PeggyValsetUpdatedEvent
+type HyperionValsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
 
-func (a PeggyValsetUpdatedEvents) Len() int { return len(a) }
-func (a PeggyValsetUpdatedEvents) Less(i, j int) bool {
+func (a HyperionValsetUpdatedEvents) Len() int { return len(a) }
+func (a HyperionValsetUpdatedEvents) Less(i, j int) bool {
 	return a[i].NewValsetNonce.Cmp(a[j].NewValsetNonce) < 0
 }
-func (a PeggyValsetUpdatedEvents) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a HyperionValsetUpdatedEvents) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // This function exists to provide a warning if Cosmos and Ethereum have different validator sets
 // for a given nonce. In the mundane version of this warning the validator sets disagree on sorting order
 // which can happen if some relayer uses an unstable sort, or in a case of a mild griefing attack.
-// The Peggy contract validates signatures in order of highest to lowest power. That way it can exit
+// The Hyperion contract validates signatures in order of highest to lowest power. That way it can exit
 // the loop early once a vote has enough power, if a relayer where to submit things in the reverse order
 // they could grief users of the contract into paying more in gas.
 // The other (and far worse) way a disagreement here could occur is if validators are colluding to steal
-// funds from the Peggy contract and have submitted a hijacking update. If slashing for off Cosmos chain
+// funds from the Hyperion contract and have submitted a hijacking update. If slashing for off Cosmos chain
 // Ethereum signatures is implemented you would put that handler here.
-func checkIfValsetsDiffer(cosmosValset, ethereumValset *peggytypes.Valset) {
+func checkIfValsetsDiffer(cosmosValset, ethereumValset *hyperiontypes.Valset) {
 	if cosmosValset == nil && ethereumValset.Nonce == 0 {
 		// bootstrapping case
 		return
@@ -408,7 +549,7 @@ func checkIfValsetsDiffer(cosmosValset, ethereumValset *peggytypes.Valset) {
 	}
 }
 
-type BridgeValidators []*peggytypes.BridgeValidator
+type BridgeValidators []*hyperiontypes.BridgeValidator
 
 // Sort sorts the validators by power
 func (b BridgeValidators) Sort() {

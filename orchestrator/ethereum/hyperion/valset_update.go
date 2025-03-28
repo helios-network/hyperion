@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type ValsetArgs struct {
@@ -22,7 +22,7 @@ type ValsetArgs struct {
 	RewardToken common.Address `protobuf:"bytes,5,opt,name=rewardToken,json=rewardToken,proto3" json:"rewardToken,omitempty"`
 }
 
-func (s *peggyContract) SendEthValsetUpdate(
+func (s *hyperionContract) SendEthValsetUpdate(
 	ctx context.Context,
 	oldValset *types.Valset,
 	newValset *types.Valset,
@@ -89,7 +89,7 @@ func (s *peggyContract) SendEthValsetUpdate(
 	// 		bytes32[] memory _s
 	// )
 
-	txData, err := peggyABI.Pack("updateValset",
+	txData, err := hyperionABI.Pack("updateValset",
 		newValsetArgs,
 		currentValsetArgs,
 		sigV,
@@ -98,7 +98,7 @@ func (s *peggyContract) SendEthValsetUpdate(
 	)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).Errorln("ABI Pack (Peggy updateValset) method")
+		log.WithError(err).Errorln("ABI Pack (Hyperion updateValset) method")
 		return nil, err
 	}
 
@@ -107,14 +107,14 @@ func (s *peggyContract) SendEthValsetUpdate(
 		return nil, errors.New("Transaction with same valset input data is already present in mempool")
 	}
 
-	txHash, err := s.SendTx(ctx, s.peggyAddress, txData)
+	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Peggy updateValset) to EVM")
+		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion updateValset) to EVM")
 		return nil, err
 	}
 
-	//     let before_nonce = get_valset_nonce(peggy_contract_address, eth_address, web3).await?;
+	//     let before_nonce = get_valset_nonce(hyperion_contract_address, eth_address, web3).await?;
 	//     if before_nonce != old_nonce {
 	//         info!(
 	//             "Someone else updated the valset to {}, exiting early",
@@ -125,7 +125,7 @@ func (s *peggyContract) SendEthValsetUpdate(
 
 	//     let tx = web3
 	//         .send_transaction(
-	//             peggy_contract_address,
+	//             hyperion_contract_address,
 	//             payload,
 	//             0u32.into(),
 	//             eth_address,
@@ -142,7 +142,7 @@ func (s *peggyContract) SendEthValsetUpdate(
 	//     // be the common case.
 	//     web3.wait_for_transaction(tx, timeout, None).await?;
 
-	//     let last_nonce = get_valset_nonce(peggy_contract_address, eth_address, web3).await?;
+	//     let last_nonce = get_valset_nonce(hyperion_contract_address, eth_address, web3).await?;
 	//     if last_nonce != new_nonce {
 	//         error!(
 	//             "Current nonce is {} expected to update to nonce {}",
@@ -218,8 +218,8 @@ func checkValsetSigsAndRepack(
 		return
 	}
 
-	if peggyPowerToPercent(powerOfGoodSigs) < 66 {
-		err = errors.New(fmt.Sprintf("insufficient voting power power=%f", peggyPowerToPercent(powerOfGoodSigs)))
+	if hyperionPowerToPercent(powerOfGoodSigs) < 66 {
+		err = errors.New(fmt.Sprintf("insufficient voting power power=%f", hyperionPowerToPercent(powerOfGoodSigs)))
 		return
 	}
 

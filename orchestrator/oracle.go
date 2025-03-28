@@ -2,16 +2,20 @@ package orchestrator
 
 import (
 	"context"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/loops"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 const (
@@ -24,10 +28,10 @@ const (
 	defaultBlocksToSearch uint64 = 2000
 
 	// Auto re-sync to catch up the validator's last observed event nonce. Reasons why event nonce fall behind:
-	// 1. It takes some time for events to be indexed on Ethereum. So if peggo queried events immediately as block produced, there is a chance the event is missed.
+	// 1. It takes some time for events to be indexed on Ethereum. So if hyperion queried events immediately as block produced, there is a chance the event is missed.
 	//  We need to re-scan this block to ensure events are not missed due to indexing delay.
 	// 2. if validator was in UnBonding state, the claims broadcasted in last iteration are failed.
-	// 3. if infura call failed while filtering events, the peggo missed to broadcast claim events occured in last iteration.
+	// 3. if infura call failed while filtering events, the hyperion missed to broadcast claim events occured in last iteration.
 	resyncInterval = 24 * time.Hour
 )
 
@@ -63,7 +67,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	defer doneFn()
 
 	// check if validator is in the active set since claims will fail otherwise
-	vs, err := l.helios.CurrentValset(ctx)
+	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
 	if err != nil {
 		l.logger.WithError(err).Warningln("failed to get active validator set on Helios")
 		return err
@@ -99,8 +103,8 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	if l.lastObservedEthHeight < 21261593 { // TODO by config
-		l.lastObservedEthHeight = 21261593
+	if l.lastObservedEthHeight < 18956778 { // TODO by config
+		l.lastObservedEthHeight = 18956778
 	}
 
 	// ensure the block range is within defaultBlocksToSearch
@@ -114,13 +118,15 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Info("events: ", events)
 
 	lastClaim, err := l.getLastClaimEvent(ctx)
 	if err != nil {
 		return err
 	}
-
+	log.Info("lastClaim: ", lastClaim)
 	newEvents := filterEvents(events, lastClaim.EthereumEventNonce)
+	log.Info("newEvents: ", newEvents)
 	sort.Slice(newEvents, func(i, j int) bool {
 		return newEvents[i].Nonce() < newEvents[j].Nonce()
 	})
@@ -136,13 +142,17 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("SOME EVENTS DETECTED %d", len(newEvents))
 	}
 
-	if expected, actual := lastClaim.EthereumEventNonce+1, newEvents[0].Nonce(); expected != actual {
-		l.Log().WithFields(log.Fields{"expected": expected, "actual": actual, "last_claimed_event_nonce": lastClaim.EthereumEventNonce}).Debugln("orchestrator missed an Ethereum event. Restarting block search from last attested claim...")
-		l.lastObservedEthHeight = lastClaim.EthereumEventHeight
-		return nil
-	}
+	log.Info("========================")
+	// if expected, actual := lastClaim.EthereumEventNonce+1, newEvents[0].Nonce(); expected != actual {
+	// 	log.Info("expected: ", expected, "actual: ", actual, "lastClaim.EthereumEventNonce: ", lastClaim.EthereumEventNonce)
+	// 	l.Log().WithFields(log.Fields{"expected": expected, "actual": actual, "last_claimed_event_nonce": lastClaim.EthereumEventNonce}).Debugln("orchestrator missed an Ethereum event. Restarting block search from last attested claim...")
+	// 	l.lastObservedEthHeight = lastClaim.EthereumEventHeight
+	// 	return nil
+	// }
+	log.Info("========================")
 
 	if err := l.sendNewEventClaims(ctx, newEvents); err != nil {
+		log.Info("err: ", err)
 		return err
 	}
 
@@ -178,7 +188,7 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get TransactionBatchExecuted events")
 		}
 
-		erc20DeploymentEvents, err := l.ethereum.GetPeggyERC20DeployedEvents(startBlock, endBlock)
+		erc20DeploymentEvents, err := l.ethereum.GetHyperionERC20DeployedEvents(startBlock, endBlock)
 		if err != nil {
 			return errors.Wrap(err, "failed to get ERC20Deployed events")
 		}
@@ -242,10 +252,10 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	return latestHeight, nil
 }
 
-func (l *oracle) getLastClaimEvent(ctx context.Context) (*peggytypes.LastClaimEvent, error) {
-	var claim *peggytypes.LastClaimEvent
+func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClaimEvent, error) {
+	var claim *hyperiontypes.LastClaimEvent
 	fn := func() (err error) {
-		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return
 	}
 
@@ -259,7 +269,7 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*peggytypes.LastClaimEv
 func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
-		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.CosmosAddr)
+		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		if err != nil {
 			return err
 		}
@@ -309,33 +319,39 @@ func (l *oracle) autoResync(ctx context.Context) error {
 }
 
 func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load Failed .env: %v", err)
+	}
+	hyperionId, _ := strconv.ParseUint(os.Getenv("HYPERION_ID"), 10, 64)
+
 	switch e := ev.(type) {
 	case *oldDeposit:
-		ev := peggyevents.PeggySendToCosmosEvent(*e)
-		return l.helios.SendOldDepositClaim(ctx, &ev)
+		ev := hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent(*e)
+		return l.helios.SendOldDepositClaim(ctx, hyperionId, &ev)
 	case *deposit:
-		ev := peggyevents.PeggySendToHeliosEvent(*e)
-		return l.helios.SendDepositClaim(ctx, &ev)
+		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
+		return l.helios.SendDepositClaim(ctx, hyperionId, &ev)
 	case *valsetUpdate:
-		ev := peggyevents.PeggyValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaim(ctx, &ev)
+		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
+		return l.helios.SendValsetClaim(ctx, hyperionId, &ev)
 	case *withdrawal:
-		ev := peggyevents.PeggyTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaim(ctx, &ev)
+		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
+		return l.helios.SendWithdrawalClaim(ctx, hyperionId, &ev)
 	case *erc20Deployment:
-		ev := peggyevents.PeggyERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaim(ctx, &ev)
+		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
+		return l.helios.SendERC20DeployedClaim(ctx, hyperionId, &ev)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}
 }
 
 type (
-	oldDeposit      peggyevents.PeggySendToCosmosEvent
-	deposit         peggyevents.PeggySendToHeliosEvent
-	valsetUpdate    peggyevents.PeggyValsetUpdatedEvent
-	withdrawal      peggyevents.PeggyTransactionBatchExecutedEvent
-	erc20Deployment peggyevents.PeggyERC20DeployedEvent
+	oldDeposit      hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent
+	deposit         hyperionevents.HyperionSendToHeliosEvent
+	valsetUpdate    hyperionevents.HyperionValsetUpdatedEvent
+	withdrawal      hyperionevents.HyperionTransactionBatchExecutedEvent
+	erc20Deployment hyperionevents.HyperionERC20DeployedEvent
 
 	event interface {
 		Nonce() uint64
@@ -344,9 +360,9 @@ type (
 
 func filterEvents(events []event, nonce uint64) (filtered []event) {
 	for _, e := range events {
-		if e.Nonce() > nonce {
-			filtered = append(filtered, e)
-		}
+		// if e.Nonce() > nonce {
+		filtered = append(filtered, e)
+		// }
 	}
 
 	return

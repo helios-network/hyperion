@@ -1,4 +1,4 @@
-package peggy
+package hyperion
 
 import (
 	"context"
@@ -13,25 +13,26 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
-	peggytypes "github.com/Helios-Chain-Labs/sdk-go/chain/peggy/types"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/keystore"
-	"github.com/Helios-Chain-Labs/peggo/orchestrator/ethereum/peggy"
-	peggyevents "github.com/Helios-Chain-Labs/peggo/solidity/wrappers/Peggy.sol"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
+	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
+	hyperionsubgraphevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/HyperionSubgraph.sol"
+	"github.com/joho/godotenv"
 )
 
 type BroadcastClient interface {
-	UpdatePeggyOrchestratorAddresses(ctx context.Context, ethFrom gethcommon.Address, orchAddr cosmostypes.AccAddress) error
-	SendValsetConfirm(ctx context.Context, ethFrom gethcommon.Address, peggyID gethcommon.Hash, valset *peggytypes.Valset) error
-	SendBatchConfirm(ctx context.Context, ethFrom gethcommon.Address, peggyID gethcommon.Hash, batch *peggytypes.OutgoingTxBatch) error
-	SendRequestBatch(ctx context.Context, denom string) error
-	SendToEth(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendOldDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToCosmosEvent) error
-	SendDepositClaim(ctx context.Context, deposit *peggyevents.PeggySendToHeliosEvent) error
-	SendWithdrawalClaim(ctx context.Context, withdrawal *peggyevents.PeggyTransactionBatchExecutedEvent) error
-	SendValsetClaim(ctx context.Context, vs *peggyevents.PeggyValsetUpdatedEvent) error
-	SendERC20DeployedClaim(ctx context.Context, erc20 *peggyevents.PeggyERC20DeployedEvent) error
+	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
+	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
+	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
+	SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendOldDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error
+	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
+	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
+	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
+	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
 }
 
 type broadcastClient struct {
@@ -45,47 +46,16 @@ func NewBroadcastClient(client chain.ChainClient, signFn keystore.PersonalSignFn
 	return broadcastClient{
 		ChainClient: client,
 		ethSignFn:   signFn,
-		svcTags:     metrics.Tags{"svc": "peggy_broadcast"},
+		svcTags:     metrics.Tags{"svc": "hyperion_broadcast"},
 	}
 }
 
-func (c broadcastClient) UpdatePeggyOrchestratorAddresses(_ context.Context, ethFrom gethcommon.Address, orchAddr cosmostypes.AccAddress) error {
-	metrics.ReportFuncCall(c.svcTags)
-	doneFn := metrics.ReportFuncTiming(c.svcTags)
-	defer doneFn()
-	// SetOrchestratorAddresses
-
-	// This message allows validators to delegate their voting responsibilities
-	// to a given key. This key is then used as an optional authentication method
-	// for sigining oracle claims
-	// This is used by the validators to set the Ethereum address that represents
-	// them on the Ethereum side of the bridge. They must sign their Cosmos address
-	// using the Ethereum address they have submitted. Like ValsetResponse this
-	// message can in theory be submitted by anyone, but only the current validator
-	// sets submissions carry any weight.
-	// -------------
-	msg := &peggytypes.MsgSetOrchestratorAddresses{
-		Sender:       c.ChainClient.FromAddress().String(),
-		EthAddress:   ethFrom.Hex(),
-		Orchestrator: orchAddr.String(),
-	}
-
-	res, err := c.ChainClient.SyncBroadcastMsg(msg)
-	fmt.Println("Response of set eth address", "res", res)
-	if err != nil {
-		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgSetOrchestratorAddresses failed")
-	}
-
-	return nil
-}
-
-func (c broadcastClient) SendValsetConfirm(_ context.Context, ethFrom gethcommon.Address, peggyID gethcommon.Hash, valset *peggytypes.Valset) error {
+func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	confirmHash := peggy.EncodeValsetConfirm(peggyID, valset)
+	confirmHash := hyperion.EncodeValsetConfirm(hyperionID, valset)
 	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -107,7 +77,8 @@ func (c broadcastClient) SendValsetConfirm(_ context.Context, ethFrom gethcommon
 	// signatures it is then possible for anyone to view these signatures in the
 	// chain store and submit them to Ethereum to update the validator set
 	// -------------
-	msg := &peggytypes.MsgValsetConfirm{
+	msg := &hyperiontypes.MsgValsetConfirm{
+		HyperionId:   hyperionId,
 		Orchestrator: c.FromAddress().String(),
 		EthAddress:   ethFrom.Hex(),
 		Nonce:        valset.Nonce,
@@ -122,12 +93,12 @@ func (c broadcastClient) SendValsetConfirm(_ context.Context, ethFrom gethcommon
 	return nil
 }
 
-func (c broadcastClient) SendBatchConfirm(_ context.Context, ethFrom gethcommon.Address, peggyID gethcommon.Hash, batch *peggytypes.OutgoingTxBatch) error {
+func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	confirmHash := peggy.EncodeTxBatchConfirm(peggyID, batch)
+	confirmHash := hyperion.EncodeTxBatchConfirm(hyperionID, batch)
 	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -142,13 +113,15 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, ethFrom gethcommon.
 	// (TODO determine this without nondeterminism) This message includes the batch
 	// as well as an Ethereum signature over this batch by the validator
 	// -------------
-	msg := &peggytypes.MsgConfirmBatch{
+	msg := &hyperiontypes.MsgConfirmBatch{
+		HyperionId:    hyperionId,
 		Orchestrator:  c.FromAddress().String(),
 		Nonce:         batch.BatchNonce,
 		Signature:     gethcommon.Bytes2Hex(signature),
 		EthSigner:     ethFrom.Hex(),
 		TokenContract: batch.TokenContract,
 	}
+	log.Info("start confirm batch, msg", msg)
 
 	if err = c.ChainClient.QueueBroadcastMsg(msg); err != nil {
 		metrics.ReportFuncError(c.svcTags)
@@ -158,12 +131,12 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, ethFrom gethcommon.
 	return nil
 }
 
-func (c broadcastClient) SendToEth(ctx context.Context, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+func (c broadcastClient) SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	// MsgSendToEth
+	// MsgSendToChain
 	// This is the message that a user calls when they want to bridge an asset
 	// it will later be removed when it is included in a batch and successfully
 	// submitted tokens are removed from the users balance immediately
@@ -176,22 +149,23 @@ func (c broadcastClient) SendToEth(ctx context.Context, destination gethcommon.A
 	// actually send this message in the first place. So a successful send has
 	// two layers of fees for the user
 	// -------------
-	msg := &peggytypes.MsgSendToEth{
-		Sender:    c.FromAddress().String(),
-		EthDest:   destination.Hex(),
-		Amount:    amount,
-		BridgeFee: fee, // TODO: use exactly that fee for transaction
+	msg := &hyperiontypes.MsgSendToChain{
+		Sender:         c.FromAddress().String(),
+		DestHyperionId: hyperionId,
+		Dest:           destination.Hex(),
+		Amount:         amount,
+		BridgeFee:      fee, // TODO: use exactly that fee for transaction
 	}
 
 	if err := c.ChainClient.QueueBroadcastMsg(msg); err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgSendToEth failed")
+		return errors.Wrap(err, "broadcasting MsgSendToChain failed")
 	}
 
 	return nil
 }
 
-func (c broadcastClient) SendRequestBatch(ctx context.Context, denom string) error {
+func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -205,7 +179,8 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, denom string) err
 	// batch, sign it, submit the signatures with a MsgConfirmBatch before a relayer
 	// can finally submit the batch
 	// -------------
-	msg := &peggytypes.MsgRequestBatch{
+	msg := &hyperiontypes.MsgRequestBatch{
+		HyperionId:   hyperionId,
 		Denom:        denom,
 		Orchestrator: c.FromAddress().String(),
 	}
@@ -217,8 +192,8 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, denom string) err
 	return nil
 }
 
-func (c broadcastClient) SendOldDepositClaim(_ context.Context, deposit *peggyevents.PeggySendToCosmosEvent) error {
-	// EthereumBridgeDepositClaim
+func (c broadcastClient) SendOldDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionsubgraphevents.HyperionSubgraphSendToCosmosEvent) error {
+	// MsgDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
 	// issued to the Cosmos address in question
@@ -234,7 +209,8 @@ func (c broadcastClient) SendOldDepositClaim(_ context.Context, deposit *peggyev
 		"event_nonce": deposit.EventNonce.String(),
 	}).Debugln("observed SendToCosmosEvent")
 
-	msg := &peggytypes.MsgDepositClaim{
+	msg := &hyperiontypes.MsgDepositClaim{
+		HyperionId:     hyperionId,
 		EventNonce:     deposit.EventNonce.Uint64(),
 		BlockHeight:    deposit.Raw.BlockNumber,
 		TokenContract:  deposit.TokenContract.Hex(),
@@ -265,12 +241,16 @@ func (c broadcastClient) SendOldDepositClaim(_ context.Context, deposit *peggyev
 	return nil
 }
 
-func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevents.PeggySendToHeliosEvent) error {
+func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error {
 	// EthereumBridgeDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
 	// issued to the Cosmos address in question
 	// -------------
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Load failed .env: %v", err)
+	}
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -283,7 +263,8 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevent
 		"token_contract": deposit.TokenContract.Hex(),
 	}).Debugln("observed SendToHeliosEvent")
 
-	msg := &peggytypes.MsgDepositClaim{
+	msg := &hyperiontypes.MsgDepositClaim{
+		HyperionId:     hyperionId,
 		EventNonce:     deposit.EventNonce.Uint64(),
 		BlockHeight:    deposit.Raw.BlockNumber,
 		TokenContract:  deposit.TokenContract.Hex(),
@@ -297,6 +278,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevent
 	log.WithFields(log.Fields{
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
+		"data":         deposit.Data,
 	}).Infoln("EthOracle sending MsgDepositClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
@@ -305,16 +287,29 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, deposit *peggyevent
 		return errors.Wrap(err, "broadcasting MsgDepositClaim failed")
 	}
 
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"event_nonce":  msg.EventNonce,
+			"event_height": msg.BlockHeight,
+			"tx_hash":      resp.TxResponse.TxHash,
+			"code":         resp.TxResponse.Code,
+			"Error":        "insufficient fee",
+		}).Infoln("EthOracle sent MsgDepositClaim")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgDepositClaim failed")
+	}
+
 	log.WithFields(log.Fields{
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
 		"tx_hash":      resp.TxResponse.TxHash,
+		"code":         resp.TxResponse.Code,
+		"GasUsed":      resp.TxResponse.GasUsed,
 	}).Infoln("EthOracle sent MsgDepositClaim")
 
 	return nil
 }
 
-func (c broadcastClient) SendWithdrawalClaim(_ context.Context, withdrawal *peggyevents.PeggyTransactionBatchExecutedEvent) error {
+func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -326,7 +321,9 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, withdrawal *pegg
 
 	// WithdrawClaim claims that a batch of withdrawal
 	// operations on the bridge contract was executed.
-	msg := &peggytypes.MsgWithdrawClaim{
+	// -------------
+	msg := &hyperiontypes.MsgWithdrawClaim{
+		HyperionId:    hyperionId,
 		EventNonce:    withdrawal.EventNonce.Uint64(),
 		BatchNonce:    withdrawal.BatchNonce.Uint64(),
 		BlockHeight:   withdrawal.Raw.BlockNumber,
@@ -354,7 +351,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, withdrawal *pegg
 	return nil
 }
 
-func (c broadcastClient) SendValsetClaim(ctx context.Context, vs *peggyevents.PeggyValsetUpdatedEvent) error {
+func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -367,15 +364,20 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, vs *peggyevents.Pe
 		"reward_token":  vs.RewardToken.Hex(),
 	}).Debugln("observed ValsetUpdatedEvent")
 
-	members := make([]*peggytypes.BridgeValidator, len(vs.Validators))
+	members := make([]*hyperiontypes.BridgeValidator, len(vs.Validators))
 	for i, val := range vs.Validators {
-		members[i] = &peggytypes.BridgeValidator{
+		members[i] = &hyperiontypes.BridgeValidator{
 			EthereumAddress: val.Hex(),
 			Power:           vs.Powers[i].Uint64(),
 		}
 	}
 
-	msg := &peggytypes.MsgValsetUpdatedClaim{
+	// MsgValsetUpdatedClaim this message permit to share to
+	// hyperion module the valset was updated on source blockchain
+	// this permit to insure the power is well share on both side
+	// -------------
+	msg := &hyperiontypes.MsgValsetUpdatedClaim{
+		HyperionId:   hyperionId,
 		EventNonce:   vs.EventNonce.Uint64(),
 		ValsetNonce:  vs.NewValsetNonce.Uint64(),
 		BlockHeight:  vs.Raw.BlockNumber,
@@ -419,7 +421,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, vs *peggyevents.Pe
 	return nil
 }
 
-func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, erc20 *peggyevents.PeggyERC20DeployedEvent) error {
+func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -432,7 +434,12 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, erc20 *peggye
 		"decimals":       erc20.Decimals,
 	}).Debugln("observed ERC20DeployedEvent")
 
-	msg := &peggytypes.MsgERC20DeployedClaim{
+	// MsgERC20DeployedClaim claims that new erc20 token
+	// was deployed on the source blockchain and will be linked
+	// as ERC20 to cosmosDenom in hyperion Module on HyperionId
+	// ----------
+	msg := &hyperiontypes.MsgERC20DeployedClaim{
+		HyperionId:    hyperionId,
 		EventNonce:    erc20.EventNonce.Uint64(),
 		BlockHeight:   erc20.Raw.BlockNumber,
 		CosmosDenom:   erc20.CosmosDenom,

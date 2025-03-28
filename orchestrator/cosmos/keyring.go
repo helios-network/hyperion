@@ -13,6 +13,7 @@ import (
 	cosmoscdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cosmoscrypto "github.com/cosmos/cosmos-sdk/crypto"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+
 	//"github.com/cosmos/cosmos-sdk/types/bech32"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pkg/errors"
