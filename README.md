@@ -44,7 +44,6 @@ Options:
 Commands:
   orchestrator             Starts the orchestrator main loop.
   q, query                 Query commands that can get state info from Hyperion.
-  tx                       Transactions for Hyperion governance and maintenance.
   version                  Print the version information and exit.
 
 Run 'hyperion COMMAND --help' for more information on a command.      
@@ -89,6 +88,7 @@ Options:
       --relay_pending_tx_wait_duration   If set, relayer will broadcast pending batches/valsetupdate only after pendingTxWaitDuration has passed (env $HYPERION_RELAY_PENDING_TX_WAIT_DURATION) (default "20m")
       --min_batch_fee_usd                If set, batch request will create batches only if fee threshold exceeds (env $HYPERION_MIN_BATCH_FEE_USD) (default 23.3)
       --coingecko_api                    Specify HTTP endpoint for coingecko api. (env $HYPERION_COINGECKO_API) (default "https://api.coingecko.com/api/v3")
+      --hyperion-id                      Specify Hyperion ID ecosystem. (env $HYPERION_ID)
 ```
 
 ## License
