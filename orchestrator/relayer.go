@@ -57,13 +57,13 @@ func (l *relayer) relay(ctx context.Context) error {
 
 	var pg loops.ParanoidGroup
 
-	// if l.cfg.RelayValsets {
-	// 	pg.Go(func() error {
-	// 		return l.retry(ctx, func() error {
-	// 			return l.relayValset(ctx, ethValset)
-	// 		})
-	// 	})
-	// }
+	if l.cfg.RelayValsets {
+		pg.Go(func() error {
+			return l.retry(ctx, func() error {
+				return l.relayValset(ctx, ethValset)
+			})
+		})
+	}
 
 	if l.cfg.RelayBatches {
 		pg.Go(func() error {
@@ -111,6 +111,8 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
+	l.Log().WithField("nonce", latestEthValset.Nonce).Infoln("try relay relayValset")
+
 	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
@@ -122,10 +124,14 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	)
 
 	for _, set := range latestHeliosValsets {
+
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": set.Nonce}).Infoln("try relay relayValset")
 		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
+
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": set.Nonce, "sigs_len": len(sigs)}).Infoln("try relay relayValset")
 
 		if len(sigs) == 0 {
 			continue
@@ -177,7 +183,7 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valse
 
 	if timeElapsed := time.Since(block.Block.Time); timeElapsed <= l.cfg.RelayValsetOffsetDur {
 		timeRemaining := time.Duration(int64(l.cfg.RelayValsetOffsetDur) - int64(timeElapsed))
-		l.Log().WithField("time_remaining", timeRemaining.String()).Debugln("valset relay offset not reached yet")
+		l.Log().WithField("time_remaining", timeRemaining.String()).Infoln("valset relay offset not reached yet")
 		return false
 	}
 

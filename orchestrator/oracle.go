@@ -70,6 +70,19 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return err
 	}
 
+	latestObservedHeight, err := l.helios.QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest valsets on Helios")
+	}
+
+	if latestObservedHeight.EthereumBlockHeight <= l.cfg.ChainParams.BridgeContractStartHeight { // first time total sync needed
+		l.lastObservedEthHeight = l.cfg.ChainParams.BridgeContractStartHeight
+		l.logger.Info("First Time Hyperion total sync needed BridgeContractStartHeight: ", l.lastObservedEthHeight)
+	}
+
+	// ajouter la possibilite de forcer un restart depuis un certain blockHeight en config
+
 	bonded := false
 	for _, v := range vs.Members {
 		if l.cfg.EthereumAddr.Hex() == v.EthereumAddress {
@@ -98,10 +111,6 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if latestHeight <= l.lastObservedEthHeight {
 		l.Log().WithFields(log.Fields{"latest": latestHeight, "observed": l.lastObservedEthHeight}).Debugln("latest Ethereum height already observed")
 		return nil
-	}
-
-	if l.lastObservedEthHeight < 18956778 { // TODO by config
-		l.lastObservedEthHeight = 18956778
 	}
 
 	// ensure the block range is within defaultBlocksToSearch

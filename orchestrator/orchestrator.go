@@ -2,9 +2,11 @@ package orchestrator
 
 import (
 	"context"
-	"math/big"
 	"time"
 
+	"github.com/pkg/errors"
+
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/avast/retry-go"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -36,6 +38,7 @@ type Config struct {
 	RelayValsets         bool
 	RelayBatches         bool
 	RelayerMode          bool
+	ChainParams          *hyperiontypes.CounterpartyChainParams
 }
 
 type Orchestrator struct {
@@ -92,26 +95,32 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 
 	s.logger.Info("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
 
-	lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
-	if lastObservedEthBlock == 0 {
-		hyperionParams, err := helios.HyperionParams(ctx)
-		if err != nil {
-			s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
-		}
+	// lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
 
-		for _, params := range hyperionParams.CounterpartyChainParams {
-			if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionIDHash {
-				lastObservedEthBlock = params.BridgeContractStartHeight
-				break
-			}
-		}
-	} else {
-		lastObservedEthBlock = lastObservedEthBlock + 1
+	h, err := s.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest ethereum header")
 	}
+	latestHeight := h.Number.Uint64()
+	// if lastObservedEthBlock == 0 {
+	// 	hyperionParams, err := helios.HyperionParams(ctx)
+	// 	if err != nil {
+	// 		s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
+	// 	}
+
+	// 	for _, params := range hyperionParams.CounterpartyChainParams {
+	// 		if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionIDHash {
+	// 			lastObservedEthBlock = params.BridgeContractStartHeight
+	// 			break
+	// 		}
+	// 	}
+	// } else {
+	// 	lastObservedEthBlock = lastObservedEthBlock + 1
+	// }
 
 	var pg loops.ParanoidGroup
 
-	pg.Go(func() error { return s.runOracle(ctx, lastObservedEthBlock) })
+	pg.Go(func() error { return s.runOracle(ctx, latestHeight) })
 	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })

@@ -1,6 +1,9 @@
 package main
 
-import cli "github.com/jawher/mow.cli"
+import (
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
+	cli "github.com/jawher/mow.cli"
+)
 
 // initGlobalOptions defines some global CLI options, that are useful for most parts of the app.
 // Before adding option to there, consider moving it into the actual Cmd.
@@ -126,6 +129,8 @@ type Config struct {
 	minBatchFeeUSD *float64
 
 	coingeckoApi *string
+
+	chainParams *hyperiontypes.CounterpartyChainParams
 }
 
 func initConfig(cmd *cli.Cmd) Config {

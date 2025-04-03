@@ -26,7 +26,7 @@ type BroadcastClient interface {
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
-	SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
 	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
@@ -129,7 +129,7 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 	return nil
 }
 
-func (c broadcastClient) SendToChain(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+func (c broadcastClient) SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -148,11 +148,11 @@ func (c broadcastClient) SendToChain(ctx context.Context, hyperionId uint64, des
 	// two layers of fees for the user
 	// -------------
 	msg := &hyperiontypes.MsgSendToChain{
-		Sender:         c.FromAddress().String(),
-		DestHyperionId: hyperionId,
-		Dest:           destination.Hex(),
-		Amount:         amount,
-		BridgeFee:      fee, // TODO: use exactly that fee for transaction
+		Sender:      c.FromAddress().String(),
+		DestChainId: chainId,
+		Dest:        destination.Hex(),
+		Amount:      amount,
+		BridgeFee:   fee, // TODO: use exactly that fee for transaction
 	}
 
 	if err := c.ChainClient.QueueBroadcastMsg(msg); err != nil {

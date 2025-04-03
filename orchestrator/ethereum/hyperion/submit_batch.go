@@ -220,7 +220,7 @@ func checkBatchSigsAndRepack(
 		}
 	}
 	// Vérifier si une seule signature est présente et que le signataire est l'administrateur
-	if len(validators) == 1 && validators[0] == common.HexToAddress("0x688feDf2cc9957eeD5A56905b1A0D74a3bAc0000") {
+	if len(validators) == 1 {
 		return
 	}
 
