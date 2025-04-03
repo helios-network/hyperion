@@ -25,15 +25,16 @@ func RunLoop(ctx context.Context, interval time.Duration, fn func() error) (err 
 		case <-delayTimer.C:
 			var start = time.Now()
 			if fnErr := fn(); fnErr != nil {
-				if fnErr == ErrGracefulStop {
-					return nil
-				}
+				log.WithError(fnErr).Errorln("loop function returned an error")
+				// if fnErr == ErrGracefulStop {
+				// 	return nil
+				// }
 
-				return fnErr
+				// return fnErr
 			}
 
 			if elapsed := time.Since(start); elapsed >= interval {
-				// in case of an overlap, use just interval
+				// in case of an overlap, use just gstinterval
 				delayTimer.Reset(interval)
 			} else {
 				delayTimer.Reset(interval - elapsed)
