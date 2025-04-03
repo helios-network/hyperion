@@ -25,6 +25,8 @@ type QueryClient interface {
 	LatestValsets(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error)
 	AllValsetConfirms(ctx context.Context, hyperionId uint64, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 
+	QueryGetLastObservedEthereumBlockHeight(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error)
+
 	OldestUnsignedTransactionBatch(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
 	UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error)
@@ -318,4 +320,27 @@ func (c queryClient) GetValidatorAddress(ctx context.Context, hyperionId uint64,
 	}
 
 	return valAddr, nil
+}
+
+func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryGetLastObservedEthereumBlockHeightRequest{
+		HyperionId: hyperionId,
+	}
+
+	resp, err := c.QueryClient.QueryGetLastObservedEthereumBlockHeight(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.LastObservedHeight, nil
 }

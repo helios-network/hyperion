@@ -39,7 +39,7 @@ type MockCosmosNetwork struct {
 	SendValsetConfirmFn              func(ctx context.Context, hyperionID uint64, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirmFn               func(ctx context.Context, hyperionID2 uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatchFn               func(ctx context.Context, hyperionID uint64, denom string) error
-	SendToChainFn                    func(ctx context.Context, hyperionId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendToChainFn                    func(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 	SendDepositClaimFn               func(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
 	SendWithdrawalClaimFn            func(ctx context.Context, hyperionID uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
 	SendValsetClaimFn                func(ctx context.Context, hyperionID uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
@@ -108,8 +108,8 @@ func (n MockCosmosNetwork) SendRequestBatch(ctx context.Context, hyperionID uint
 	return n.SendRequestBatchFn(ctx, hyperionID, denom)
 }
 
-func (n MockCosmosNetwork) SendToChain(ctx context.Context, hyperionID uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
-	return n.SendToChainFn(ctx, hyperionID, destination, amount, fee)
+func (n MockCosmosNetwork) SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+	return n.SendToChainFn(ctx, chainId, destination, amount, fee)
 }
 
 func (n MockCosmosNetwork) SendDepositClaim(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error {

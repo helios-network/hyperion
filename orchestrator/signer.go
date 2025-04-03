@@ -42,9 +42,9 @@ func (l *signer) sign(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	// if err := l.signValidatorSets(ctx); err != nil {
-	// 	return err
-	// }
+	if err := l.signValidatorSets(ctx); err != nil {
+		return err
+	}
 
 	if err := l.signNewBatch(ctx); err != nil {
 		return err

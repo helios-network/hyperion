@@ -115,11 +115,13 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			log.Fatalln("Counterparty Chain Params not found for hyperionId =", *cfg.hyperionID)
 		}
 
+		cfg.chainParams = counterpartyChainParamsCfg
+
 		//------------
 
 		var (
-			hyperionContractAddr = gethcommon.HexToAddress(counterpartyChainParamsCfg.BridgeCounterpartyAddress)
-			heliosTokenAddr      = gethcommon.HexToAddress(counterpartyChainParamsCfg.CosmosCoinErc20Contract)
+			hyperionContractAddr = gethcommon.HexToAddress(cfg.chainParams.BridgeCounterpartyAddress)
+			heliosTokenAddr      = gethcommon.HexToAddress(cfg.chainParams.CosmosCoinErc20Contract)
 			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 
@@ -169,6 +171,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			RelayValsets:         *cfg.relayValsets,
 			RelayBatches:         *cfg.relayBatches,
 			RelayerMode:          !isValidator,
+			ChainParams:          cfg.chainParams,
 		}
 
 		// Create hyperion and run it

@@ -2,6 +2,7 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -37,6 +38,7 @@ type Network interface {
 	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
 	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
+	GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
 	GetTransactionBatchExecutedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error)
 
 	GetValsetNonce(ctx context.Context) (*big.Int, error)
@@ -229,6 +231,37 @@ func (n *network) GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperi
 		valsetUpdatedEvents = append(valsetUpdatedEvents, iter.Event)
 	}
 
+	return valsetUpdatedEvents, nil
+}
+
+func (n *network) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
+	fmt.Println("ALALALALLALALALLALAL-1")
+	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
+	}
+
+	iter, err := hyperionFilterer.FilterValsetUpdatedEvent(&bind.FilterOpts{
+		Start: block,
+		End:   &block,
+	}, nil)
+	if err != nil {
+		if !isUnknownBlockErr(err) {
+			return nil, errors.Wrap(err, "failed to scan past ValsetUpdatedEvent events from Ethereum")
+		} else if iter == nil {
+			return nil, errors.New("no iterator returned")
+		}
+	}
+
+	defer iter.Close()
+
+	var valsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
+	for iter.Next() {
+		fmt.Println("ALALALALLALALALLALAL")
+		valsetUpdatedEvents = append(valsetUpdatedEvents, iter.Event)
+	}
+
+	fmt.Println("ALALALALLALALALLALAL0")
 	return valsetUpdatedEvents, nil
 }
 
