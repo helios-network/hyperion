@@ -111,8 +111,6 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	l.Log().WithField("nonce", latestEthValset.Nonce).Infoln("try relay relayValset")
-
 	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
@@ -124,19 +122,13 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	)
 
 	for _, set := range latestHeliosValsets {
-
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": set.Nonce}).Infoln("try relay relayValset")
 		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
-
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": set.Nonce, "sigs_len": len(sigs)}).Infoln("try relay relayValset")
-
 		if len(sigs) == 0 {
 			continue
 		}
-
 		confirmations = sigs
 		latestConfirmedValset = set
 		break
@@ -147,7 +139,11 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 		return nil
 	}
 
-	if !l.shouldRelayValset(ctx, latestConfirmedValset) {
+	shouldRelay := l.shouldRelayValset(ctx, latestConfirmedValset)
+
+	l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "hls_nonce": latestConfirmedValset.Nonce, "sigs": len(confirmations), "should_relay": shouldRelay, "synched": latestEthValset.Nonce == latestConfirmedValset.Nonce}).Infoln("relayer try relay Valset")
+
+	if !shouldRelay {
 		return nil
 	}
 

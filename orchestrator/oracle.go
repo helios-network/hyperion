@@ -126,20 +126,22 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	}
 	log.Info("events: ", events)
 
-	lastClaim, err := l.getLastClaimEvent(ctx)
+	lastObservedEventNonce, err := l.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return err
 	}
-	log.Info("lastClaim: ", lastClaim)
-	newEvents := filterEvents(events, lastClaim.EthereumEventNonce)
+
+	log.Info("lastObservedEventNonce: ", lastObservedEventNonce)
+	newEvents := filterEvents(events, lastObservedEventNonce)
 	log.Info("newEvents: ", newEvents)
+
 	sort.Slice(newEvents, func(i, j int) bool {
 		return newEvents[i].Nonce() < newEvents[j].Nonce()
 	})
 
 	if len(newEvents) == 0 {
 		l.Log().Infoln("NO EVENTS DETECTED 0")
-		l.Log().WithFields(log.Fields{"last_claimed_event_nonce": lastClaim.EthereumEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("no new events on Ethereum")
+		l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("oracle no new events on Ethereum")
 		l.lastObservedEthHeight = latestHeight
 		return nil
 	}
@@ -148,14 +150,19 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("SOME EVENTS DETECTED %d", len(newEvents))
 	}
 
-	log.Info("========================")
-	// if expected, actual := lastClaim.EthereumEventNonce+1, newEvents[0].Nonce(); expected != actual {
-	// 	log.Info("expected: ", expected, "actual: ", actual, "lastClaim.EthereumEventNonce: ", lastClaim.EthereumEventNonce)
-	// 	l.Log().WithFields(log.Fields{"expected": expected, "actual": actual, "last_claimed_event_nonce": lastClaim.EthereumEventNonce}).Debugln("orchestrator missed an Ethereum event. Restarting block search from last attested claim...")
-	// 	l.lastObservedEthHeight = lastClaim.EthereumEventHeight
-	// 	return nil
-	// }
-	log.Info("========================")
+	l.Log().WithFields(log.Fields{"event_helios_nonce": lastObservedEventNonce, "event_ethereum_nonce": newEvents[0].Nonce()}).Infoln("try oracle relay to helios")
+
+	if newEvents[0].Nonce() > lastObservedEventNonce+1 {
+		// we missed an event
+		lastObservedHeight, err := l.helios.QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
+		if err != nil {
+			return err
+		}
+		l.lastObservedEthHeight = lastObservedHeight.EthereumBlockHeight
+		// move back to the last observed event height
+		l.Log().WithFields(log.Fields{"current_helios_nonce": lastObservedEventNonce, "wanted_nonce": lastObservedEventNonce + 1, "actual_ethereum_nonce": newEvents[0].Nonce()}).Infoln("orchestrator missed an Ethereum event. Restarting block search from last observed claim...")
+		return nil
+	}
 
 	if err := l.sendNewEventClaims(ctx, newEvents); err != nil {
 		log.Info("err: ", err)

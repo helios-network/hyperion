@@ -26,6 +26,7 @@ type QueryClient interface {
 	AllValsetConfirms(ctx context.Context, hyperionId uint64, nonce uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
 
 	QueryGetLastObservedEthereumBlockHeight(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error)
+	QueryGetLastObservedEventNonce(ctx context.Context, hyperionId uint64) (uint64, error)
 
 	OldestUnsignedTransactionBatch(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
@@ -343,4 +344,27 @@ func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context
 	}
 
 	return resp.LastObservedHeight, nil
+}
+
+func (c queryClient) QueryGetLastObservedEventNonce(ctx context.Context, hyperionId uint64) (uint64, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryGetLastObservedEventNonceRequest{
+		HyperionId: hyperionId,
+	}
+
+	resp, err := c.QueryClient.QueryGetLastObservedEventNonce(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return 0, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return 0, ErrNotFound
+	}
+
+	return resp.LastObservedEventNonce, nil
 }
