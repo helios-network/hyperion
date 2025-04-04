@@ -222,6 +222,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 		CosmosReceiver: cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
 		Orchestrator:   c.ChainClient.FromAddress().String(),
 		Data:           deposit.Data,
+		TxHash:         deposit.Raw.TxHash.Hex(),
 	}
 
 	log.WithFields(log.Fields{
@@ -278,6 +279,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 		BlockHeight:   withdrawal.Raw.BlockNumber,
 		TokenContract: withdrawal.Token.Hex(),
 		Orchestrator:  c.FromAddress().String(),
+		TxHash:        withdrawal.Raw.TxHash.Hex(),
 	}
 
 	log.WithFields(log.Fields{

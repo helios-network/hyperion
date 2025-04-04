@@ -206,11 +206,6 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get ValsetUpdated events")
 		}
 
-		// for _, e := range oldDepositEvents {
-		// 	ev := oldDeposit(*e)
-		// 	events = append(events, &ev)
-		// }
-
 		for _, e := range depositEvents {
 			ev := deposit(*e)
 			events = append(events, &ev)

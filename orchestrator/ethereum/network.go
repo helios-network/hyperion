@@ -48,9 +48,8 @@ type Network interface {
 		confirms []*hyperiontypes.MsgValsetConfirm,
 	) (*gethcommon.Hash, error)
 
-	GetLastEventNonce(
-		ctx context.Context,
-	) (*big.Int, error)
+	GetLastEventNonce(ctx context.Context) (*big.Int, error)
+	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
 
 	GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
 	SendTransactionBatch(ctx context.Context,
@@ -149,6 +148,10 @@ func (n *network) GetValsetNonce(ctx context.Context) (*big.Int, error) {
 
 func (n *network) GetLastEventNonce(ctx context.Context) (*big.Int, error) {
 	return n.HyperionContract.GetLastEventNonce(ctx, n.FromAddr)
+}
+
+func (n *network) GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error) {
+	return n.HyperionContract.GetLastValsetCheckpoint(ctx, n.FromAddr)
 }
 
 func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error) {

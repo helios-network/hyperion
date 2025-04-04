@@ -36,6 +36,7 @@ type Config struct {
 	RelayBatchOffsetDur  time.Duration
 	RelayValsets         bool
 	RelayBatches         bool
+	RelayExternalDatas   bool
 	RelayerMode          bool
 	ChainParams          *hyperiontypes.CounterpartyChainParams
 }
@@ -92,7 +93,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 	}
 	hyperionID := hyperionIDHash.Big().Uint64()
 
-	s.logger.Info("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
+	log.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
 
 	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
 	if err != nil {
@@ -119,7 +120,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 	}
 
 	if lastEventNonce.Uint64() > lastObservedEventNonce {
-		s.logger.Info("lastEventNonce is greater than lastObservedEventNonce, starting from lastObservedEventNonce")
+		log.Infoln("lastEventNonce is greater than lastObservedEventNonce, starting from lastObservedEventNonce")
 		// start from the next block after the last observed height
 		ethereumBlockHeightWhereStart = latestObservedHeight.EthereumBlockHeight + 1
 	}

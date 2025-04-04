@@ -79,6 +79,11 @@ type HyperionContract interface {
 		ctx context.Context,
 		callerAddress common.Address,
 	) (*big.Int, error)
+
+	GetLastValsetCheckpoint(
+		ctx context.Context,
+		callerAddress common.Address,
+	) (*common.Hash, error)
 }
 
 func NewHyperionContract(

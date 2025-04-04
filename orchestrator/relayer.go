@@ -2,12 +2,16 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
 	"sort"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
@@ -20,7 +24,7 @@ import (
 )
 
 const (
-	defaultRelayerLoopDur    = 5 * time.Minute
+	defaultRelayerLoopDur    = 1 * time.Minute
 	findValsetBlocksToSearch = 2000
 )
 
@@ -55,6 +59,32 @@ func (l *relayer) relay(ctx context.Context) error {
 		return err
 	}
 
+	log.WithFields(log.Fields{
+		"Nonce":        ethValset.Nonce,
+		"RewardAmount": ethValset.RewardAmount,
+	}).Infoln("ETH VALESET")
+
+	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
+	if err != nil {
+		return err
+	}
+
+	ethCheckpoint, err := l.ethereum.GetLastValsetCheckpoint(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"Helios": heliosCheckpoint.Hex(),
+		"Eth":    ethCheckpoint.Hex(),
+		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
+	}).Infoln("Relayer: checkpoints")
+
+	// if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
+	// 	l.Log().Infoln("relayer: checkpoint not synced yet for working")
+	// 	return nil
+	// }
+
 	var pg loops.ParanoidGroup
 
 	if l.cfg.RelayValsets {
@@ -73,6 +103,14 @@ func (l *relayer) relay(ctx context.Context) error {
 		})
 	}
 
+	if l.cfg.RelayExternalDatas {
+		pg.Go(func() error {
+			return l.retry(ctx, func() error {
+				return l.relayExternalData(ctx, ethValset)
+			})
+		})
+	}
+
 	if pg.Initialized() {
 		if err := pg.Wait(); err != nil {
 			return err
@@ -81,6 +119,116 @@ func (l *relayer) relay(ctx context.Context) error {
 
 	return nil
 
+}
+
+func (l *relayer) encodeData(
+	hyperionId common.Hash,
+	valsetNonce uint64,
+	validators []string,
+	powers []uint64,
+	rewardAmount *big.Int,
+	rewardToken string,
+) (common.Hash, error) {
+
+	methodName := [32]byte{}
+	copy(methodName[:], []byte("checkpoint"))
+
+	// Conversion des validators en common.Address
+	validatorsArr := make([]common.Address, len(validators))
+	for i, v := range validators {
+		validatorsArr[i] = common.HexToAddress(v)
+	}
+
+	// Conversion des powers en []*big.Int
+	powersArr := make([]*big.Int, len(powers))
+	for i, power := range powers {
+		powersArr[i] = new(big.Int).SetUint64(power)
+	}
+
+	bytes32Ty, _ := abi.NewType("bytes32", "", nil)
+	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	addressTy, _ := abi.NewType("address", "", nil)
+	addressArrayTy, _ := abi.NewType("address[]", "", nil)
+	uint256ArrayTy, _ := abi.NewType("uint256[]", "", nil)
+
+	// Préparer les arguments de façon identique à abi.encode() côté Solidity
+	arguments := abi.Arguments{
+		{Type: bytes32Ty},      // hyperionId
+		{Type: bytes32Ty},      // methodName ("checkpoint")
+		{Type: uint256Ty},      // valsetNonce
+		{Type: addressArrayTy}, // validators
+		{Type: uint256ArrayTy}, // powers
+		{Type: uint256Ty},      // rewardAmount
+		{Type: addressTy},      // rewardToken
+	}
+
+	encodedBytes, err := arguments.Pack(
+		hyperionId,
+		methodName,
+		new(big.Int).SetUint64(valsetNonce),
+		validatorsArr,
+		powersArr,
+		rewardAmount,
+		common.HexToAddress(rewardToken),
+	)
+
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	// Enfin, réaliser keccak256 sur les données encodées
+	checkpoint := crypto.Keccak256Hash(encodedBytes)
+
+	return checkpoint, nil
+}
+
+func (l *relayer) makeCheckpoint(ctx context.Context, valset *hyperiontypes.Valset) (*common.Hash, error) {
+	/** function makeCheckpoint(
+	      ValsetArgs memory _valsetArgs,
+	      bytes32 _hyperionId
+	  ) private pure returns (bytes32) {
+	      // bytes32 encoding of the string "checkpoint"
+	      bytes32 methodName = 0x636865636b706f696e7400000000000000000000000000000000000000000000;
+
+	      bytes32 checkpoint = keccak256(
+	          abi.encode(
+	              _hyperionId,
+	              methodName,
+	              _valsetArgs.valsetNonce,
+	              _valsetArgs.validators,
+	              _valsetArgs.powers,
+	              _valsetArgs.rewardAmount,
+	              _valsetArgs.rewardToken
+	          )
+	      );
+	      return checkpoint;
+	  }
+	*/
+	validators := []string{}
+	powers := []uint64{}
+
+	for _, validator := range valset.Members {
+		validators = append(validators, validator.EthereumAddress)
+		powers = append(powers, validator.Power)
+	}
+
+	hyperionIDHash, err := l.ethereum.GetHyperionID(ctx)
+	if err != nil {
+		l.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+	}
+	// Encoder les données
+	checkpoint, err := l.encodeData(
+		hyperionIDHash,
+		valset.Nonce,
+		validators,
+		powers,
+		valset.RewardAmount.BigInt(),
+		valset.RewardToken,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &checkpoint, nil
 }
 
 func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
@@ -265,6 +413,18 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	}
 
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
+
+	return nil
+}
+
+func (l *relayer) relayExternalData(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+	metrics.ReportFuncCall(l.svcTags)
+	doneFn := metrics.ReportFuncTiming(l.svcTags)
+	defer doneFn()
+
+	// TODO: get external data batch from helios (maybe edit batch_creator for build special batch who contains only external data)
+	// TODO: format abi from tx information then call external data on ethereum
+	// TODO: send special claimData to helios
 
 	return nil
 }

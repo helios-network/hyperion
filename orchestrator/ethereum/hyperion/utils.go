@@ -67,6 +67,25 @@ func (s *hyperionContract) GetLastEventNonce(
 	return nonce, nil
 }
 
+func (s *hyperionContract) GetLastValsetCheckpoint(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*common.Hash, error) {
+
+	checkpointBytes, err := s.ethHyperion.StateLastValsetCheckpoint(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		return nil, err
+	}
+
+	checkpoint := common.BytesToHash(checkpointBytes[:])
+	return &checkpoint, nil
+}
+
 // Gets the hyperionID
 func (s *hyperionContract) GetHyperionID(
 	ctx context.Context,

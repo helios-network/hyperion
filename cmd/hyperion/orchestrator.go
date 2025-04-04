@@ -170,6 +170,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			RelayBatchOffsetDur:  batchDur,
 			RelayValsets:         *cfg.relayValsets,
 			RelayBatches:         *cfg.relayBatches,
+			RelayExternalDatas:   *cfg.relayExternalDatas,
 			RelayerMode:          !isValidator,
 			ChainParams:          cfg.chainParams,
 		}
