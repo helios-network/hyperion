@@ -2,7 +2,9 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
+	"os"
 	"sort"
 	"time"
 
@@ -59,11 +61,6 @@ func (l *relayer) relay(ctx context.Context) error {
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"Nonce":        ethValset.Nonce,
-		"RewardAmount": ethValset.RewardAmount,
-	}).Infoln("ETH VALESET")
-
 	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
 	if err != nil {
 		return err
@@ -80,10 +77,22 @@ func (l *relayer) relay(ctx context.Context) error {
 		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
 	}).Infoln("Relayer: checkpoints")
 
-	// if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
-	// 	l.Log().Infoln("relayer: checkpoint not synced yet for working")
-	// 	return nil
-	// }
+	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
+		l.Log().Infoln("relayer: checkpoint not synced yet waiting...")
+
+		json, _ := json.Marshal(ethValset)
+		if err == nil {
+			os.WriteFile("valset-error.json", json, 0644)
+		}
+
+		return nil
+	}
+
+	// write valset to file
+	json, err := json.Marshal(ethValset)
+	if err == nil {
+		os.WriteFile("valset.json", json, 0644)
+	}
 
 	var pg loops.ParanoidGroup
 
@@ -478,6 +487,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 
 		// we take only the first event if we find any at all.
 		event := valsetUpdatedEvents[0]
+
+		log.Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
+
 		valset := &hyperiontypes.Valset{
 			Nonce:        event.NewValsetNonce.Uint64(),
 			Members:      make([]*hyperiontypes.BridgeValidator, 0, len(event.Powers)),

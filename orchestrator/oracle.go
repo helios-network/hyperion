@@ -131,7 +131,12 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("lastObservedEventNonce: ", lastObservedEventNonce)
+	lastEventNonce, err := l.ethereum.GetLastEventNonce(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Info("lastObservedEventNonce: ", lastObservedEventNonce, " lastEventNonce: ", lastEventNonce)
 	newEvents := filterEvents(events, lastObservedEventNonce)
 	log.Info("newEvents: ", newEvents)
 
