@@ -31,8 +31,8 @@ var (
 
 // HyperionPrecompileMetaData contains all meta data concerning the HyperionPrecompile contract.
 var HyperionPrecompileMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"hyperionId\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"eventNonce\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"blockHeight\",\"type\":\"uint64\"},{\"internalType\":\"string\",\"name\":\"tokenContract\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"ethereumSender\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"cosmosReceiver\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"orchestrator\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"data\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"txHash\",\"type\":\"string\"}],\"name\":\"depositClaim\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"orchestratorAddress\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"hyperionId\",\"type\":\"uint64\"}],\"name\":\"setOrchestratorAddresses\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x6080806040523460155761026d908161001a8239f35b5f80fdfe60808060405260049081361015610014575f80fd5b5f3560e01c9081635c1ea75714610144575063b998366a14610034575f80fd5b34610140576101403660031901126101405767ffffffffffffffff9080358281160361014057610062610178565b50604435828116036101405760643582811161014057610085903690830161018f565b5060a4358281116101405761009d903690830161018f565b5060c435828111610140576100b5903690830161018f565b5060e435828111610140576100cd903690830161018f565b5061010435828111610140576100e6903690830161018f565b5061012435918211610140576100fe9136910161018f565b50610107610205565b50610110610205565b50610119610205565b50610122610205565b5061012b610205565b50610134610205565b50602060405160018152f35b5f80fd5b823461014057604036600319011261014057356001600160a01b0381160361014057602090610171610178565b5060018152f35b6024359067ffffffffffffffff8216820361014057565b81601f820112156101405780359067ffffffffffffffff928383116101f15760405193601f8401601f19908116603f01168501908111858210176101f1576040528284526020838301011161014057815f926020809301838601378301015290565b634e487b7160e01b5f52604160045260245ffd5b604051906040820182811067ffffffffffffffff8211176101f1576040526005825264307831323360d81b602083015256fea26469706673582212206967269123dcacbd2004e17ecb7a4f620c818090170bd7be61bd00753aca92c864736f6c63430008190033",
+	ABI: "[{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"hyperionId\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"eventNonce\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"blockHeight\",\"type\":\"uint64\"},{\"internalType\":\"string\",\"name\":\"tokenContract\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"ethereumSender\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"cosmosReceiver\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"orchestrator\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"data\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"txHash\",\"type\":\"string\"}],\"name\":\"depositClaim\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"orchestratorAddress\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"hyperionId\",\"type\":\"uint64\"}],\"name\":\"setOrchestratorAddresses\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
+	Bin: "0x6080806040523460155761026d908161001a8239f35b5f80fdfe60808060405260049081361015610014575f80fd5b5f3560e01c9081635c1ea75714610144575063b998366a14610034575f80fd5b34610140576101403660031901126101405767ffffffffffffffff9080358281160361014057610062610178565b50604435828116036101405760643582811161014057610085903690830161018f565b5060a4358281116101405761009d903690830161018f565b5060c435828111610140576100b5903690830161018f565b5060e435828111610140576100cd903690830161018f565b5061010435828111610140576100e6903690830161018f565b5061012435918211610140576100fe9136910161018f565b50610107610205565b50610110610205565b50610119610205565b50610122610205565b5061012b610205565b50610134610205565b50602060405160018152f35b5f80fd5b823461014057604036600319011261014057356001600160a01b0381160361014057602090610171610178565b5060018152f35b6024359067ffffffffffffffff8216820361014057565b81601f820112156101405780359067ffffffffffffffff928383116101f15760405193601f8401601f19908116603f01168501908111858210176101f1576040528284526020838301011161014057815f926020809301838601378301015290565b634e487b7160e01b5f52604160045260245ffd5b604051906040820182811067ffffffffffffffff8211176101f1576040526005825264307831323360d81b602083015256fea2646970667358221220053fa4f1e2ed97ca7bc0a68cbe91d048e5e57554e0f343fe2c556c1764c8c6c464736f6c63430008190033",
 }
 
 // HyperionPrecompileABI is the input ABI used to generate the binding from.
@@ -202,44 +202,64 @@ func (_HyperionPrecompile *HyperionPrecompileTransactorRaw) Transact(opts *bind.
 	return _HyperionPrecompile.Contract.contract.Transact(opts, method, params...)
 }
 
-// DepositClaim is a paid mutator transaction binding the contract method 0xb998366a.
+// DepositClaim is a free data retrieval call binding the contract method 0xb998366a.
 //
-// Solidity: function depositClaim(uint64 hyperionId, uint64 eventNonce, uint64 blockHeight, string tokenContract, uint256 amount, string ethereumSender, string cosmosReceiver, string orchestrator, string data, string txHash) returns(bool success)
-func (_HyperionPrecompile *HyperionPrecompileTransactor) DepositClaim(opts *bind.TransactOpts, hyperionId uint64, eventNonce uint64, blockHeight uint64, tokenContract string, amount *big.Int, ethereumSender string, cosmosReceiver string, orchestrator string, data string, txHash string) (*types.Transaction, error) {
-	return _HyperionPrecompile.contract.Transact(opts, "depositClaim", hyperionId, eventNonce, blockHeight, tokenContract, amount, ethereumSender, cosmosReceiver, orchestrator, data, txHash)
+// Solidity: function depositClaim(uint64 hyperionId, uint64 eventNonce, uint64 blockHeight, string tokenContract, uint256 amount, string ethereumSender, string cosmosReceiver, string orchestrator, string data, string txHash) pure returns(bool success)
+func (_HyperionPrecompile *HyperionPrecompileCaller) DepositClaim(opts *bind.CallOpts, hyperionId uint64, eventNonce uint64, blockHeight uint64, tokenContract string, amount *big.Int, ethereumSender string, cosmosReceiver string, orchestrator string, data string, txHash string) (bool, error) {
+	var out []interface{}
+	err := _HyperionPrecompile.contract.Call(opts, &out, "depositClaim", hyperionId, eventNonce, blockHeight, tokenContract, amount, ethereumSender, cosmosReceiver, orchestrator, data, txHash)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
-// DepositClaim is a paid mutator transaction binding the contract method 0xb998366a.
+// DepositClaim is a free data retrieval call binding the contract method 0xb998366a.
 //
-// Solidity: function depositClaim(uint64 hyperionId, uint64 eventNonce, uint64 blockHeight, string tokenContract, uint256 amount, string ethereumSender, string cosmosReceiver, string orchestrator, string data, string txHash) returns(bool success)
-func (_HyperionPrecompile *HyperionPrecompileSession) DepositClaim(hyperionId uint64, eventNonce uint64, blockHeight uint64, tokenContract string, amount *big.Int, ethereumSender string, cosmosReceiver string, orchestrator string, data string, txHash string) (*types.Transaction, error) {
-	return _HyperionPrecompile.Contract.DepositClaim(&_HyperionPrecompile.TransactOpts, hyperionId, eventNonce, blockHeight, tokenContract, amount, ethereumSender, cosmosReceiver, orchestrator, data, txHash)
+// Solidity: function depositClaim(uint64 hyperionId, uint64 eventNonce, uint64 blockHeight, string tokenContract, uint256 amount, string ethereumSender, string cosmosReceiver, string orchestrator, string data, string txHash) pure returns(bool success)
+func (_HyperionPrecompile *HyperionPrecompileSession) DepositClaim(hyperionId uint64, eventNonce uint64, blockHeight uint64, tokenContract string, amount *big.Int, ethereumSender string, cosmosReceiver string, orchestrator string, data string, txHash string) (bool, error) {
+	return _HyperionPrecompile.Contract.DepositClaim(&_HyperionPrecompile.CallOpts, hyperionId, eventNonce, blockHeight, tokenContract, amount, ethereumSender, cosmosReceiver, orchestrator, data, txHash)
 }
 
-// DepositClaim is a paid mutator transaction binding the contract method 0xb998366a.
+// DepositClaim is a free data retrieval call binding the contract method 0xb998366a.
 //
-// Solidity: function depositClaim(uint64 hyperionId, uint64 eventNonce, uint64 blockHeight, string tokenContract, uint256 amount, string ethereumSender, string cosmosReceiver, string orchestrator, string data, string txHash) returns(bool success)
-func (_HyperionPrecompile *HyperionPrecompileTransactorSession) DepositClaim(hyperionId uint64, eventNonce uint64, blockHeight uint64, tokenContract string, amount *big.Int, ethereumSender string, cosmosReceiver string, orchestrator string, data string, txHash string) (*types.Transaction, error) {
-	return _HyperionPrecompile.Contract.DepositClaim(&_HyperionPrecompile.TransactOpts, hyperionId, eventNonce, blockHeight, tokenContract, amount, ethereumSender, cosmosReceiver, orchestrator, data, txHash)
+// Solidity: function depositClaim(uint64 hyperionId, uint64 eventNonce, uint64 blockHeight, string tokenContract, uint256 amount, string ethereumSender, string cosmosReceiver, string orchestrator, string data, string txHash) pure returns(bool success)
+func (_HyperionPrecompile *HyperionPrecompileCallerSession) DepositClaim(hyperionId uint64, eventNonce uint64, blockHeight uint64, tokenContract string, amount *big.Int, ethereumSender string, cosmosReceiver string, orchestrator string, data string, txHash string) (bool, error) {
+	return _HyperionPrecompile.Contract.DepositClaim(&_HyperionPrecompile.CallOpts, hyperionId, eventNonce, blockHeight, tokenContract, amount, ethereumSender, cosmosReceiver, orchestrator, data, txHash)
 }
 
-// SetOrchestratorAddresses is a paid mutator transaction binding the contract method 0x5c1ea757.
+// SetOrchestratorAddresses is a free data retrieval call binding the contract method 0x5c1ea757.
 //
-// Solidity: function setOrchestratorAddresses(address orchestratorAddress, uint64 hyperionId) returns(bool success)
-func (_HyperionPrecompile *HyperionPrecompileTransactor) SetOrchestratorAddresses(opts *bind.TransactOpts, orchestratorAddress common.Address, hyperionId uint64) (*types.Transaction, error) {
-	return _HyperionPrecompile.contract.Transact(opts, "setOrchestratorAddresses", orchestratorAddress, hyperionId)
+// Solidity: function setOrchestratorAddresses(address orchestratorAddress, uint64 hyperionId) pure returns(bool success)
+func (_HyperionPrecompile *HyperionPrecompileCaller) SetOrchestratorAddresses(opts *bind.CallOpts, orchestratorAddress common.Address, hyperionId uint64) (bool, error) {
+	var out []interface{}
+	err := _HyperionPrecompile.contract.Call(opts, &out, "setOrchestratorAddresses", orchestratorAddress, hyperionId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
-// SetOrchestratorAddresses is a paid mutator transaction binding the contract method 0x5c1ea757.
+// SetOrchestratorAddresses is a free data retrieval call binding the contract method 0x5c1ea757.
 //
-// Solidity: function setOrchestratorAddresses(address orchestratorAddress, uint64 hyperionId) returns(bool success)
-func (_HyperionPrecompile *HyperionPrecompileSession) SetOrchestratorAddresses(orchestratorAddress common.Address, hyperionId uint64) (*types.Transaction, error) {
-	return _HyperionPrecompile.Contract.SetOrchestratorAddresses(&_HyperionPrecompile.TransactOpts, orchestratorAddress, hyperionId)
+// Solidity: function setOrchestratorAddresses(address orchestratorAddress, uint64 hyperionId) pure returns(bool success)
+func (_HyperionPrecompile *HyperionPrecompileSession) SetOrchestratorAddresses(orchestratorAddress common.Address, hyperionId uint64) (bool, error) {
+	return _HyperionPrecompile.Contract.SetOrchestratorAddresses(&_HyperionPrecompile.CallOpts, orchestratorAddress, hyperionId)
 }
 
-// SetOrchestratorAddresses is a paid mutator transaction binding the contract method 0x5c1ea757.
+// SetOrchestratorAddresses is a free data retrieval call binding the contract method 0x5c1ea757.
 //
-// Solidity: function setOrchestratorAddresses(address orchestratorAddress, uint64 hyperionId) returns(bool success)
-func (_HyperionPrecompile *HyperionPrecompileTransactorSession) SetOrchestratorAddresses(orchestratorAddress common.Address, hyperionId uint64) (*types.Transaction, error) {
-	return _HyperionPrecompile.Contract.SetOrchestratorAddresses(&_HyperionPrecompile.TransactOpts, orchestratorAddress, hyperionId)
+// Solidity: function setOrchestratorAddresses(address orchestratorAddress, uint64 hyperionId) pure returns(bool success)
+func (_HyperionPrecompile *HyperionPrecompileCallerSession) SetOrchestratorAddresses(orchestratorAddress common.Address, hyperionId uint64) (bool, error) {
+	return _HyperionPrecompile.Contract.SetOrchestratorAddresses(&_HyperionPrecompile.CallOpts, orchestratorAddress, hyperionId)
 }

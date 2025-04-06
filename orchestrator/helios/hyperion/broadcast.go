@@ -31,6 +31,8 @@ type BroadcastClient interface {
 	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
 	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
 	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
+	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
+	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
 }
 
 type broadcastClient struct {
@@ -186,6 +188,42 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64
 		metrics.ReportFuncError(c.svcTags)
 		return errors.Wrap(err, "broadcasting MsgRequestBatch failed")
 	}
+
+	return nil
+}
+
+func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	// MsgSetOrchestratorAddresses
+	// Permit to set the orchestrator address on the hyperion module
+	// -------------
+	msg := &hyperiontypes.MsgSetOrchestratorAddresses{
+		Sender:       c.FromAddress().String(),
+		HyperionId:   hyperionId,
+		EthAddress:   ethAddress,
+		Orchestrator: c.FromAddress().String(),
+	}
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgSetOrchestratorAddresses failed")
+	}
+
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"tx_hash": resp.TxResponse.TxHash,
+			"code":    resp.TxResponse.Code,
+			"Error":   "insufficient fee",
+		}).Infoln("EthOracle sent MsgSetOrchestratorAddresses")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgSetOrchestratorAddresses failed")
+	}
+
+	// TODO: wait for the tx to be included in a block
+
+	time.Sleep(10 * time.Second)
 
 	return nil
 }
@@ -417,6 +455,34 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 		"event_height": msg.BlockHeight,
 		"tx_hash":      resp.TxResponse.TxHash,
 	}).Infoln("Oracle sent MsgERC20DeployedClaim")
+
+	return nil
+}
+
+func (c broadcastClient) SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &hyperiontypes.MsgForceSetValsetAndLastObservedEventNonce{
+		HyperionId:                      hyperionId,
+		Valset:                          valset,
+		Signer:                          c.FromAddress().String(),
+		LastObservedEventNonce:          nonce,
+		LastObservedEthereumBlockHeight: blockHeight,
+	}
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgForceSetValset failed")
+	}
+
+	log.WithFields(log.Fields{
+		"tx_hash": resp.TxResponse.TxHash,
+	}).Infoln("Oracle sent MsgForceSetValset")
+
+	time.Sleep(10 * time.Second)
 
 	return nil
 }

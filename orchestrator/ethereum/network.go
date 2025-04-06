@@ -50,6 +50,7 @@ type Network interface {
 	GetLastEventNonce(ctx context.Context) (*big.Int, error)
 	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
 	GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error)
+	GetLastEventHeight(ctx context.Context) (*big.Int, error)
 
 	GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
 	SendTransactionBatch(ctx context.Context,
@@ -156,6 +157,10 @@ func (n *network) GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash
 
 func (n *network) GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error) {
 	return n.HyperionContract.GetLastValsetUpdatedEventHeight(ctx, n.FromAddr)
+}
+
+func (n *network) GetLastEventHeight(ctx context.Context) (*big.Int, error) {
+	return n.HyperionContract.GetLastEventHeight(ctx, n.FromAddr)
 }
 
 func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error) {

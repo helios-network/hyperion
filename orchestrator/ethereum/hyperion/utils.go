@@ -113,6 +113,24 @@ func (s *hyperionContract) GetLastValsetUpdatedEventHeight(
 	return height, nil
 }
 
+func (s *hyperionContract) GetLastEventHeight(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*big.Int, error) {
+
+	height, err := s.ethHyperion.StateLastEventHeight(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventHeight call failed")
+		return nil, err
+	}
+
+	return height, nil
+}
+
 // Gets the hyperionID
 func (s *hyperionContract) GetHyperionID(
 	ctx context.Context,
