@@ -84,6 +84,11 @@ type HyperionContract interface {
 		ctx context.Context,
 		callerAddress common.Address,
 	) (*common.Hash, error)
+
+	GetLastValsetUpdatedEventHeight(
+		ctx context.Context,
+		callerAddress common.Address,
+	) (*big.Int, error)
 }
 
 func NewHyperionContract(

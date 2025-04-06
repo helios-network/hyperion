@@ -95,6 +95,24 @@ func (s *hyperionContract) GetLastValsetCheckpoint(
 	return &checkpoint, nil
 }
 
+func (s *hyperionContract) GetLastValsetUpdatedEventHeight(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*big.Int, error) {
+
+	height, err := s.ethHyperion.StateLastValsetHeight(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		return nil, err
+	}
+
+	return height, nil
+}
+
 // Gets the hyperionID
 func (s *hyperionContract) GetHyperionID(
 	ctx context.Context,

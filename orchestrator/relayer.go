@@ -26,8 +26,7 @@ import (
 )
 
 const (
-	defaultRelayerLoopDur    = 1 * time.Minute
-	findValsetBlocksToSearch = 2000
+	defaultRelayerLoopDur = 1 * time.Minute
 )
 
 func (s *Orchestrator) runRelayer(ctx context.Context) error {
@@ -78,7 +77,7 @@ func (l *relayer) relay(ctx context.Context) error {
 	}).Infoln("Relayer: checkpoints")
 
 	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
-		l.Log().Infoln("relayer: checkpoint not synced yet waiting...")
+		l.Log().Infoln("relayer: checkpoint not synced yet waiting (rpc should be untrustable) ...")
 
 		json, _ := json.Marshal(ethValset)
 		if err == nil {
@@ -444,9 +443,10 @@ func (l *relayer) relayExternalData(ctx context.Context, latestEthValset *hyperi
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
 func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
-	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+
+	lastValsetUpdatedEventHeight, err := l.ethereum.GetLastValsetUpdatedEventHeight(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get latest ethereum header")
+		return nil, errors.Wrap(err, "failed to get last valset updated event")
 	}
 
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
@@ -459,17 +459,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}
 
-	currentBlock := latestHeader.Number.Uint64()
+	if lastValsetUpdatedEventHeight.Uint64() > 0 {
 
-	for currentBlock > 0 {
-		var startSearchBlock uint64
-		if currentBlock <= findValsetBlocksToSearch {
-			startSearchBlock = 0
-		} else {
-			startSearchBlock = currentBlock - findValsetBlocksToSearch
-		}
-
-		valsetUpdatedEvents, err := l.ethereum.GetValsetUpdatedEvents(startSearchBlock, currentBlock)
+		valsetUpdatedEvents, err := l.ethereum.GetValsetUpdatedEventsAtSpecificBlock(lastValsetUpdatedEventHeight.Uint64())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events from Ethereum")
 		}
@@ -481,8 +473,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
 
 		if len(valsetUpdatedEvents) == 0 {
-			currentBlock = startSearchBlock
-			continue
+			return nil, errors.Wrap(err, "failed to get Eth valset")
 		}
 
 		// we take only the first event if we find any at all.
