@@ -38,7 +38,6 @@ type EVMProviderWithRet interface {
 	SendTransactionWithRet(ctx context.Context, tx *types.Transaction) (txHash common.Hash, err error)
 }
 
-
 type evmProviderWithRet struct {
 	pool    *EVMProviders
 	svcTags metrics.Tags
@@ -76,8 +75,8 @@ func (p *evmProviderWithRet) FilterLogs(ctx context.Context, query ethereum.Filt
 	return logs, nil
 }
 
-	// SubscribeFilterLogs creates a background log filtering operation, returning
-	// a subscription immediately, which can be used to stream the found events.
+// SubscribeFilterLogs creates a background log filtering operation, returning
+// a subscription immediately, which can be used to stream the found events.
 func (p *evmProviderWithRet) SubscribeFilterLogs(ctx context.Context, query ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
 	return nil, nil
 }
@@ -89,15 +88,15 @@ func (p *evmProviderWithRet) CodeAt(ctx context.Context, contract common.Address
 		result, err = client.CodeAt(ctx, contract, blockNumber)
 		return nil
 	})
-	if err != nil {
+	if err != nil && result != nil {
 		metrics.ReportFuncError(p.svcTags)
 		return nil, err
 	}
 	return result, nil
 }
 
-	// CallContract executes an Ethereum contract call with the specified data as the
-	// input.
+// CallContract executes an Ethereum contract call with the specified data as the
+// input.
 func (p *evmProviderWithRet) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	result := make([]byte, 0)
 	var err error
@@ -105,7 +104,7 @@ func (p *evmProviderWithRet) CallContract(ctx context.Context, call ethereum.Cal
 		result, err = client.CallContract(ctx, call, blockNumber)
 		return nil
 	})
-	if err != nil {
+	if err != nil && result != nil {
 		metrics.ReportFuncError(p.svcTags)
 		return nil, err
 	}
