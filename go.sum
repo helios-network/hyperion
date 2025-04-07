@@ -75,8 +75,8 @@ github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20 h1:IrbfnLW0yY7h
 github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20/go.mod h1:ZW4eIE98wivInyQyhxU2nHqEielc/iZAcr41qNyWSrw=
 github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2 h1:os51E5nojjXF2N5NKn0BN8MsLzgZAvueg3SLiUGxGCA=
 github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2/go.mod h1:Za5YrKh2gyP44/7xWLA1+EA9x+dsUEg9o3cD0gcu9pA=
-github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-42 h1:vwKYWTePZ6jXzFElId85mglTYR92MoEmMuztTN9yTCc=
-github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-42/go.mod h1:6KKWPMzgUaf5VZjcRDJQlKbw7FElf0RL/DlonLY8llg=
+github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-50 h1:BIIPtdh/nxSySHAUyjedYQdthdF42yEObNzWf6OiWw8=
+github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-50/go.mod h1:6KKWPMzgUaf5VZjcRDJQlKbw7FElf0RL/DlonLY8llg=
 github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2 h1:4Z+qXwo6H+rcoIuOLqyRX5qdWS6A0woypOAkkDB5DUo=
 github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2/go.mod h1:cxLwrKnl5QZsljZP/OmH/nEAIj89m4mE0FW5Mn31Nco=
 github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-6 h1:HgLh5ZYtyoc3IrEH2UgR5OgL2Me/ledf1GnhiYYoUZ0=

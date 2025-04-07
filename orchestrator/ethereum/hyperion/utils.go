@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 )
 
@@ -37,8 +38,6 @@ func (s *hyperionContract) GetValsetNonce(
 	callerAddress common.Address,
 ) (*big.Int, error) {
 
-	fmt.Println("call state_lastValsetNonce", callerAddress.String())
-
 	nonce, err := s.ethHyperion.StateLastValsetNonce(&bind.CallOpts{
 		From:    callerAddress,
 		Context: ctx,
@@ -50,6 +49,86 @@ func (s *hyperionContract) GetValsetNonce(
 	}
 
 	return nonce, nil
+}
+
+func (s *hyperionContract) GetLastEventNonce(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*big.Int, error) {
+
+	nonce, err := s.ethHyperion.StateLastEventNonce(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		return nil, err
+	}
+
+	return nonce, nil
+}
+
+func (s *hyperionContract) GetLastValsetCheckpoint(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*common.Hash, error) {
+
+	checkpointBytes, err := s.ethHyperion.StateLastValsetCheckpoint(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		return nil, err
+	}
+
+	bts := []byte{}
+	for _, b := range checkpointBytes {
+		bts = append(bts, b)
+	}
+
+	fmt.Println("checkpointBytes: ", hexutil.Encode(bts))
+
+	checkpoint := common.BytesToHash(checkpointBytes[:])
+	return &checkpoint, nil
+}
+
+func (s *hyperionContract) GetLastValsetUpdatedEventHeight(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*big.Int, error) {
+
+	height, err := s.ethHyperion.StateLastValsetHeight(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		return nil, err
+	}
+
+	return height, nil
+}
+
+func (s *hyperionContract) GetLastEventHeight(
+	ctx context.Context,
+	callerAddress common.Address,
+) (*big.Int, error) {
+
+	height, err := s.ethHyperion.StateLastEventHeight(&bind.CallOpts{
+		From:    callerAddress,
+		Context: ctx,
+	})
+
+	if err != nil {
+		err = errors.Wrap(err, "StateLastEventHeight call failed")
+		return nil, err
+	}
+
+	return height, nil
 }
 
 // Gets the hyperionID

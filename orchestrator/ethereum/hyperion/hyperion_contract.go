@@ -74,6 +74,26 @@ type HyperionContract interface {
 
 	SubscribeToPendingTxs(
 		alchemyWebsocketURL string)
+
+	GetLastEventNonce(
+		ctx context.Context,
+		callerAddress common.Address,
+	) (*big.Int, error)
+
+	GetLastValsetCheckpoint(
+		ctx context.Context,
+		callerAddress common.Address,
+	) (*common.Hash, error)
+
+	GetLastValsetUpdatedEventHeight(
+		ctx context.Context,
+		callerAddress common.Address,
+	) (*big.Int, error)
+
+	GetLastEventHeight(
+		ctx context.Context,
+		callerAddress common.Address,
+	) (*big.Int, error)
 }
 
 func NewHyperionContract(

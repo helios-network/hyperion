@@ -2,7 +2,6 @@ package ethereum
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -46,6 +45,11 @@ type Network interface {
 		newValset *hyperiontypes.Valset,
 		confirms []*hyperiontypes.MsgValsetConfirm,
 	) (*gethcommon.Hash, error)
+
+	GetLastEventNonce(ctx context.Context) (*big.Int, error)
+	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
+	GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error)
+	GetLastEventHeight(ctx context.Context) (*big.Int, error)
 
 	GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
 	SendTransactionBatch(ctx context.Context,
@@ -135,6 +139,22 @@ func (n *network) GetHyperionID(ctx context.Context) (gethcommon.Hash, error) {
 
 func (n *network) GetValsetNonce(ctx context.Context) (*big.Int, error) {
 	return n.HyperionContract.GetValsetNonce(ctx, n.FromAddr)
+}
+
+func (n *network) GetLastEventNonce(ctx context.Context) (*big.Int, error) {
+	return n.HyperionContract.GetLastEventNonce(ctx, n.FromAddr)
+}
+
+func (n *network) GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error) {
+	return n.HyperionContract.GetLastValsetCheckpoint(ctx, n.FromAddr)
+}
+
+func (n *network) GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error) {
+	return n.HyperionContract.GetLastValsetUpdatedEventHeight(ctx, n.FromAddr)
+}
+
+func (n *network) GetLastEventHeight(ctx context.Context) (*big.Int, error) {
+	return n.HyperionContract.GetLastEventHeight(ctx, n.FromAddr)
 }
 
 func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error) {
@@ -229,7 +249,6 @@ func (n *network) GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperi
 }
 
 func (n *network) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
-	fmt.Println("ALALALALLALALALLALAL-1")
 	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
@@ -251,11 +270,9 @@ func (n *network) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperi
 
 	var valsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
 	for iter.Next() {
-		fmt.Println("ALALALALLALALALLALAL")
 		valsetUpdatedEvents = append(valsetUpdatedEvents, iter.Event)
 	}
 
-	fmt.Println("ALALALALLALALALLALAL0")
 	return valsetUpdatedEvents, nil
 }
 

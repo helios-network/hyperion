@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	cli "github.com/jawher/mow.cli"
 	"github.com/pkg/errors"
@@ -154,6 +155,55 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
+		} else {
+			err := heliosNetwork.SendSetOrchestratorAddresses(ctx, uint64(*cfg.hyperionID), ethKeyFromAddress.String())
+			orShutdown(err)
+			addr, isValidator = helios.HasRegisteredOrchestrator(heliosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
+			if isValidator {
+				log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
+			}
+		}
+
+		// check if the helios hyperion is not synchronized
+		nonce, err := heliosNetwork.QueryGetLastObservedEventNonce(ctx, uint64(*cfg.hyperionID))
+		orShutdown(err)
+		lastEventNonce, err := ethNetwork.GetLastEventNonce(ctx)
+		orShutdown(err)
+		if nonce == 0 && lastEventNonce.Uint64() > 1 { // not firstime
+
+			height, err := ethNetwork.GetLastValsetUpdatedEventHeight(ctx)
+			orShutdown(err)
+
+			lastEventBlockHeight, err := ethNetwork.GetLastEventHeight(ctx)
+			orShutdown(err)
+
+			events, err := ethNetwork.GetValsetUpdatedEventsAtSpecificBlock(height.Uint64())
+			orShutdown(err)
+
+			if len(events) == 0 {
+				log.Fatalln("helios hyperion is not synchronized, please wait for it to be synchronized")
+			}
+
+			event := events[0]
+
+			valset := &hyperiontypes.Valset{
+				Nonce:        event.NewValsetNonce.Uint64(),
+				Members:      make([]*hyperiontypes.BridgeValidator, 0, len(event.Powers)),
+				RewardAmount: sdkmath.NewIntFromBigInt(event.RewardAmount),
+				RewardToken:  event.RewardToken.Hex(),
+			}
+
+			for idx, p := range event.Powers {
+				valset.Members = append(valset.Members, &hyperiontypes.BridgeValidator{
+					Power:           p.Uint64(),
+					EthereumAddress: event.Validators[idx].Hex(),
+				})
+			}
+
+			err = heliosNetwork.SendForceSetValsetAndLastObservedEventNonce(ctx, uint64(*cfg.hyperionID), lastEventNonce.Uint64(), lastEventBlockHeight.Uint64(), valset)
+			orShutdown(err)
+
+			log.Infoln("helios hyperion is now forcefully synchronized with ethereum hyperion")
 		}
 
 		var (
@@ -181,6 +231,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			RelayBatchOffsetDur:  batchDur,
 			RelayValsets:         *cfg.relayValsets,
 			RelayBatches:         *cfg.relayBatches,
+			RelayExternalDatas:   *cfg.relayExternalDatas,
 			RelayerMode:          !isValidator,
 			ChainParams:          cfg.chainParams,
 		}

@@ -122,6 +122,7 @@ type Config struct {
 	relayValsets          *bool
 	relayValsetOffsetDur  *string
 	relayBatches          *bool
+	relayExternalDatas    *bool
 	relayBatchOffsetDur   *string
 	pendingTxWaitDuration *string
 
@@ -300,6 +301,13 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "relay_batches",
 		Desc:   "If enabled, relayer will relay batches to ethereum",
 		EnvVar: "HYPERION_RELAY_BATCHES",
+		Value:  false,
+	})
+
+	cfg.relayExternalDatas = cmd.Bool(cli.BoolOpt{
+		Name:   "relay_external_datas",
+		Desc:   "If enabled, relayer will relay external datas taken on ethereum",
+		EnvVar: "HYPERION_RELAY_EXTERNAL_DATAS",
 		Value:  false,
 	})
 

@@ -30,10 +30,7 @@ func initMetrics(c *cli.Cmd) {
 		&statsdDisabled,
 	)
 
-	if toBool(*statsdDisabled) {
-		// initializes statsd client with a mock one with no-op enabled
-		metrics.Disable()
-	} else {
+	if !toBool(*statsdDisabled) {
 		go func() {
 			for {
 				hostname, _ := os.Hostname()
@@ -42,7 +39,7 @@ func initMetrics(c *cli.Cmd) {
 					EnvName:              *envName,
 					HostName:             hostname,
 					StuckFunctionTimeout: duration(*statsdStuckDur, 30*time.Minute),
-					MockingEnabled:       toBool(*statsdMocking) || *envName == "local",
+					MockingEnabled:       toBool(*statsdMocking),
 				})
 				if err != nil {
 					log.WithError(err).Warningln("metrics init failed, will retry in 1 min")

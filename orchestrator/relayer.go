@@ -2,12 +2,18 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
+	"math/big"
+	"os"
 	"sort"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
@@ -20,8 +26,7 @@ import (
 )
 
 const (
-	defaultRelayerLoopDur    = 5 * time.Minute
-	findValsetBlocksToSearch = 2000
+	defaultRelayerLoopDur = 1 * time.Minute
 )
 
 func (s *Orchestrator) runRelayer(ctx context.Context) error {
@@ -55,6 +60,39 @@ func (l *relayer) relay(ctx context.Context) error {
 		return err
 	}
 
+	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
+	if err != nil {
+		return err
+	}
+
+	ethCheckpoint, err := l.ethereum.GetLastValsetCheckpoint(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"Helios": heliosCheckpoint.Hex(),
+		"Eth":    ethCheckpoint.Hex(),
+		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
+	}).Infoln("Relayer: checkpoints")
+
+	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
+		l.Log().Infoln("relayer: checkpoint not synced yet waiting (rpc should be untrustable) ...")
+
+		json, _ := json.Marshal(ethValset)
+		if err == nil {
+			os.WriteFile("valset-error.json", json, 0644)
+		}
+
+		return nil
+	}
+
+	// write valset to file
+	json, err := json.Marshal(ethValset)
+	if err == nil {
+		os.WriteFile("valset.json", json, 0644)
+	}
+
 	var pg loops.ParanoidGroup
 
 	if l.cfg.RelayValsets {
@@ -73,6 +111,14 @@ func (l *relayer) relay(ctx context.Context) error {
 		})
 	}
 
+	if l.cfg.RelayExternalDatas {
+		pg.Go(func() error {
+			return l.retry(ctx, func() error {
+				return l.relayExternalData(ctx, ethValset)
+			})
+		})
+	}
+
 	if pg.Initialized() {
 		if err := pg.Wait(); err != nil {
 			return err
@@ -81,6 +127,116 @@ func (l *relayer) relay(ctx context.Context) error {
 
 	return nil
 
+}
+
+func (l *relayer) encodeData(
+	hyperionId common.Hash,
+	valsetNonce uint64,
+	validators []string,
+	powers []uint64,
+	rewardAmount *big.Int,
+	rewardToken string,
+) (common.Hash, error) {
+
+	methodName := [32]byte{}
+	copy(methodName[:], []byte("checkpoint"))
+
+	// Conversion des validators en common.Address
+	validatorsArr := make([]common.Address, len(validators))
+	for i, v := range validators {
+		validatorsArr[i] = common.HexToAddress(v)
+	}
+
+	// Conversion des powers en []*big.Int
+	powersArr := make([]*big.Int, len(powers))
+	for i, power := range powers {
+		powersArr[i] = new(big.Int).SetUint64(power)
+	}
+
+	bytes32Ty, _ := abi.NewType("bytes32", "", nil)
+	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	addressTy, _ := abi.NewType("address", "", nil)
+	addressArrayTy, _ := abi.NewType("address[]", "", nil)
+	uint256ArrayTy, _ := abi.NewType("uint256[]", "", nil)
+
+	// Préparer les arguments de façon identique à abi.encode() côté Solidity
+	arguments := abi.Arguments{
+		{Type: bytes32Ty},      // hyperionId
+		{Type: bytes32Ty},      // methodName ("checkpoint")
+		{Type: uint256Ty},      // valsetNonce
+		{Type: addressArrayTy}, // validators
+		{Type: uint256ArrayTy}, // powers
+		{Type: uint256Ty},      // rewardAmount
+		{Type: addressTy},      // rewardToken
+	}
+
+	encodedBytes, err := arguments.Pack(
+		hyperionId,
+		methodName,
+		new(big.Int).SetUint64(valsetNonce),
+		validatorsArr,
+		powersArr,
+		rewardAmount,
+		common.HexToAddress(rewardToken),
+	)
+
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	// Enfin, réaliser keccak256 sur les données encodées
+	checkpoint := crypto.Keccak256Hash(encodedBytes)
+
+	return checkpoint, nil
+}
+
+func (l *relayer) makeCheckpoint(ctx context.Context, valset *hyperiontypes.Valset) (*common.Hash, error) {
+	/** function makeCheckpoint(
+	      ValsetArgs memory _valsetArgs,
+	      bytes32 _hyperionId
+	  ) private pure returns (bytes32) {
+	      // bytes32 encoding of the string "checkpoint"
+	      bytes32 methodName = 0x636865636b706f696e7400000000000000000000000000000000000000000000;
+
+	      bytes32 checkpoint = keccak256(
+	          abi.encode(
+	              _hyperionId,
+	              methodName,
+	              _valsetArgs.valsetNonce,
+	              _valsetArgs.validators,
+	              _valsetArgs.powers,
+	              _valsetArgs.rewardAmount,
+	              _valsetArgs.rewardToken
+	          )
+	      );
+	      return checkpoint;
+	  }
+	*/
+	validators := []string{}
+	powers := []uint64{}
+
+	for _, validator := range valset.Members {
+		validators = append(validators, validator.EthereumAddress)
+		powers = append(powers, validator.Power)
+	}
+
+	hyperionIDHash, err := l.ethereum.GetHyperionID(ctx)
+	if err != nil {
+		l.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+	}
+	// Encoder les données
+	checkpoint, err := l.encodeData(
+		hyperionIDHash,
+		valset.Nonce,
+		validators,
+		powers,
+		valset.RewardAmount.BigInt(),
+		valset.RewardToken,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &checkpoint, nil
 }
 
 func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
@@ -111,8 +267,6 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	l.Log().WithField("nonce", latestEthValset.Nonce).Infoln("try relay relayValset")
-
 	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
@@ -124,19 +278,13 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 	)
 
 	for _, set := range latestHeliosValsets {
-
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": set.Nonce}).Infoln("try relay relayValset")
 		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
-
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": set.Nonce, "sigs_len": len(sigs)}).Infoln("try relay relayValset")
-
 		if len(sigs) == 0 {
 			continue
 		}
-
 		confirmations = sigs
 		latestConfirmedValset = set
 		break
@@ -147,7 +295,11 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 		return nil
 	}
 
-	if !l.shouldRelayValset(ctx, latestConfirmedValset) {
+	shouldRelay := l.shouldRelayValset(ctx, latestConfirmedValset)
+
+	l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "hls_nonce": latestConfirmedValset.Nonce, "sigs": len(confirmations), "should_relay": shouldRelay, "synched": latestEthValset.Nonce == latestConfirmedValset.Nonce}).Infoln("relayer try relay Valset")
+
+	if !shouldRelay {
 		return nil
 	}
 
@@ -273,15 +425,28 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	return nil
 }
 
+func (l *relayer) relayExternalData(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+	metrics.ReportFuncCall(l.svcTags)
+	doneFn := metrics.ReportFuncTiming(l.svcTags)
+	defer doneFn()
+
+	// TODO: get external data batch from helios (maybe edit batch_creator for build special batch who contains only external data)
+	// TODO: format abi from tx information then call external data on ethereum
+	// TODO: send special claimData to helios
+
+	return nil
+}
+
 // FindLatestValset finds the latest valset on the Hyperion contract by looking back through the event
 // history and finding the most recent ValsetUpdatedEvent. Most of the time this will be very fast
 // as the latest update will be in recent blockchain history and the search moves from the present
 // backwards in time. In the case that the validator set has not been updated for a very long time
 // this will take longer.
 func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
-	latestHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+
+	lastValsetUpdatedEventHeight, err := l.ethereum.GetLastValsetUpdatedEventHeight(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get latest ethereum header")
+		return nil, errors.Wrap(err, "failed to get last valset updated event")
 	}
 
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
@@ -294,17 +459,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}
 
-	currentBlock := latestHeader.Number.Uint64()
+	if lastValsetUpdatedEventHeight.Uint64() > 0 {
 
-	for currentBlock > 0 {
-		var startSearchBlock uint64
-		if currentBlock <= findValsetBlocksToSearch {
-			startSearchBlock = 0
-		} else {
-			startSearchBlock = currentBlock - findValsetBlocksToSearch
-		}
-
-		valsetUpdatedEvents, err := l.ethereum.GetValsetUpdatedEvents(startSearchBlock, currentBlock)
+		valsetUpdatedEvents, err := l.ethereum.GetValsetUpdatedEventsAtSpecificBlock(lastValsetUpdatedEventHeight.Uint64())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events from Ethereum")
 		}
@@ -316,12 +473,14 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
 
 		if len(valsetUpdatedEvents) == 0 {
-			currentBlock = startSearchBlock
-			continue
+			return nil, errors.Wrap(err, "failed to get Eth valset")
 		}
 
 		// we take only the first event if we find any at all.
 		event := valsetUpdatedEvents[0]
+
+		log.Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
+
 		valset := &hyperiontypes.Valset{
 			Nonce:        event.NewValsetNonce.Uint64(),
 			Members:      make([]*hyperiontypes.BridgeValidator, 0, len(event.Powers)),

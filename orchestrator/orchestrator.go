@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
-
+	"cosmossdk.io/errors"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/avast/retry-go"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
@@ -37,6 +36,7 @@ type Config struct {
 	RelayBatchOffsetDur  time.Duration
 	RelayValsets         bool
 	RelayBatches         bool
+	RelayExternalDatas   bool
 	RelayerMode          bool
 	ChainParams          *hyperiontypes.CounterpartyChainParams
 }
@@ -96,34 +96,41 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 	}
 	hyperionID := hyperionIDHash.Big().Uint64()
 
-	s.logger.Info("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
+	log.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
 
-	// lastObservedEthBlock, _ := s.getLastClaimBlockHeight(ctx, helios)
+	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
+	if err != nil {
+		s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
+	}
 
 	h, err := s.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest ethereum header")
 	}
 	latestHeight := h.Number.Uint64()
-	// if lastObservedEthBlock == 0 {
-	// 	hyperionParams, err := helios.HyperionParams(ctx)
-	// 	if err != nil {
-	// 		s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
-	// 	}
 
-	// 	for _, params := range hyperionParams.CounterpartyChainParams {
-	// 		if gethcommon.BigToHash(new(big.Int).SetUint64(params.HyperionId)) == hyperionIDHash {
-	// 			lastObservedEthBlock = params.BridgeContractStartHeight
-	// 			break
-	// 		}
-	// 	}
-	// } else {
-	// 	lastObservedEthBlock = lastObservedEthBlock + 1
-	// }
+	// start from top of the blockchain
+	ethereumBlockHeightWhereStart := latestHeight
+
+	lastObservedEventNonce, err := s.helios.QueryGetLastObservedEventNonce(ctx, s.cfg.HyperionId)
+	if err != nil {
+		s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
+	}
+
+	lastEventNonce, err := s.ethereum.GetLastEventNonce(ctx)
+	if err != nil {
+		s.logger.WithError(err).Fatalln("unable to query blockchain state_lastEventNonce, is rpc running?")
+	}
+
+	if lastEventNonce.Uint64() > lastObservedEventNonce {
+		log.Infoln("lastEventNonce is greater than lastObservedEventNonce, starting from lastObservedEventNonce")
+		// start from the next block after the last observed height
+		ethereumBlockHeightWhereStart = latestObservedHeight.EthereumBlockHeight + 1
+	}
 
 	var pg loops.ParanoidGroup
 
-	pg.Go(func() error { return s.runOracle(ctx, latestHeight) })
+	pg.Go(func() error { return s.runOracle(ctx, ethereumBlockHeightWhereStart) })
 	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
