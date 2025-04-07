@@ -279,6 +279,8 @@ func (c queryClient) HyperionParams(ctx context.Context) (*hyperiontypes.Params,
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
+	log.Println("Try to get HyperionParams")
+
 	resp, err := c.QueryClient.Params(ctx, &hyperiontypes.QueryParamsRequest{})
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)

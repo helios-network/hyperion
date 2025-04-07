@@ -107,7 +107,7 @@ type Config struct {
 	// Ethereum params
 	hyperionID            *int
 	ethChainID            *int
-	ethNodeRPC            *string
+	ethNodeRPCs            *string
 	ethNodeAlchemyWS      *string
 	ethGasPriceAdjustment *float64
 	ethMaxGasPrice        *string
@@ -228,10 +228,10 @@ func initConfig(cmd *cli.Cmd) Config {
 		Value:  42,
 	})
 
-	cfg.ethNodeRPC = cmd.String(cli.StringOpt{
+	cfg.ethNodeRPCs = cmd.String(cli.StringOpt{
 		Name:   "eth-node-http",
 		Desc:   "Specify HTTP endpoint for an Ethereum node.",
-		EnvVar: "HYPERION_ETH_RPC",
+		EnvVar: "HYPERION_ETH_RPCS",
 		Value:  "http://localhost:1317",
 	})
 
