@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -22,7 +21,7 @@ import (
 )
 
 type NetworkConfig struct {
-	EthNodeRPC            string
+	EthNodeRPCs            string
 	GasPriceAdjustment    float64
 	MaxGasPrice           string
 	PendingTxWaitDuration string
@@ -74,18 +73,13 @@ func NewNetwork(
 	signerFn bind.SignerFn,
 	cfg NetworkConfig,
 ) (Network, error) {
-	evmRPC, err := rpc.Dial(cfg.EthNodeRPC)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to ethereum RPC: %s", cfg.EthNodeRPC)
-	}
-
 	log.Info("fromAddr: ", fromAddr)
 	ethCommitter, err := committer.NewEthCommitter(
 		fromAddr,
 		cfg.GasPriceAdjustment,
 		cfg.MaxGasPrice,
 		signerFn,
-		provider.NewEVMProvider(evmRPC),
+		provider.NewEVMProvider(cfg.EthNodeRPCs),
 	)
 	if err != nil {
 		return nil, err

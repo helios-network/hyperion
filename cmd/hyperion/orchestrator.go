@@ -15,6 +15,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -56,7 +57,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				Gas:           *cfg.heliosGas,
 			}
 			ethNetworkCfg = ethereum.NetworkConfig{
-				EthNodeRPC:            *cfg.ethNodeRPC,
+				EthNodeRPCs:           *cfg.ethNodeRPCs,
 				GasPriceAdjustment:    *cfg.ethGasPriceAdjustment,
 				MaxGasPrice:           *cfg.ethMaxGasPrice,
 				PendingTxWaitDuration: *cfg.pendingTxWaitDuration,
@@ -96,7 +97,17 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		hyperionParams, err := heliosNetwork.HyperionParams(ctx)
+		delay, err := time.ParseDuration("1s")
+		orShutdown(errors.Wrap(err, "failed to parse duration"))
+
+		// loops.RetryFunction(ctx, func() (string, error) {
+		// 	heliosNetwork.HyperionParams(ctx)
+		// 	return "hello", nil
+		// }, delay)
+		hyperionParams, err := loops.RetryFunction(ctx, func() (*hyperiontypes.Params, error) {
+			log.Println(heliosNetwork)
+			return heliosNetwork.HyperionParams(ctx)
+		}, delay)
 		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
 
 		// 1.1 Search HyperionId into CounterpartyChainParams
@@ -136,11 +147,14 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		log.WithFields(log.Fields{
 			"chain_id":             *cfg.ethChainID,
-			"rpc":                  *cfg.ethNodeRPC,
+			"rpcs":                 *cfg.ethNodeRPCs,
 			"max_gas_price":        *cfg.ethMaxGasPrice,
 			"gas_price_adjustment": *cfg.ethGasPriceAdjustment,
 		}).Infoln("connected to Ethereum network")
 
+		////////////////////////////////////////////
+		// HERE to ->
+		////////////////////////////////////////////
 		addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
@@ -194,6 +208,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 			log.Infoln("helios hyperion is now forcefully synchronized with ethereum hyperion")
 		}
+		////////////////////////////////////////////
 
 		var (
 			valsetDur time.Duration

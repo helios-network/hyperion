@@ -76,6 +76,6 @@ func checkStatsdPrefix(s string) string {
 // orShutdown fatals the app if there was an error.
 func orShutdown(err error) {
 	if err != nil && err != grpc.ErrServerStopped {
-		log.WithError(err).Fatalln("unable to start hyperion")
+		log.WithError(err).Debugln("unable to start hyperion")
 	}
 }

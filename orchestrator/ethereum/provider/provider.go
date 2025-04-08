@@ -3,8 +3,7 @@ package provider
 import (
 	"context"
 	"math/big"
-
-	"github.com/pkg/errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -14,8 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	// log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/metrics"
 )
@@ -42,19 +39,80 @@ type EVMProviderWithRet interface {
 }
 
 type evmProviderWithRet struct {
-	*ethclient.Client
-	rc      *rpc.Client
+	pool    *EVMProviders
 	svcTags metrics.Tags
 }
 
-func NewEVMProvider(rc *rpc.Client) EVMProviderWithRet {
+func NewEVMProvider(rpcUrls string) EVMProviderWithRet {
+	// split the RPC URLs by comma
+	rpcUrls = strings.TrimSpace(rpcUrls)
+	// split by comma to rpcUrlsTuple
+	rpcUrlsTuple := strings.Split(rpcUrls, ",")
+	pool := NewEVMProviders(rpcUrlsTuple)
 	return &evmProviderWithRet{
-		Client: ethclient.NewClient(rc),
-		rc:     rc,
+		pool: pool,
 		svcTags: metrics.Tags{
 			"svc": string("eth_provider"),
 		},
 	}
+}
+
+func (p *evmProviderWithRet) FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error) {
+	metrics.ReportFuncCall(p.svcTags)
+	doneFn := metrics.ReportFuncTiming(p.svcTags)
+	defer doneFn()
+
+	var logs []types.Log
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		logs, err = client.FilterLogs(ctx, query)
+		return err
+	})
+	if err != nil {
+		metrics.ReportFuncError(p.svcTags)
+		return nil, err
+	}
+	return logs, nil
+}
+
+// SubscribeFilterLogs creates a background log filtering operation, returning
+// a subscription immediately, which can be used to stream the found events.
+func (p *evmProviderWithRet) SubscribeFilterLogs(ctx context.Context, query ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
+	return nil, nil
+}
+
+func (p *evmProviderWithRet) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
+	result := make([]byte, 0)
+	var err error
+	p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		result, err = client.CodeAt(ctx, contract, blockNumber)
+		return nil
+	})
+	if err != nil && result != nil {
+		metrics.ReportFuncError(p.svcTags)
+		return nil, err
+	}
+	return result, nil
+}
+
+// CallContract executes an Ethereum contract call with the specified data as the
+// input.
+func (p *evmProviderWithRet) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	result := make([]byte, 0)
+	var err error
+	p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		result, err = client.CallContract(ctx, call, blockNumber)
+		return nil
+	})
+	if err != nil && result != nil {
+		metrics.ReportFuncError(p.svcTags)
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *evmProviderWithRet) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+	return nil
 }
 
 func (p *evmProviderWithRet) SendTransactionWithRet(ctx context.Context, tx *types.Transaction) (txHash common.Hash, err error) {
@@ -63,15 +121,15 @@ func (p *evmProviderWithRet) SendTransactionWithRet(ctx context.Context, tx *typ
 	defer doneFn()
 
 	data, err := rlp.EncodeToBytes(tx)
-	// convert data to hex
-	// hexData := hexutil.Encode(data)
-	// log.Info("hexData: ", hexData)
 	if err != nil {
 		metrics.ReportFuncError(p.svcTags)
 		return common.Hash{}, err
 	}
 
-	if err := p.rc.CallContext(ctx, &txHash, "eth_sendRawTransaction", hexutil.Encode(data)); err != nil {
+	err = p.pool.CallRpcClientWithRetry(ctx, func(client *rpc.Client) error {
+		return client.CallContext(ctx, &txHash, "eth_sendRawTransaction", hexutil.Encode(data))
+	})
+	if err != nil {
 		metrics.ReportFuncError(p.svcTags)
 		return common.Hash{}, err
 	}
@@ -79,76 +137,84 @@ func (p *evmProviderWithRet) SendTransactionWithRet(ctx context.Context, tx *typ
 	return txHash, nil
 }
 
-type TransactFunc func(opts *bind.TransactOpts, contract *common.Address, input []byte) (*types.Transaction, error)
-
-func TransactFn(p EVMProviderWithRet, contractAddress common.Address, txHashOut *common.Hash) TransactFunc {
-	return func(opts *bind.TransactOpts, contract *common.Address, input []byte) (*types.Transaction, error) {
+// Implement other methods of EVMProvider using the pool
+func (p *evmProviderWithRet) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+	var nonce uint64
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
 		var err error
+		nonce, err = client.PendingNonceAt(ctx, account)
+		return err
+	})
+	return nonce, err
+}
 
-		// Ensure a valid value field and resolve the account nonce
-		value := opts.Value
-		if value == nil {
-			value = new(big.Int)
-		}
+func (p *evmProviderWithRet) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
+	var code []byte
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		code, err = client.PendingCodeAt(ctx, account)
+		return err
+	})
+	return code, err
+}
 
-		var nonce uint64
-		if opts.Nonce == nil {
-			nonce, err = p.PendingNonceAt(opts.Context, opts.From)
-			if err != nil {
-				return nil, errors.Errorf("failed to retrieve account nonce: %v", err)
-			}
-		} else {
-			nonce = opts.Nonce.Uint64()
-		}
+func (p *evmProviderWithRet) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
+	var gas uint64
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		gas, err = client.EstimateGas(ctx, msg)
+		return err
+	})
+	return gas, err
+}
 
-		// Figure out the gas allowance and gas price values
-		gasPrice := opts.GasPrice
-		if gasPrice == nil {
-			gasPrice, err = p.SuggestGasPrice(opts.Context)
-			if err != nil {
-				return nil, errors.Errorf("failed to suggest gas price: %v", err)
-			}
-		}
+func (p *evmProviderWithRet) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
+	var tipCap *big.Int
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		tipCap, err = client.SuggestGasTipCap(ctx)
+		return err
+	})
+	return tipCap, err
+}
 
-		gasLimit := opts.GasLimit
-		if gasLimit == 0 {
-			// Gas estimation cannot succeed without code for method invocations
-			if contract != nil {
-				if code, err := p.PendingCodeAt(opts.Context, contractAddress); err != nil {
-					return nil, err
-				} else if len(code) == 0 {
-					return nil, bind.ErrNoCode
-				}
-			}
-			// If the contract surely has code (or code is not needed), estimate the transaction
-			msg := ethereum.CallMsg{From: opts.From, To: contract, GasPrice: gasPrice, Value: value, Data: input}
-			gasLimit, err = p.EstimateGas(opts.Context, msg)
-			if err != nil {
-				return nil, errors.Errorf("failed to estimate gas needed: %v", err)
-			}
-		}
-		// Create the transaction, sign it and schedule it for execution
-		var rawTx *types.Transaction
-		if contract == nil {
-			rawTx = types.NewContractCreation(nonce, value, gasLimit, gasPrice, input)
-		} else {
-			rawTx = types.NewTransaction(nonce, contractAddress, value, gasLimit, gasPrice, input)
-		}
-		if opts.Signer == nil {
-			return nil, errors.New("no signer to authorize the transaction with")
-		}
+func (p *evmProviderWithRet) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	var gasPrice *big.Int
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		gasPrice, err = client.SuggestGasPrice(ctx)
+		return err
+	})
+	return gasPrice, err
+}
 
-		signedTx, err := opts.Signer(opts.From, rawTx)
-		if err != nil {
-			return nil, err
-		}
+func (p *evmProviderWithRet) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
+	var tx *types.Transaction
+	var isPending bool
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		tx, isPending, err = client.TransactionByHash(ctx, hash)
+		return err
+	})
+	return tx, isPending, err
+}
 
-		txHash, err := p.SendTransactionWithRet(opts.Context, signedTx)
-		if err != nil {
-			return nil, err
-		}
+func (p *evmProviderWithRet) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	var receipt *types.Receipt
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		receipt, err = client.TransactionReceipt(ctx, txHash)
+		return err
+	})
+	return receipt, err
+}
 
-		*txHashOut = txHash
-		return signedTx, nil
-	}
+func (p *evmProviderWithRet) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	var header *types.Header
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		header, err = client.HeaderByNumber(ctx, number)
+		return err
+	})
+	return header, err
 }

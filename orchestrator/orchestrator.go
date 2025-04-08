@@ -87,7 +87,10 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 	log.Infoln("running orchestrator in validator mode")
 
 	// get hyperion ID from contract
-	hyperionIDHash, err := eth.GetHyperionID(ctx)
+	delay, err := time.ParseDuration("1s")
+	hyperionIDHash, err := loops.RetryFunction(ctx, func() (gethcommon.Hash, error) {
+		return eth.GetHyperionID(ctx)
+	}, delay)
 	if err != nil {
 		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
 	}

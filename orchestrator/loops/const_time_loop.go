@@ -2,6 +2,7 @@ package loops
 
 import (
 	"context"
+	"fmt"
 	"runtime/debug"
 	"time"
 
@@ -57,5 +58,78 @@ func panicRecover(err *error) {
 
 		*err = errors.Errorf("loop panic: %v", r)
 		log.Errorln(*err)
+	}
+}
+
+func RetryFunction[T any](ctx context.Context, callback func() (T, error), delay time.Duration) (p T, err error) {
+	var zero T
+	
+	// Set up panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			p = zero
+			err = fmt.Errorf("panic in callback: %v", r)
+			log.Errorf("Callback function panicked: %v", r)
+			// Optional: include stack trace
+			debug.PrintStack()
+		}
+	}()
+	
+	for {
+		// Check if context is cancelled before each attempt
+		select {
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		default:
+			// Continue with retry
+		}
+		
+		// Execute callback with panic protection
+		var result T
+		var callErr error
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					callErr = fmt.Errorf("panic in callback: %v", r)
+					log.Errorf("Callback function panicked: %v", r)
+				}
+			}()
+			result, callErr = callback()
+		}()
+		
+		if callErr == nil {
+			return result, nil
+		}
+		
+		log.Warningf("Attempt failed: %v. Retrying in %v...", callErr, delay)
+		
+		// Use timer with context to allow for cancellation during sleep
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+			// Continue to next iteration
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return zero, ctx.Err()
+		}
+	}
+}
+
+
+func RetryUntilSuccess[T any, P any](callback func(params P) (T, error), params P, delay time.Duration) (T, error) {
+	var attempt int
+	
+	for {
+		attempt++
+		result, err := callback(params)
+		if err == nil {
+			return result, nil
+		}
+		
+		log.Warningf("Attempt %d failed: %v. Retrying in %v...\n", attempt, err, delay)
+		time.Sleep(delay)
 	}
 }
