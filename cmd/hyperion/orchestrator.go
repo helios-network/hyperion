@@ -15,11 +15,11 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	chaintypes "github.com/Helios-Chain-Labs/sdk-go/chain/types"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 )
 
 // startOrchestrator action runs an infinite loop,
@@ -57,7 +57,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				Gas:           *cfg.heliosGas,
 			}
 			ethNetworkCfg = ethereum.NetworkConfig{
-				EthNodeRPCs:            *cfg.ethNodeRPCs,
+				EthNodeRPCs:           *cfg.ethNodeRPCs,
 				GasPriceAdjustment:    *cfg.ethGasPriceAdjustment,
 				MaxGasPrice:           *cfg.ethMaxGasPrice,
 				PendingTxWaitDuration: *cfg.pendingTxWaitDuration,
@@ -147,11 +147,14 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		log.WithFields(log.Fields{
 			"chain_id":             *cfg.ethChainID,
-			"rpcs":                  *cfg.ethNodeRPCs,
+			"rpcs":                 *cfg.ethNodeRPCs,
 			"max_gas_price":        *cfg.ethMaxGasPrice,
 			"gas_price_adjustment": *cfg.ethGasPriceAdjustment,
 		}).Infoln("connected to Ethereum network")
 
+		////////////////////////////////////////////
+		// HERE to ->
+		////////////////////////////////////////////
 		addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
@@ -205,6 +208,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 			log.Infoln("helios hyperion is now forcefully synchronized with ethereum hyperion")
 		}
+		////////////////////////////////////////////
 
 		var (
 			valsetDur time.Duration

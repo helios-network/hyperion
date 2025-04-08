@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -21,15 +22,21 @@ var (
 	ErrAllAttemptsFailed = errors.New("all retry attempts failed")
 )
 
+type RPCReputation struct {
+	rpcUrl     string
+	reputation uint64
+}
+
 // EVMProviders manages multiple Ethereum RPC and ethclient connections
 type EVMProviders struct {
-	rcs        []*rpc.Client
-	ethClients []*ethclient.Client
-	urls       []string
-	currentIdx uint32
-	maxRetries int
-	timeout    time.Duration
-	mu         sync.RWMutex
+	rcs         []*rpc.Client
+	ethClients  []*ethclient.Client
+	urls        []string
+	reputations map[string]*RPCReputation
+	currentIdx  uint32
+	maxRetries  int
+	timeout     time.Duration
+	mu          sync.RWMutex
 }
 
 // NewEVMProviders creates a new EVMProviders instance with the given RPC URLs
@@ -43,7 +50,7 @@ func NewEVMProvidersWithOptions(rpcs []string, maxRetries int, timeout time.Dura
 	var rcs []*rpc.Client
 	var ethClients []*ethclient.Client
 	var validUrls []string
-
+	reputations := make(map[string]*RPCReputation)
 	for _, rpcUrl := range rpcs {
 		client, err := rpc.Dial(rpcUrl)
 		if err != nil {
@@ -54,6 +61,10 @@ func NewEVMProvidersWithOptions(rpcs []string, maxRetries int, timeout time.Dura
 		rcs = append(rcs, client)
 		ethClients = append(ethClients, ethClient)
 		validUrls = append(validUrls, rpcUrl)
+		reputations[rpcUrl] = &RPCReputation{
+			rpcUrl:     rpcUrl,
+			reputation: 0,
+		}
 	}
 
 	if len(rcs) == 0 {
@@ -62,11 +73,12 @@ func NewEVMProvidersWithOptions(rpcs []string, maxRetries int, timeout time.Dura
 	}
 
 	return &EVMProviders{
-		rcs:        rcs,
-		ethClients: ethClients,
-		urls:       validUrls,
-		maxRetries: maxRetries,
-		timeout:    timeout,
+		rcs:         rcs,
+		ethClients:  ethClients,
+		urls:        validUrls,
+		maxRetries:  maxRetries,
+		timeout:     timeout,
+		reputations: reputations,
 	}
 }
 
@@ -85,16 +97,25 @@ func (p *EVMProviders) getNextClient() (*ethclient.Client, *rpc.Client) {
 }
 
 // getRandomClient returns a random client
-func (p *EVMProviders) getRandomClient() (*ethclient.Client, *rpc.Client) {
+func (p *EVMProviders) getRandomClient() (*ethclient.Client, *rpc.Client, string) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	if len(p.ethClients) == 0 {
-		return nil, nil
+		return nil, nil, ""
 	}
 
 	idx := rand.Intn(len(p.ethClients))
-	return p.ethClients[idx], p.rcs[idx]
+	return p.ethClients[idx], p.rcs[idx], p.urls[idx]
+}
+
+func (p *EVMProviders) classifyRpcUrl(rpcUrl string, failed bool) {
+	if !failed {
+		p.reputations[rpcUrl].reputation += 1
+	} else if p.reputations[rpcUrl].reputation > 0 {
+		p.reputations[rpcUrl].reputation -= 1
+	}
+	fmt.Println("rpcUrl: ", rpcUrl, "reputation: ", p.reputations[rpcUrl].reputation)
 }
 
 // CallEthClientWithRetry executes an operation with the ethclient with retry logic
@@ -110,14 +131,14 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 	var lastErr error
 	for attempt := 0; attempt < p.maxRetries; attempt++ {
 		// Get next client using round-robin
-		ethClient, _ := p.getNextClient()
+		ethClient, _, rpcUrl := p.getRandomClient()
 		if ethClient == nil {
 			return ErrNoClientsAvailable
 		}
 
 		// Create a context with timeout
 		timeoutCtx, cancel := context.WithTimeout(ctx, p.timeout)
-		
+
 		// Execute the operation
 		errCh := make(chan error, 1)
 		go func() {
@@ -129,13 +150,19 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 		case err := <-errCh:
 			cancel()
 			if err == nil {
+				fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
+				p.classifyRpcUrl(rpcUrl, false)
 				return nil // Success
 			}
 			lastErr = err
+			fmt.Println("ERRORrpcUrl: ", rpcUrl)
+			p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		case <-timeoutCtx.Done():
 			cancel()
 			lastErr = timeoutCtx.Err()
+			fmt.Println("TIMEOUTrpcUrl: ", rpcUrl)
+			p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		}
 	}
@@ -166,7 +193,7 @@ func (p *EVMProviders) CallRpcClientWithRetry(ctx context.Context, operation fun
 
 		// Create a context with timeout
 		timeoutCtx, cancel := context.WithTimeout(ctx, p.timeout)
-		
+
 		// Execute the operation
 		errCh := make(chan error, 1)
 		go func() {
@@ -213,16 +240,16 @@ func (p *EVMProviders) AddEndpoint(rpcUrl string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	ethClient := ethclient.NewClient(client)
-	
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	p.rcs = append(p.rcs, client)
 	p.ethClients = append(p.ethClients, ethClient)
 	p.urls = append(p.urls, rpcUrl)
-	
+
 	return nil
 }
 
