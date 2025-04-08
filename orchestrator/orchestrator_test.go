@@ -67,8 +67,7 @@ func Test_BatchCreator(t *testing.T) {
 				logger:      DummyLog,
 				maxAttempts: maxLoopRetries,
 				cfg: Config{
-					MinBatchFeeUSD:       51.0,
-					ERC20ContractMapping: map[gethcommon.Address]string{heliosTokenAddress: "helios"},
+					MinBatchFeeUSD: 51.0,
 				},
 				priceFeed: MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
 				helios: MockCosmosNetwork{
@@ -99,8 +98,7 @@ func Test_BatchCreator(t *testing.T) {
 				maxAttempts: maxLoopRetries,
 				priceFeed:   MockPriceFeed{QueryUSDPriceFn: func(_ gethcommon.Address) (float64, error) { return 1, nil }},
 				cfg: Config{
-					MinBatchFeeUSD:       49.0,
-					ERC20ContractMapping: map[gethcommon.Address]string{heliosTokenAddress: "helios"},
+					MinBatchFeeUSD: 49.0,
 				},
 				helios: MockCosmosNetwork{
 					SendRequestBatchFn: func(context.Context, uint64, string) error { return nil },

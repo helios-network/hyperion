@@ -33,6 +33,7 @@ build
 dist/
 .env
 .env2
+.env3
 
 solidity/artifacts/
 solidity/node_modules/

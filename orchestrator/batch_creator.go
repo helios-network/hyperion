@@ -73,7 +73,11 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 		log.Fatalf("Load Failed .env: %v", err)
 	}
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
-	tokenDenom := l.getTokenDenom(l.cfg.HyperionId, tokenAddress)
+	tokenDenom, _, err := l.helios.QueryTokenAddressToDenom(ctx, l.cfg.HyperionId, tokenAddress)
+	if err != nil {
+		l.Log().WithError(err).Warningln("failed to query token address to denom")
+		return
+	}
 
 	tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
 	if err != nil {
@@ -90,13 +94,10 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 	_ = l.helios.SendRequestBatch(ctx, l.cfg.HyperionId, tokenDenom)
 }
 
-func (l *batchCreator) getTokenDenom(hyperionId uint64, tokenAddr gethcommon.Address) string {
-	if cosmosDenom, ok := l.cfg.ERC20ContractMapping[tokenAddr]; ok {
-		return cosmosDenom
-	}
-
-	return hyperiontypes.HyperionDenomString(hyperionId, tokenAddr)
-}
+// func (l *batchCreator) getTokenDenom(hyperionId uint64, tokenAddr gethcommon.Address) string {
+// 	l.helios.QueryTokenAddressToDenom(ctx, hyperionId, tokenAddr)
+// 	return hyperiontypes.HyperionDenomString(hyperionId, tokenAddr)
+// }
 
 func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
 	if l.cfg.MinBatchFeeUSD == 0 {

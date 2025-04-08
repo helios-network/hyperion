@@ -32,6 +32,9 @@ type QueryClient interface {
 	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
 	UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error)
 	TransactionBatchSignatures(ctx context.Context, hyperionId uint64, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
+
+	QueryTokenAddressToDenom(ctx context.Context, hyperionId uint64, tokenAddress gethcommon.Address) (string, bool, error)
+	QueryDenomToTokenAddress(ctx context.Context, hyperionId uint64, denom string) (gethcommon.Address, bool, error)
 }
 
 type queryClient struct {
@@ -369,4 +372,52 @@ func (c queryClient) QueryGetLastObservedEventNonce(ctx context.Context, hyperio
 	}
 
 	return resp.LastObservedEventNonce, nil
+}
+
+func (c queryClient) QueryDenomToTokenAddress(ctx context.Context, hyperionId uint64, denom string) (gethcommon.Address, bool, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryDenomToTokenAddressRequest{
+		HyperionId: hyperionId,
+		Denom:      denom,
+	}
+
+	resp, err := c.QueryClient.DenomToTokenAddress(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return gethcommon.Address{}, false, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return gethcommon.Address{}, false, ErrNotFound
+	}
+
+	return gethcommon.HexToAddress(resp.TokenAddress), resp.CosmosOriginated, nil
+}
+
+func (c queryClient) QueryTokenAddressToDenom(ctx context.Context, hyperionId uint64, tokenAddress gethcommon.Address) (string, bool, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryTokenAddressToDenomRequest{
+		HyperionId:   hyperionId,
+		TokenAddress: tokenAddress.Hex(),
+	}
+
+	resp, err := c.QueryClient.TokenAddressToDenom(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return "", false, errors.Wrap(err, "failed to query TokenAddressToDenom from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return "", false, ErrNotFound
+	}
+
+	return resp.Denom, resp.CosmosOriginated, nil
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
-	chaintypes "github.com/Helios-Chain-Labs/sdk-go/chain/types"
 )
 
 // startOrchestrator action runs an infinite loop,
@@ -133,15 +132,12 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 		var (
 			hyperionContractAddr = gethcommon.HexToAddress(cfg.chainParams.BridgeCounterpartyAddress)
-			heliosTokenAddr      = gethcommon.HexToAddress(cfg.chainParams.CosmosCoinErc20Contract)
-			erc20ContractMapping = map[gethcommon.Address]string{heliosTokenAddr: chaintypes.HeliosCoin}
 		)
 
-		log.WithFields(log.Fields{"hyperion_contract": hyperionContractAddr.String(), "helios_token_contract": heliosTokenAddr.String()}).Debugln("loaded Hyperion module params")
+		log.WithFields(log.Fields{"hyperion_contract": hyperionContractAddr.String()}).Debugln("loaded Hyperion module params")
 
 		// 2. Connect to ethereum network
 
-		log.Info("hyperionContractAddr", hyperionContractAddr)
 		ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethNetworkCfg)
 		orShutdown(err)
 
@@ -230,7 +226,6 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			CosmosAddr:           heliosKeyring.Addr,
 			EthereumAddr:         ethKeyFromAddress,
 			MinBatchFeeUSD:       *cfg.minBatchFeeUSD,
-			ERC20ContractMapping: erc20ContractMapping,
 			RelayValsetOffsetDur: valsetDur,
 			RelayBatchOffsetDur:  batchDur,
 			RelayValsets:         *cfg.relayValsets,

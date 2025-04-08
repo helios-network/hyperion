@@ -31,7 +31,6 @@ type Config struct {
 	HyperionId           uint64
 	EthereumAddr         gethcommon.Address
 	MinBatchFeeUSD       float64
-	ERC20ContractMapping map[gethcommon.Address]string
 	RelayValsetOffsetDur time.Duration
 	RelayBatchOffsetDur  time.Duration
 	RelayValsets         bool
