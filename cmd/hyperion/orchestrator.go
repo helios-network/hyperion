@@ -155,7 +155,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		
 		if *cfg.testnetAutoRegister {
 			log.Printf("auto-registering validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
-			err = helios.TestnetAutoRegisterValidator(ctx, *cfg.hyperionID, heliosNetwork, isValidator, addr, ethKeyFromAddress)
+			isValidator, err = helios.TestnetAutoRegisterValidator(ctx, *cfg.hyperionID, heliosNetwork, isValidator, addr, ethKeyFromAddress)
 			orShutdown(err)
 		}
 
@@ -163,6 +163,10 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			log.Printf("force-updating valset for validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
 			err = helios.TestnetForceUpdateValset(ctx, *cfg.hyperionID, heliosNetwork, ethNetwork)
 			orShutdown(err)
+		}
+
+		if !isValidator {
+			orShutdown(errors.Wrap(err, "Currently Hyperion is only worked on valiator mode"))
 		}
 
 		var (

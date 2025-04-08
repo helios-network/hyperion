@@ -15,18 +15,18 @@ func TestnetAutoRegisterValidator(
 	isValidator bool,
 	addr cosmostypes.AccAddress,
 	ethKeyFromAddress ethcmn.Address,
-) error {
+) (bool, error) {
 	if isValidator {
 		log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
 	} else {
 		err := heliosNetwork.SendSetOrchestratorAddresses(ctx, uint64(hyperionID), ethKeyFromAddress.String())
 		if err != nil {
-			return err
+			return false, err
 		}
 		addr, isValidator = HasRegisteredOrchestrator(heliosNetwork, uint64(hyperionID), ethKeyFromAddress)
 		if isValidator {
 			log.Debugln("provided ETH address is registered with an orchestrator", addr.String())
 		}
 	}
-	return nil
+	return true, nil
 }
