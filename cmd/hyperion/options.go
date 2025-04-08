@@ -131,6 +131,10 @@ type Config struct {
 
 	coingeckoApi *string
 
+	// Testnet config
+	testnetAutoRegister *bool
+	testnetForceValset *bool
+
 	chainParams *hyperiontypes.CounterpartyChainParams
 }
 
@@ -341,6 +345,21 @@ func initConfig(cmd *cli.Cmd) Config {
 		Desc:   "Specify HTTP endpoint for pricefeed api.",
 		EnvVar: "HYPERION_COINGECKO_API",
 		Value:  "https://api.coingecko.com/api/v3",
+	})
+
+	/** Testnet **/
+	cfg.testnetAutoRegister = cmd.Bool(cli.BoolOpt{
+		Name:   "testnet_auto_register",
+		Desc:   "If enabled, relayer will automatically register the validator on testnet",
+		EnvVar: "TESTNET_ENABLE_AUTO_REGISTER",
+		Value:  false,
+	})
+
+	cfg.testnetForceValset = cmd.Bool(cli.BoolOpt{
+		Name:   "testnet_force_valset",
+		Desc:   "If enabled, relayer will force valset update on testnet",
+		EnvVar: "TESTNET_ENABLE_FORCE_SET_VALSET",
+		Value:  false,
 	})
 
 	return cfg
