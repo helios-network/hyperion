@@ -14,6 +14,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -70,6 +71,8 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			"go_arch":    version.GoArch,
 		}).Infoln("Hyperion - Hyperion module companion binary for bridging assets between Helios and Ethereum")
 
+		delay, err := time.ParseDuration("1s")
+		orShutdown(errors.Wrap(err, "failed to parse duration"))
 		// 1. Connect to Helios network
 
 		heliosKeyring, err := helios.NewKeyring(heliosKeyringCfg)
@@ -87,25 +90,20 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		log.WithFields(log.Fields{"address": ethKeyFromAddress.String()}).Infoln("Initialized Ethereum keyring")
 
 		heliosNetworkCfg.ValidatorAddress = heliosKeyring.Addr.String()
-		heliosNetwork, err := helios.NewNetwork(heliosKeyring, personalSignFn, heliosNetworkCfg)
-		orShutdown(err)
-		log.WithFields(log.Fields{"chain_id": *cfg.heliosChainID, "gas_price": *cfg.heliosGasPrices}).Infoln("connected to Helios network")
 
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		// delay, err := time.ParseDuration("1s")
-		// orShutdown(errors.Wrap(err, "failed to parse duration"))
+		heliosNetwork, err := loops.RetryFunction(ctx, func() (helios.Network, error) {
+			return helios.NewNetwork(heliosKeyring, personalSignFn, heliosNetworkCfg)
+		}, delay)
 
-		// loops.RetryFunction(ctx, func() (string, error) {
-		// 	heliosNetwork.HyperionParams(ctx)
-		// 	return "hello", nil
-		// }, delay)
-		// hyperionParams, err := loops.RetryFunction(ctx, func() (*hyperiontypes.Params, error) {
-		// 	log.Println(heliosNetwork)
-		// 	return heliosNetwork.HyperionParams(ctx)
-		// }, delay)
-		hyperionParams, err := heliosNetwork.HyperionParams(ctx)
+		orShutdown(err)
+		log.WithFields(log.Fields{"chain_id": *cfg.heliosChainID, "gas_price": *cfg.heliosGasPrices}).Infoln("connected to Helios network")
+
+		hyperionParams, err := loops.RetryFunction(ctx, func() (*hyperiontypes.Params, error) {
+			return heliosNetwork.HyperionParams(ctx)
+		}, delay)
 		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
 
 		// 1.1 Search HyperionId into CounterpartyChainParams
@@ -148,7 +146,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		}).Infoln("connected to Ethereum network")
 
 		addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(*cfg.hyperionID), ethKeyFromAddress)
-		
+
 		if *cfg.testnetAutoRegister {
 			log.Printf("auto-registering validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
 			isValidator, err = helios.TestnetAutoRegisterValidator(ctx, *cfg.hyperionID, heliosNetwork, isValidator, addr, ethKeyFromAddress)
