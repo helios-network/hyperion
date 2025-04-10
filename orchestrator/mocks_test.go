@@ -24,28 +24,35 @@ func (p MockPriceFeed) QueryUSDPrice(address gethcommon.Address) (float64, error
 }
 
 type MockCosmosNetwork struct {
-	HyperionParamsFn                 func(ctx context.Context) (*hyperiontypes.Params, error)
-	LastClaimEventByAddrFn           func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
-	GetValidatorAddressFn            func(ctx context.Context, hyperionId uint64, address gethcommon.Address) (cosmostypes.AccAddress, error)
-	CurrentValsetFn                  func(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error)
-	ValsetAtFn                       func(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error)
-	OldestUnsignedValsetsFn          func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
-	LatestValsetsFn                  func(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error)
-	AllValsetConfirmsFn              func(ctx context.Context, hyperionId uint64, uint642 uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
-	OldestUnsignedTransactionBatchFn func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
-	LatestTransactionBatchesFn       func(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
-	UnbatchedTokensWithFeesFn        func(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.BatchFees, error)
-	TransactionBatchSignaturesFn     func(ctx context.Context, hyperionID uint64, nonce uint64, address gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
-	SendValsetConfirmFn              func(ctx context.Context, hyperionID uint64, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
-	SendBatchConfirmFn               func(ctx context.Context, hyperionID2 uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
-	SendRequestBatchFn               func(ctx context.Context, hyperionID uint64, denom string) error
-	SendToChainFn                    func(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendDepositClaimFn               func(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
-	SendWithdrawalClaimFn            func(ctx context.Context, hyperionID uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
-	SendValsetClaimFn                func(ctx context.Context, hyperionID uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
-	SendERC20DeployedClaimFn         func(ctx context.Context, hyperionID uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
-	GetBlockFn                       func(ctx context.Context, height int64) (*cometrpc.ResultBlock, error)
-	GetLatestBlockHeightFn           func(ctx context.Context) (int64, error)
+	HyperionParamsFn                              func(ctx context.Context) (*hyperiontypes.Params, error)
+	LastClaimEventByAddrFn                        func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
+	GetValidatorAddressFn                         func(ctx context.Context, hyperionId uint64, address gethcommon.Address) (cosmostypes.AccAddress, error)
+	CurrentValsetFn                               func(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error)
+	ValsetAtFn                                    func(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error)
+	OldestUnsignedValsetsFn                       func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
+	LatestValsetsFn                               func(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.Valset, error)
+	AllValsetConfirmsFn                           func(ctx context.Context, hyperionId uint64, uint642 uint64) ([]*hyperiontypes.MsgValsetConfirm, error)
+	OldestUnsignedTransactionBatchFn              func(ctx context.Context, hyperionId uint64, address cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
+	LatestTransactionBatchesFn                    func(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
+	UnbatchedTokensWithFeesFn                     func(ctx context.Context, hyperionID uint64) ([]*hyperiontypes.BatchFees, error)
+	TransactionBatchSignaturesFn                  func(ctx context.Context, hyperionID uint64, nonce uint64, address gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
+	SendValsetConfirmFn                           func(ctx context.Context, hyperionID uint64, address gethcommon.Address, hash gethcommon.Hash, valset *hyperiontypes.Valset) error
+	SendBatchConfirmFn                            func(ctx context.Context, hyperionID2 uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
+	SendRequestBatchFn                            func(ctx context.Context, hyperionID uint64, denom string) error
+	SendToChainFn                                 func(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendDepositClaimFn                            func(ctx context.Context, hyperionID uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
+	SendWithdrawalClaimFn                         func(ctx context.Context, hyperionID uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
+	SendValsetClaimFn                             func(ctx context.Context, hyperionID uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
+	SendERC20DeployedClaimFn                      func(ctx context.Context, hyperionID uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
+	GetBlockFn                                    func(ctx context.Context, height int64) (*cometrpc.ResultBlock, error)
+	GetLatestBlockHeightFn                        func(ctx context.Context) (int64, error)
+	QueryTokenAddressToDenomFn                    func(ctx context.Context, hyperionId uint64, tokenAddress gethcommon.Address) (string, bool, error)
+	QueryDenomToTokenAddressFn                    func(ctx context.Context, hyperionId uint64, denom string) (gethcommon.Address, bool, error)
+	QueryGetLastObservedEthereumBlockHeightFn     func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error)
+	QueryGetLastObservedEventNonceFn              func(ctx context.Context, hyperionId uint64) (uint64, error)
+	SendSetOrchestratorAddressesFn                func(ctx context.Context, hyperionId uint64, ethAddress string) error
+	SendForceSetValsetAndLastObservedEventNonceFn func(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
+	GetLastEventHeightFn                          func(ctx context.Context) (*big.Int, error)
 }
 
 func (n MockCosmosNetwork) HyperionParams(ctx context.Context) (*hyperiontypes.Params, error) {
@@ -134,6 +141,33 @@ func (n MockCosmosNetwork) GetBlock(ctx context.Context, height int64) (*cometrp
 
 func (n MockCosmosNetwork) GetLatestBlockHeight(ctx context.Context) (int64, error) {
 	//TODO implement me
+	return n.GetLatestBlockHeightFn(ctx)
+}
+
+func (n MockCosmosNetwork) QueryTokenAddressToDenom(ctx context.Context, hyperionId uint64, tokenAddress gethcommon.Address) (string, bool, error) {
+	//TODO implement me
+	return n.QueryTokenAddressToDenomFn(ctx, hyperionId, tokenAddress)
+}
+
+func (n MockCosmosNetwork) QueryDenomToTokenAddress(ctx context.Context, hyperionId uint64, denom string) (gethcommon.Address, bool, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (n MockCosmosNetwork) QueryGetLastObservedEthereumBlockHeight(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+	panic("implement me")
+
+}
+
+func (n MockCosmosNetwork) QueryGetLastObservedEventNonce(ctx context.Context, hyperionId uint64) (uint64, error) {
+	panic("implement me")
+}
+
+func (n MockCosmosNetwork) SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
+	panic("implement me")
+}
+
+func (n MockCosmosNetwork) SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error {
 	panic("implement me")
 }
 
@@ -147,18 +181,27 @@ func (n MockCosmosNetwork) GetValidatorSet(ctx context.Context, height int64) (*
 	panic("implement me")
 }
 
+func (n MockCosmosNetwork) GetLastEventHeight(ctx context.Context) (*big.Int, error) {
+	panic("implement me")
+}
+
 type MockEthereumNetwork struct {
-	GetHeaderByNumberFn                 func(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
-	GetHyperionIDFn                     func(ctx context.Context) (gethcommon.Hash, error)
-	GetSendToHeliosEventsFn             func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
-	GetHyperionERC20DeployedEventsFn    func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
-	GetValsetUpdatedEventsFn            func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
-	GetTransactionBatchExecutedEventsFn func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error)
-	GetValsetNonceFn                    func(ctx context.Context) (*big.Int, error)
-	SendEthValsetUpdateFn               func(ctx context.Context, oldValset *hyperiontypes.Valset, newValset *hyperiontypes.Valset, confirms []*hyperiontypes.MsgValsetConfirm) (*gethcommon.Hash, error)
-	GetTxBatchNonceFn                   func(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
-	SendTransactionBatchFn              func(ctx context.Context, currentValset *hyperiontypes.Valset, batch *hyperiontypes.OutgoingTxBatch, confirms []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error)
-	TokenDecimalsFn                     func(ctx context.Context, address gethcommon.Address) (uint8, error)
+	GetHeaderByNumberFn                     func(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
+	GetHyperionIDFn                         func(ctx context.Context) (gethcommon.Hash, error)
+	GetSendToHeliosEventsFn                 func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
+	GetHyperionERC20DeployedEventsFn        func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
+	GetValsetUpdatedEventsFn                func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
+	GetTransactionBatchExecutedEventsFn     func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionTransactionBatchExecutedEvent, error)
+	GetValsetNonceFn                        func(ctx context.Context) (*big.Int, error)
+	SendEthValsetUpdateFn                   func(ctx context.Context, oldValset *hyperiontypes.Valset, newValset *hyperiontypes.Valset, confirms []*hyperiontypes.MsgValsetConfirm) (*gethcommon.Hash, error)
+	GetTxBatchNonceFn                       func(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
+	SendTransactionBatchFn                  func(ctx context.Context, currentValset *hyperiontypes.Valset, batch *hyperiontypes.OutgoingTxBatch, confirms []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error)
+	TokenDecimalsFn                         func(ctx context.Context, address gethcommon.Address) (uint8, error)
+	GetLastEventHeightFn                    func(ctx context.Context) (*big.Int, error)
+	GetLastEventNonceFn                     func(ctx context.Context) (*big.Int, error)
+	GetLastValsetCheckpointFn               func(ctx context.Context) (*gethcommon.Hash, error)
+	GetLastValsetUpdatedEventHeightFn       func(ctx context.Context) (*big.Int, error)
+	GetValsetUpdatedEventsAtSpecificBlockFn func(block uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
 }
 
 func (n MockEthereumNetwork) GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error) {
@@ -204,6 +247,27 @@ func (n MockEthereumNetwork) GetTxBatchNonce(ctx context.Context, erc20ContractA
 func (n MockEthereumNetwork) SendTransactionBatch(ctx context.Context, currentValset *hyperiontypes.Valset, batch *hyperiontypes.OutgoingTxBatch, confirms []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
 	return n.SendTransactionBatchFn(ctx, currentValset, batch, confirms)
 }
+
+func (n MockEthereumNetwork) GetLastEventHeight(ctx context.Context) (*big.Int, error) {
+	panic("implement me")
+}
+
+func (n MockEthereumNetwork) GetLastEventNonce(ctx context.Context) (*big.Int, error) {
+	panic("implement me")
+}
+
+func (n MockEthereumNetwork) GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error) {
+	panic("implement me")
+}
+
+func (n MockEthereumNetwork) GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error) {
+	panic("implement me")
+}
+
+func (n MockEthereumNetwork) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
+	panic("implement me")
+}
+
 
 var (
 	DummyLog = DummyLogger{}
