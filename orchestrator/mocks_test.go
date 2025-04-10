@@ -155,12 +155,12 @@ func (n MockCosmosNetwork) QueryDenomToTokenAddress(ctx context.Context, hyperio
 }
 
 func (n MockCosmosNetwork) QueryGetLastObservedEthereumBlockHeight(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
-	panic("implement me")
+	return n.QueryGetLastObservedEthereumBlockHeightFn(ctx, hyperionId)
 
 }
 
 func (n MockCosmosNetwork) QueryGetLastObservedEventNonce(ctx context.Context, hyperionId uint64) (uint64, error) {
-	panic("implement me")
+	return n.QueryGetLastObservedEventNonceFn(ctx, hyperionId)
 }
 
 func (n MockCosmosNetwork) SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
@@ -249,23 +249,23 @@ func (n MockEthereumNetwork) SendTransactionBatch(ctx context.Context, currentVa
 }
 
 func (n MockEthereumNetwork) GetLastEventHeight(ctx context.Context) (*big.Int, error) {
-	panic("implement me")
+	return n.GetLastEventHeightFn(ctx)
 }
 
 func (n MockEthereumNetwork) GetLastEventNonce(ctx context.Context) (*big.Int, error) {
-	panic("implement me")
+	return n.GetLastEventNonceFn(ctx)
 }
 
 func (n MockEthereumNetwork) GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error) {
-	panic("implement me")
+	return n.GetLastValsetCheckpointFn(ctx)
 }
 
 func (n MockEthereumNetwork) GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error) {
-	panic("implement me")
+	return n.GetLastValsetUpdatedEventHeightFn(ctx)
 }
 
 func (n MockEthereumNetwork) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
-	panic("implement me")
+	return n.GetValsetUpdatedEventsAtSpecificBlockFn(block)
 }
 
 
