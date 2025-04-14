@@ -147,6 +147,26 @@ func Test_Oracle(t *testing.T) {
 
 	ethAddr1 := gethcommon.HexToAddress("0x76D2dDbb89C36FA39FAa5c5e7C61ee95AC4D76C4")
 	ethAddr2 := gethcommon.HexToAddress("0x3959f5246c452463279F690301D923D5a75bbD88")
+	chainParams := hyperiontypes.CounterpartyChainParams{
+		HyperionId:                    1,
+		ContractSourceHash:            "1",
+		BridgeCounterpartyAddress:     "1",
+		BridgeChainId:                 1,
+		BridgeChainName:               "1",
+		BridgeChainLogo:               "1",
+		BridgeChainType:               "1",
+		SignedValsetsWindow:           1,
+		SignedBatchesWindow:           1,
+		SignedClaimsWindow:            1,
+		TargetBatchTimeout:            1,
+		TargetOutgoingTxTimeout:       1,
+		AverageBlockTime:              1,
+		AverageCounterpartyBlockTime:  1,
+		UnbondSlashingValsetsWindow:   1,
+		ClaimSlashingEnabled:          true,
+		BridgeContractStartHeight:     1,
+		Initializer:                   "1",
+	}
 
 	testTable := []struct {
 		name                  string
@@ -165,6 +185,9 @@ func Test_Oracle(t *testing.T) {
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
 						return nil, errors.New("oops")
 					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return nil, errors.New("oops")
+					},
 				},
 			},
 		},
@@ -174,7 +197,7 @@ func Test_Oracle(t *testing.T) {
 			expected: nil,
 			orch: &Orchestrator{
 				logger:      DummyLog,
-				cfg:         Config{EthereumAddr: ethAddr1},
+				cfg:         Config{EthereumAddr: ethAddr1, ChainParams: &chainParams},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
@@ -184,6 +207,12 @@ func Test_Oracle(t *testing.T) {
 									EthereumAddress: ethAddr2.String(),
 								},
 							},
+						}, nil
+					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return &hyperiontypes.LastObservedEthereumBlockHeight{
+							CosmosBlockHeight:   10,
+							EthereumBlockHeight: 10,
 						}, nil
 					},
 				},
@@ -209,6 +238,9 @@ func Test_Oracle(t *testing.T) {
 							},
 						}, nil
 					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return nil, errors.New("oops")
+					},
 				},
 				ethereum: MockEthereumNetwork{
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
@@ -223,7 +255,7 @@ func Test_Oracle(t *testing.T) {
 			expected: nil,
 			orch: &Orchestrator{
 				logger:      DummyLog,
-				cfg:         Config{EthereumAddr: ethAddr2},
+				cfg:         Config{EthereumAddr: ethAddr2, ChainParams: &chainParams},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
@@ -233,6 +265,12 @@ func Test_Oracle(t *testing.T) {
 									EthereumAddress: ethAddr2.String(),
 								},
 							},
+						}, nil
+					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return &hyperiontypes.LastObservedEthereumBlockHeight {
+							CosmosBlockHeight: 10,
+							EthereumBlockHeight: 10,
 						}, nil
 					},
 				},
@@ -262,6 +300,9 @@ func Test_Oracle(t *testing.T) {
 							},
 						}, nil
 					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return nil, errors.New("oops")
+					},
 				},
 				ethereum: MockEthereumNetwork{
 					GetHeaderByNumberFn: func(context.Context, *big.Int) (*gethtypes.Header, error) {
@@ -288,6 +329,9 @@ func Test_Oracle(t *testing.T) {
 								},
 							},
 						}, nil
+					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return nil, errors.New("oops")
 					},
 
 					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
@@ -321,7 +365,7 @@ func Test_Oracle(t *testing.T) {
 			lastObservedEthHeight: 100,
 			orch: &Orchestrator{
 				logger:      DummyLog,
-				cfg:         Config{EthereumAddr: ethAddr2},
+				cfg:         Config{EthereumAddr: ethAddr2, ChainParams: &chainParams},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
@@ -333,6 +377,17 @@ func Test_Oracle(t *testing.T) {
 							},
 						}, nil
 					},
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return &hyperiontypes.LastObservedEthereumBlockHeight {
+							CosmosBlockHeight: 10,
+							EthereumBlockHeight: 10,
+						}, nil
+					},
+
+					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
+						return 1, nil
+					},
+					
 
 					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return &hyperiontypes.LastClaimEvent{
@@ -357,6 +412,9 @@ func Test_Oracle(t *testing.T) {
 					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
 					},
+					GetLastEventNonceFn: func(ctx context.Context) (*big.Int, error) {
+						return new(big.Int).SetUint64(1), nil
+					},
 				},
 			},
 		},
@@ -367,7 +425,7 @@ func Test_Oracle(t *testing.T) {
 			lastObservedEthHeight: 100,
 			orch: &Orchestrator{
 				logger:      DummyLog,
-				cfg:         Config{EthereumAddr: ethAddr2},
+				cfg:         Config{EthereumAddr: ethAddr2, ChainParams: &chainParams},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
@@ -377,6 +435,18 @@ func Test_Oracle(t *testing.T) {
 									EthereumAddress: ethAddr2.String(),
 								},
 							},
+						}, nil
+					},
+
+					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
+						return 1, nil
+					},
+					
+
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return &hyperiontypes.LastObservedEthereumBlockHeight {
+							CosmosBlockHeight: 10,
+							EthereumBlockHeight: 10,
 						}, nil
 					},
 
@@ -403,6 +473,9 @@ func Test_Oracle(t *testing.T) {
 					},
 					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
+					},
+					GetLastEventNonceFn: func(ctx context.Context) (*big.Int, error) {
+						return new(big.Int).SetUint64(1), nil
 					},
 				},
 			},
@@ -415,7 +488,7 @@ func Test_Oracle(t *testing.T) {
 			lastResyncWithHelios:  time.Now(), // skip auto resync
 			orch: &Orchestrator{
 				logger:      DummyLog,
-				cfg:         Config{EthereumAddr: ethAddr2},
+				cfg:         Config{EthereumAddr: ethAddr2, ChainParams: &chainParams},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
@@ -425,6 +498,18 @@ func Test_Oracle(t *testing.T) {
 									EthereumAddress: ethAddr2.String(),
 								},
 							},
+						}, nil
+					},
+
+
+					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
+						return 1, nil
+					},
+					
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return &hyperiontypes.LastObservedEthereumBlockHeight {
+							CosmosBlockHeight: 10,
+							EthereumBlockHeight: 10,
 						}, nil
 					},
 
@@ -451,6 +536,9 @@ func Test_Oracle(t *testing.T) {
 					},
 					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
+					},
+					GetLastEventNonceFn: func(ctx context.Context) (*big.Int, error) {
+						return new(big.Int).SetUint64(1), nil
 					},
 				},
 			},
@@ -462,7 +550,7 @@ func Test_Oracle(t *testing.T) {
 			lastObservedEthHeight: 100,
 			orch: &Orchestrator{
 				logger:      DummyLog,
-				cfg:         Config{EthereumAddr: ethAddr2},
+				cfg:         Config{EthereumAddr: ethAddr2, ChainParams: &chainParams},
 				maxAttempts: maxLoopRetries,
 				helios: MockCosmosNetwork{
 					CurrentValsetFn: func(_ context.Context, _ uint64) (*hyperiontypes.Valset, error) {
@@ -472,6 +560,17 @@ func Test_Oracle(t *testing.T) {
 									EthereumAddress: ethAddr2.String(),
 								},
 							},
+						}, nil
+					},
+
+					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
+						return 1, nil
+					},
+
+					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
+						return &hyperiontypes.LastObservedEthereumBlockHeight {
+							CosmosBlockHeight: 10,
+							EthereumBlockHeight: 10,
 						}, nil
 					},
 
@@ -498,6 +597,9 @@ func Test_Oracle(t *testing.T) {
 					},
 					GetHyperionERC20DeployedEventsFn: func(_, _ uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error) {
 						return nil, nil
+					},
+					GetLastEventNonceFn: func(ctx context.Context) (*big.Int, error) {
+						return new(big.Int).SetUint64(1), nil
 					},
 				},
 			},
