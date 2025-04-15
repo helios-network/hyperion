@@ -92,6 +92,10 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	if !bonded {
 		l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height}).Warningln("validator not in active set, cannot make claims...")
+		err := l.helios.SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 
