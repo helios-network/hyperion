@@ -69,7 +69,7 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperionty
 
 func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) {
 	// err := godotenv.Load("path/to/.env") // use this for only testing
-	err := godotenv.Load()
+	err := godotenv.Load("../.env")
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
