@@ -349,7 +349,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	err := godotenv.Load()
+	err := godotenv.Load("../.env")
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
@@ -411,6 +411,11 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
 	// 	return nil
 	// }
+
+	log.Info("latestEthValset", latestEthValset)
+	log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
+	log.Info("confirmations", confirmations)
+
 
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
