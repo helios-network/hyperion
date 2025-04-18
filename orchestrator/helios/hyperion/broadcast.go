@@ -2,6 +2,7 @@ package hyperion
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -249,6 +250,11 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 		"data":           deposit.Data,
 		"token_contract": deposit.TokenContract.Hex(),
 	}).Debugln("observed SendToHeliosEvent")
+
+	// check if data is valid json
+	if !json.Valid([]byte(deposit.Data)) {
+		deposit.Data = ""
+	}
 
 	msg := &hyperiontypes.MsgDepositClaim{
 		HyperionId:     hyperionId,
