@@ -21,11 +21,12 @@ import (
 )
 
 type NetworkConfig struct {
-	EthNodeRPCs            string
+	EthNodeRPCs           string
 	GasPriceAdjustment    float64
 	MaxGasPrice           string
 	PendingTxWaitDuration string
 	EthNodeAlchemyWS      string
+	ChainID               int
 }
 
 // Network is the orchestrator's reference endpoint to the Ethereum network
