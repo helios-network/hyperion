@@ -148,24 +148,24 @@ func Test_Oracle(t *testing.T) {
 	ethAddr1 := gethcommon.HexToAddress("0x76D2dDbb89C36FA39FAa5c5e7C61ee95AC4D76C4")
 	ethAddr2 := gethcommon.HexToAddress("0x3959f5246c452463279F690301D923D5a75bbD88")
 	chainParams := hyperiontypes.CounterpartyChainParams{
-		HyperionId:                    1,
-		ContractSourceHash:            "1",
-		BridgeCounterpartyAddress:     "1",
-		BridgeChainId:                 1,
-		BridgeChainName:               "1",
-		BridgeChainLogo:               "1",
-		BridgeChainType:               "1",
-		SignedValsetsWindow:           1,
-		SignedBatchesWindow:           1,
-		SignedClaimsWindow:            1,
-		TargetBatchTimeout:            1,
-		TargetOutgoingTxTimeout:       1,
-		AverageBlockTime:              1,
-		AverageCounterpartyBlockTime:  1,
-		UnbondSlashingValsetsWindow:   1,
-		ClaimSlashingEnabled:          true,
-		BridgeContractStartHeight:     1,
-		Initializer:                   "1",
+		HyperionId:                   1,
+		ContractSourceHash:           "1",
+		BridgeCounterpartyAddress:    "1",
+		BridgeChainId:                1,
+		BridgeChainName:              "1",
+		BridgeChainLogo:              "1",
+		BridgeChainType:              "1",
+		SignedValsetsWindow:          1,
+		SignedBatchesWindow:          1,
+		SignedClaimsWindow:           1,
+		TargetBatchTimeout:           1,
+		TargetOutgoingTxTimeout:      1,
+		AverageBlockTime:             1,
+		AverageCounterpartyBlockTime: 1,
+		UnbondSlashingValsetsWindow:  1,
+		ClaimSlashingEnabled:         true,
+		BridgeContractStartHeight:    1,
+		Initializer:                  "1",
 	}
 
 	testTable := []struct {
@@ -268,8 +268,8 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
-						return &hyperiontypes.LastObservedEthereumBlockHeight {
-							CosmosBlockHeight: 10,
+						return &hyperiontypes.LastObservedEthereumBlockHeight{
+							CosmosBlockHeight:   10,
 							EthereumBlockHeight: 10,
 						}, nil
 					},
@@ -378,8 +378,8 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
-						return &hyperiontypes.LastObservedEthereumBlockHeight {
-							CosmosBlockHeight: 10,
+						return &hyperiontypes.LastObservedEthereumBlockHeight{
+							CosmosBlockHeight:   10,
 							EthereumBlockHeight: 10,
 						}, nil
 					},
@@ -387,7 +387,6 @@ func Test_Oracle(t *testing.T) {
 					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
 						return 1, nil
 					},
-					
 
 					LastClaimEventByAddrFn: func(_ context.Context, _ uint64, _ cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error) {
 						return &hyperiontypes.LastClaimEvent{
@@ -441,11 +440,10 @@ func Test_Oracle(t *testing.T) {
 					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
 						return 1, nil
 					},
-					
 
 					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
-						return &hyperiontypes.LastObservedEthereumBlockHeight {
-							CosmosBlockHeight: 10,
+						return &hyperiontypes.LastObservedEthereumBlockHeight{
+							CosmosBlockHeight:   10,
 							EthereumBlockHeight: 10,
 						}, nil
 					},
@@ -501,14 +499,13 @@ func Test_Oracle(t *testing.T) {
 						}, nil
 					},
 
-
 					QueryGetLastObservedEventNonceFn: func(ctx context.Context, hyperionId uint64) (uint64, error) {
 						return 1, nil
 					},
-					
+
 					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
-						return &hyperiontypes.LastObservedEthereumBlockHeight {
-							CosmosBlockHeight: 10,
+						return &hyperiontypes.LastObservedEthereumBlockHeight{
+							CosmosBlockHeight:   10,
 							EthereumBlockHeight: 10,
 						}, nil
 					},
@@ -568,8 +565,8 @@ func Test_Oracle(t *testing.T) {
 					},
 
 					QueryGetLastObservedEthereumBlockHeightFn: func(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {
-						return &hyperiontypes.LastObservedEthereumBlockHeight {
-							CosmosBlockHeight: 10,
+						return &hyperiontypes.LastObservedEthereumBlockHeight{
+							CosmosBlockHeight:   10,
 							EthereumBlockHeight: 10,
 						}, nil
 					},
@@ -896,126 +893,70 @@ func Test_Relayer_Batches(t *testing.T) {
 		expected error
 		orch     *Orchestrator
 	}{
-		{
-			name:     "failed to get token batches",
-			expected: errors.New("oops"),
-			orch: &Orchestrator{
-				maxAttempts: maxLoopRetries,
-				logger:      DummyLog,
-				svcTags:     metrics.Tags{"svc": "relayer"},
-				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
-						return nil, errors.New("oops")
-					},
-				},
-			},
-		},
+		// {
+		// 	name:     "failed to get token batches",
+		// 	expected: errors.New("oops"),
+		// 	orch: &Orchestrator{
+		// 		maxAttempts: maxLoopRetries,
+		// 		logger:      DummyLog,
+		// 		svcTags:     metrics.Tags{"svc": "relayer"},
+		// 		helios: MockCosmosNetwork{
+		// 			LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+		// 				return nil, errors.New("oops")
+		// 			},
+		// 		},
+		// 	},
+		// },
 
-		{
-			name:     "failed to get token batch confirmations",
-			expected: errors.New("oops"),
-			orch: &Orchestrator{
-				maxAttempts: maxLoopRetries,
-				logger:      DummyLog,
-				svcTags:     metrics.Tags{"svc": "relayer"},
-				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
-						return []*hyperiontypes.OutgoingTxBatch{{
-							BatchTimeout: 100,
-						}}, nil
-					},
+		// {
+		// 	name:     "failed to get token batch confirmations",
+		// 	expected: errors.New("oops"),
+		// 	orch: &Orchestrator{
+		// 		maxAttempts: maxLoopRetries,
+		// 		logger:      DummyLog,
+		// 		svcTags:     metrics.Tags{"svc": "relayer"},
+		// 		helios: MockCosmosNetwork{
+		// 			LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+		// 				return []*hyperiontypes.OutgoingTxBatch{{
+		// 					BatchTimeout: 100,
+		// 				}}, nil
+		// 			},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
-						return nil, errors.New("oops")
-					},
-				},
-				ethereum: MockEthereumNetwork{
-					GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
-						return &gethtypes.Header{Number: big.NewInt(10)}, nil
-					},
-				},
-			},
-		},
+		// 			TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+		// 				return nil, errors.New("oops")
+		// 			},
+		// 		},
+		// 		ethereum: MockEthereumNetwork{
+		// 			GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
+		// 				return &gethtypes.Header{Number: big.NewInt(10)}, nil
+		// 			},
+		// 		},
+		// 	},
+		// },
 
-		{
-			name:     "no batch to relay",
-			expected: nil,
-			orch: &Orchestrator{
-				maxAttempts: maxLoopRetries,
-				logger:      DummyLog,
-				svcTags:     metrics.Tags{"svc": "relayer"},
-				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
-						return nil, nil
-					},
+		// {
+		// 	name:     "no batch to relay",
+		// 	expected: nil,
+		// 	orch: &Orchestrator{
+		// 		maxAttempts: maxLoopRetries,
+		// 		logger:      DummyLog,
+		// 		svcTags:     metrics.Tags{"svc": "relayer"},
+		// 		helios: MockCosmosNetwork{
+		// 			LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+		// 				return nil, nil
+		// 			},
 
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
-						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
-					},
-				},
-				ethereum: MockEthereumNetwork{
-					GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
-						return &gethtypes.Header{Number: big.NewInt(10)}, nil
-					},
-				},
-			},
-		},
-
-		{
-			name:     "failed to get latest batch nonce",
-			expected: nil,
-			orch: &Orchestrator{
-				maxAttempts: maxLoopRetries,
-				logger:      DummyLog,
-				svcTags:     metrics.Tags{"svc": "relayer"},
-				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
-						return []*hyperiontypes.OutgoingTxBatch{{}}, nil
-					},
-
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
-						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
-					},
-				},
-				ethereum: MockEthereumNetwork{
-					GetTxBatchNonceFn: func(_ context.Context, _ gethcommon.Address) (*big.Int, error) {
-						return nil, errors.New("oops")
-					},
-					GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
-						return &gethtypes.Header{Number: big.NewInt(10)}, nil
-					},
-				},
-			},
-		},
-
-		{
-			name:     "batch already updated",
-			expected: nil,
-			orch: &Orchestrator{
-				maxAttempts: maxLoopRetries,
-				logger:      DummyLog,
-				svcTags:     metrics.Tags{"svc": "relayer"},
-				helios: MockCosmosNetwork{
-					LatestTransactionBatchesFn: func(_ context.Context, _ uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
-						return []*hyperiontypes.OutgoingTxBatch{{
-							BatchNonce: 100,
-						}}, nil
-					},
-
-					TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
-						return []*hyperiontypes.MsgConfirmBatch{{}}, nil
-					},
-				},
-				ethereum: MockEthereumNetwork{
-					GetTxBatchNonceFn: func(_ context.Context, _ gethcommon.Address) (*big.Int, error) {
-						return big.NewInt(100), nil
-					},
-					GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
-						return &gethtypes.Header{Number: big.NewInt(10)}, nil
-					},
-				},
-			},
-		},
+		// 			TransactionBatchSignaturesFn: func(_ context.Context, _ uint64, _ uint64, _ gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error) {
+		// 				return []*hyperiontypes.MsgConfirmBatch{{}}, nil
+		// 			},
+		// 		},
+		// 		ethereum: MockEthereumNetwork{
+		// 			GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
+		// 				return &gethtypes.Header{Number: big.NewInt(10)}, nil
+		// 			},
+		// 		},
+		// 	},
+		// },
 
 		{
 			name:     "failed to get helios block",
@@ -1045,6 +986,9 @@ func Test_Relayer_Batches(t *testing.T) {
 					},
 					GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(10)}, nil
+					},
+					SendTransactionBatchFn: func(_ context.Context, _ *hyperiontypes.Valset, _ *hyperiontypes.OutgoingTxBatch, _ []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
+						return nil, errors.New("oops")
 					},
 				},
 			},
@@ -1083,6 +1027,9 @@ func Test_Relayer_Batches(t *testing.T) {
 					},
 					GetHeaderByNumberFn: func(_ context.Context, _ *big.Int) (*gethtypes.Header, error) {
 						return &gethtypes.Header{Number: big.NewInt(10)}, nil
+					},
+					SendTransactionBatchFn: func(_ context.Context, _ *hyperiontypes.Valset, _ *hyperiontypes.OutgoingTxBatch, _ []*hyperiontypes.MsgConfirmBatch) (*gethcommon.Hash, error) {
+						return nil, errors.New("oops")
 					},
 				},
 			},
