@@ -169,6 +169,8 @@ func (e *ethCommitter) SendTx(
 			defer cancelFn()
 			opts.Context = ctxTimed
 
+			log.Info("nonce: ", nonce, "gasPrice: ", opts.GasPrice, "gasLimit: ", opts.GasLimit)
+
 			tx := types.NewTransaction(opts.Nonce.Uint64(), recipient, nil, opts.GasLimit, opts.GasPrice, txData)
 			// log.Info("e.fromAddress: ", e.fromAddress)
 			// log.Info("opts.From: ", opts.From)

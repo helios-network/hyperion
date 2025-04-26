@@ -63,7 +63,7 @@ func panicRecover(err *error) {
 
 func RetryFunction[T any](ctx context.Context, callback func() (T, error), delay time.Duration) (p T, err error) {
 	var zero T
-	
+
 	// Set up panic recovery
 	defer func() {
 		if r := recover(); r != nil {
@@ -74,7 +74,7 @@ func RetryFunction[T any](ctx context.Context, callback func() (T, error), delay
 			debug.PrintStack()
 		}
 	}()
-	
+
 	for {
 		// Check if context is cancelled before each attempt
 		select {
@@ -83,11 +83,11 @@ func RetryFunction[T any](ctx context.Context, callback func() (T, error), delay
 		default:
 			// Continue with retry
 		}
-		
+
 		// Execute callback with panic protection
 		var result T
 		var callErr error
-		
+
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -97,13 +97,13 @@ func RetryFunction[T any](ctx context.Context, callback func() (T, error), delay
 			}()
 			result, callErr = callback()
 		}()
-		
+
 		if callErr == nil {
 			return result, nil
 		}
-		
+
 		log.Warningf("Attempt failed: %v. Retrying in %v...", callErr, delay)
-		
+
 		// Use timer with context to allow for cancellation during sleep
 		timer := time.NewTimer(delay)
 		select {
@@ -118,17 +118,16 @@ func RetryFunction[T any](ctx context.Context, callback func() (T, error), delay
 	}
 }
 
-
 func RetryUntilSuccess[T any, P any](callback func(params P) (T, error), params P, delay time.Duration) (T, error) {
 	var attempt int
-	
+
 	for {
 		attempt++
 		result, err := callback(params)
 		if err == nil {
 			return result, nil
 		}
-		
+
 		log.Warningf("Attempt %d failed: %v. Retrying in %v...\n", attempt, err, delay)
 		time.Sleep(delay)
 	}

@@ -18,7 +18,10 @@ func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting BatchCreator...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		return bc.requestTokenBatches(ctx)
+		log.Info("requesting token batches")
+		err := bc.requestTokenBatches(ctx)
+		log.Info("requesting token batches done")
+		return err
 	})
 }
 

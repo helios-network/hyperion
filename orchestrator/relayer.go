@@ -38,7 +38,10 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
-		return r.relay(ctx)
+		log.Info("relaying")
+		err := r.relay(ctx)
+		log.Info("relaying done")
+		return err
 	})
 }
 
@@ -55,20 +58,28 @@ func (l *relayer) relay(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
+	log.Info("relaying getLatestEthValset")
+
 	ethValset, err := l.getLatestEthValset(ctx)
 	if err != nil {
 		return err
 	}
+
+	log.Info("relaying makeCheckpoint")
 
 	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
 	if err != nil {
 		return err
 	}
 
+	log.Info("relaying getLastValsetCheckpoint")
+
 	ethCheckpoint, err := l.ethereum.GetLastValsetCheckpoint(ctx)
 	if err != nil {
 		return err
 	}
+
+	log.Info("relaying getLastValsetCheckpoint done")
 
 	log.WithFields(log.Fields{
 		"Helios": heliosCheckpoint.Hex(),
@@ -79,12 +90,14 @@ func (l *relayer) relay(ctx context.Context) error {
 	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
 		l.Log().Infoln("relayer: checkpoint not synced yet waiting (rpc should be untrustable) ...")
 
-		json, _ := json.Marshal(ethValset)
+		json, err := json.Marshal(ethValset)
 		if err == nil {
 			os.WriteFile("valset-error.json", json, 0644)
 		}
 
 		return nil
+	} else {
+		log.Info("valset is synced")
 	}
 
 	// write valset to file
@@ -531,7 +544,7 @@ func checkIfValsetsDiffer(cosmosValset, ethereumValset *hyperiontypes.Valset) {
 		log.WithField(
 			"eth_valset_nonce",
 			ethereumValset.Nonce,
-		).Errorln("Cosmos does not have a valset for nonce from Ethereum chain. Possible bridge hijacking!")
+		).Errorln("Cosmos does not have a valset for nonce from Ethereum chain. Maybe not synced yet?")
 		return
 	}
 

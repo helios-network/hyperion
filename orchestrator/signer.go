@@ -24,7 +24,10 @@ func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Signer...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		return signer.sign(ctx)
+		log.Info("signing")
+		err := signer.sign(ctx)
+		log.Info("signing done")
+		return err
 	})
 }
 
