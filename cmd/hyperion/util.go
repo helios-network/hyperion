@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,4 +79,42 @@ func orShutdown(err error) {
 	if err != nil && err != grpc.ErrServerStopped {
 		log.WithError(err).Fatalln("unable to start hyperion")
 	}
+}
+
+func formatRPCs(input string) map[string][]string {
+	pairs := strings.Split(input, ",")
+	result := make(map[string][]string)
+
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, ":", 2)
+		if len(parts) == 2 {
+			key := parts[0]
+			value := parts[1]
+			result[key] = append(result[key], value)
+		}
+	}
+
+	return result
+}
+
+func formatHyperionIds(input string) map[int]int {
+	pairs := strings.Split(input, ",")
+	result := make(map[int]int)
+
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, ":", 2)
+		if len(parts) == 2 {
+			key, err := strconv.Atoi(parts[0])
+			if err != nil {
+				continue
+			}
+			value, err := strconv.Atoi(parts[1])
+			if err != nil {
+				continue
+			}
+			result[key] = value
+		}
+	}
+
+	return result
 }

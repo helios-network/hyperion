@@ -105,10 +105,7 @@ type Config struct {
 	heliosPrivKey       *string
 
 	// Ethereum params
-	hyperionID            *int
-	ethChainID            *int
-	ethNodeRPCs            *string
-	ethNodeAlchemyWS      *string
+	evmRPCs               map[string][]string
 	ethGasPriceAdjustment *float64
 	ethMaxGasPrice        *string
 
@@ -133,7 +130,7 @@ type Config struct {
 
 	// Testnet config
 	testnetAutoRegister *bool
-	testnetForceValset *bool
+	testnetForceValset  *bool
 
 	chainParams *hyperiontypes.CounterpartyChainParams
 }
@@ -219,33 +216,12 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	/** Ethereum **/
 
-	cfg.hyperionID = cmd.Int(cli.IntOpt{
-		Name:   "hyperion-id",
-		Desc:   "Specify Hyperion ID of the Ethereum network.",
-		EnvVar: "HYPERION_ID",
-		Value:  0,
-	})
-
-	cfg.ethChainID = cmd.Int(cli.IntOpt{
-		Name:   "eth-chain-id",
-		Desc:   "Specify Chain ID of the Ethereum network.",
-		EnvVar: "HYPERION_ETH_CHAIN_ID",
-		Value:  42,
-	})
-
-	cfg.ethNodeRPCs = cmd.String(cli.StringOpt{
-		Name:   "eth-node-http",
+	cfg.evmRPCs = formatRPCs(*cmd.String(cli.StringOpt{
+		Name:   "rpcs",
 		Desc:   "Specify HTTP endpoint for an Ethereum node.",
-		EnvVar: "HYPERION_ETH_RPCS",
-		Value:  "http://localhost:1317",
-	})
-
-	cfg.ethNodeAlchemyWS = cmd.String(cli.StringOpt{
-		Name:   "eth-node-alchemy-ws",
-		Desc:   "Specify websocket url for an Alchemy ethereum node.",
-		EnvVar: "HYPERION_ETH_ALCHEMY_WS",
-		Value:  "",
-	})
+		EnvVar: "HYPERION_EVM_RPCS",
+		Value:  "1:http://localhost:1317",
+	}))
 
 	cfg.ethGasPriceAdjustment = cmd.Float64(cli.Float64Opt{
 		Name:   "eth_gas_price_adjustment",

@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -40,19 +41,19 @@ type EVMProviders struct {
 }
 
 // NewEVMProviders creates a new EVMProviders instance with the given RPC URLs
-func NewEVMProviders(rpcs []string) *EVMProviders {
+func NewEVMProviders(rpcs []*hyperiontypes.Rpc) *EVMProviders {
 	return NewEVMProvidersWithOptions(rpcs, 3, 10*time.Second)
 }
 
 // NewEVMProvidersWithOptions creates a new EVMProviders with custom retry and timeout settings
-func NewEVMProvidersWithOptions(rpcs []string, maxRetries int, timeout time.Duration) *EVMProviders {
+func NewEVMProvidersWithOptions(rpcs []*hyperiontypes.Rpc, maxRetries int, timeout time.Duration) *EVMProviders {
 	// Loop and create rpc clients
 	var rcs []*rpc.Client
 	var ethClients []*ethclient.Client
 	var validUrls []string
 	reputations := make(map[string]*RPCReputation)
-	for _, rpcUrl := range rpcs {
-		client, err := rpc.Dial(rpcUrl)
+	for _, rpcReputation := range rpcs {
+		client, err := rpc.Dial(rpcReputation.Url)
 		if err != nil {
 			// Skip failed connections but don't panic
 			continue
@@ -60,10 +61,10 @@ func NewEVMProvidersWithOptions(rpcs []string, maxRetries int, timeout time.Dura
 		ethClient := ethclient.NewClient(client)
 		rcs = append(rcs, client)
 		ethClients = append(ethClients, ethClient)
-		validUrls = append(validUrls, rpcUrl)
-		reputations[rpcUrl] = &RPCReputation{
-			rpcUrl:     rpcUrl,
-			reputation: 0,
+		validUrls = append(validUrls, rpcReputation.Url)
+		reputations[rpcReputation.Url] = &RPCReputation{
+			rpcUrl:     rpcReputation.Url,
+			reputation: rpcReputation.Reputation,
 		}
 	}
 

@@ -21,11 +21,11 @@ import (
 )
 
 type NetworkConfig struct {
-	EthNodeRPCs            string
+	EthNodeRPCs           []*hyperiontypes.Rpc
 	GasPriceAdjustment    float64
 	MaxGasPrice           string
 	PendingTxWaitDuration string
-	EthNodeAlchemyWS      string
+	ChainID               int
 }
 
 // Network is the orchestrator's reference endpoint to the Ethereum network
@@ -96,12 +96,13 @@ func NewNetwork(
 	}
 
 	// If Alchemy Websocket URL is set, then Subscribe to Pending Transaction of Hyperion Contract.
-	if cfg.EthNodeAlchemyWS != "" {
-		log.WithFields(log.Fields{
-			"url": cfg.EthNodeAlchemyWS,
-		}).Infoln("subscribing to Alchemy websocket")
-		go hyperionContract.SubscribeToPendingTxs(cfg.EthNodeAlchemyWS)
-	}
+	// disabled for now
+	// if cfg.EthNodeAlchemyWS != "" {
+	// 	log.WithFields(log.Fields{
+	// 		"url": cfg.EthNodeAlchemyWS,
+	// 	}).Infoln("subscribing to Alchemy websocket")
+	// 	go hyperionContract.SubscribeToPendingTxs(cfg.EthNodeAlchemyWS)
+	// }
 
 	n := &network{
 		HyperionContract: hyperionContract,

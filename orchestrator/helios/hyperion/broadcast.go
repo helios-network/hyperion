@@ -56,6 +56,8 @@ func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64,
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
+	log.Infoln("sending valset confirm", c.ethSignFn)
+
 	confirmHash := hyperion.EncodeValsetConfirm(hyperionID, valset)
 	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
