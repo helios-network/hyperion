@@ -105,9 +105,7 @@ type Config struct {
 	heliosPrivKey       *string
 
 	// Ethereum params
-	hyperionIDs           map[int]int
 	evmRPCs               map[string][]string
-	ethNodeAlchemyWS      *string
 	ethGasPriceAdjustment *float64
 	ethMaxGasPrice        *string
 
@@ -218,27 +216,12 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	/** Ethereum **/
 
-
-	cfg.hyperionIDs = formatHyperionIds(*cmd.String(cli.StringOpt{
-		Name:   "hyperion-ids",
-		Desc:   "Specify Hyperion ID of the Ethereum network.",
-		EnvVar: "HYPERION_IDS",
-		Value:  "80002:21,80001:22",
-	}))
-
 	cfg.evmRPCs = formatRPCs(*cmd.String(cli.StringOpt{
 		Name:   "rpcs",
 		Desc:   "Specify HTTP endpoint for an Ethereum node.",
 		EnvVar: "HYPERION_EVM_RPCS",
 		Value:  "1:http://localhost:1317",
 	}))
-
-	cfg.ethNodeAlchemyWS = cmd.String(cli.StringOpt{
-		Name:   "eth-node-alchemy-ws",
-		Desc:   "Specify websocket url for an Alchemy ethereum node.",
-		EnvVar: "HYPERION_ETH_ALCHEMY_WS",
-		Value:  "",
-	})
 
 	cfg.ethGasPriceAdjustment = cmd.Float64(cli.Float64Opt{
 		Name:   "eth_gas_price_adjustment",

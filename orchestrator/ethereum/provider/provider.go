@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/Helios-Chain-Labs/metrics"
+	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type EVMProvider interface {
@@ -43,12 +43,8 @@ type evmProviderWithRet struct {
 	svcTags metrics.Tags
 }
 
-func NewEVMProvider(rpcUrls string) EVMProviderWithRet {
-	// split the RPC URLs by comma
-	rpcUrls = strings.TrimSpace(rpcUrls)
-	// split by comma to rpcUrlsTuple
-	rpcUrlsTuple := strings.Split(rpcUrls, ",")
-	pool := NewEVMProviders(rpcUrlsTuple)
+func NewEVMProvider(rpcUrls []*hyperiontypes.Rpc) EVMProviderWithRet {
+	pool := NewEVMProviders(rpcUrls)
 	return &evmProviderWithRet{
 		pool: pool,
 		svcTags: metrics.Tags{

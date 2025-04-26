@@ -29,13 +29,76 @@ type NetworkConfig struct {
 	Gas string
 }
 
+type NetworkWithoutBroadcast interface {
+	hyperion.QueryClient
+	tendermint.Client
+}
+
 type Network interface {
 	hyperion.QueryClient
 	hyperion.BroadcastClient
 	tendermint.Client
 }
 
-func NewNetwork(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg NetworkConfig) (Network, error) {
+func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWithoutBroadcast, error) {
+	clientCfg := cfg.loadClientConfig()
+
+	log.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
+
+	clientCtx, err := chain.NewClientContext(clientCfg.ChainId, cfg.ValidatorAddress, k)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infoln("Context OK")
+
+	log.Infoln("NodeURI", clientCfg.TmEndpoint)
+
+	clientCtx.WithNodeURI(clientCfg.TmEndpoint)
+
+	log.Infoln("Node URI OK")
+
+	tmRPC, err := comethttp.New(clientCfg.TmEndpoint, "/websocket")
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infoln("RPC OK")
+
+	clientCtx = clientCtx.WithClient(tmRPC)
+
+	log.Infoln("WithClient OK")
+
+	log.Infoln(fmt.Sprintf("GasPrice CONFIG %s", cfg.GasPrice))
+	log.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
+
+	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas(cfg.Gas))
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infoln("NewChainClient OK")
+
+	time.Sleep(1 * time.Second)
+
+	conn := awaitConnection(chainClient, 1*time.Minute)
+
+	log.Infoln("CON OK")
+
+	net := struct {
+		hyperion.QueryClient
+		tendermint.Client
+	}{
+		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+		tendermint.NewRPCClient(clientCfg.TmEndpoint),
+	}
+
+	log.Infoln("NET LOADED")
+
+	return net, nil
+}
+
+func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg NetworkConfig) (Network, error) {
 	clientCfg := cfg.loadClientConfig()
 
 	log.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)

@@ -42,14 +42,16 @@ func (l *signer) sign(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
+	l.Log().Infoln("signing")
 	if err := l.signValidatorSets(ctx); err != nil {
 		return err
 	}
+	l.Log().Infoln("signing validator sets done")
 
 	if err := l.signNewBatch(ctx); err != nil {
 		return err
 	}
-
+	l.Log().Infoln("signing new batch done")
 	return nil
 }
 
@@ -60,11 +62,14 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
 	fn := func() error {
+		l.Log().Infoln("getting oldest unsigned valsets")
 		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
+		l.Log().Infoln("getting oldest unsigned valsets done")
 		return nil
 	}
 
 	if err := l.retry(ctx, fn); err != nil {
+		l.Log().Infoln("getting oldest unsigned valsets failed")
 		return err
 	}
 
@@ -73,10 +78,14 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 		return nil
 	}
 
+	l.Log().Infoln("signing valsets", len(valsets))
+
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
+			l.Log().Infoln("signing valset", vs.Nonce)
 			return l.helios.SendValsetConfirm(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, vs)
 		}); err != nil {
+			l.Log().Infoln("signing valset failed", err)
 			return err
 		}
 

@@ -168,9 +168,9 @@ func getBatchCheckpointValues(batch *types.OutgoingTxBatch) (amounts []*big.Int,
 	fees = make([]*big.Int, len(batch.Transactions))
 
 	for i, tx := range batch.Transactions {
-		amounts[i] = tx.Erc20Token.Amount.BigInt()
+		amounts[i] = tx.Token.Amount.BigInt()
 		destinations[i] = common.HexToAddress(tx.DestAddress)
-		fees[i] = tx.Erc20Fee.Amount.BigInt()
+		fees[i] = tx.Fee.Amount.BigInt()
 	}
 
 	return
