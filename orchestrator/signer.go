@@ -60,7 +60,7 @@ func (l *signer) sign(ctx context.Context) error {
 
 func (l *signer) signValidatorSets(ctx context.Context) error {
 	var valsets []*hyperiontypes.Valset
-	err := godotenv.Load("../.env")
+	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
@@ -100,7 +100,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 
 func (l *signer) signNewBatch(ctx context.Context) error {
 	var oldestUnsignedBatch *hyperiontypes.OutgoingTxBatch
-	err := godotenv.Load("../.env")
+	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Load Failed .env: %v", err)
 	}
