@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -361,11 +360,6 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Load Failed .env: %v", err)
-	}
 
 	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
 	log.Info("batches: ", batches)

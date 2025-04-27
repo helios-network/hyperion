@@ -4,7 +4,6 @@ import (
 	"context"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/joho/godotenv"
 	"github.com/shopspring/decimal"
 	log "github.com/xlab/suplog"
 
@@ -71,11 +70,6 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperionty
 }
 
 func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) {
-	// err := godotenv.Load("path/to/.env") // use this for only testing
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Load Failed .env: %v", err)
-	}
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
 	tokenDenom, _, err := l.helios.QueryTokenAddressToDenom(ctx, l.cfg.HyperionId, tokenAddress)
 	if err != nil {

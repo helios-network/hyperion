@@ -20,7 +20,6 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
-	"github.com/joho/godotenv"
 )
 
 type BroadcastClient interface {
@@ -237,10 +236,6 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
 	// issued to the Cosmos address in question
 	// -------------
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Load failed .env: %v", err)
-	}
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()

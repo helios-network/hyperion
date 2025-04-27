@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -334,11 +333,6 @@ func (l *oracle) autoResync(ctx context.Context) error {
 }
 
 func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Load Failed .env: %v", err)
-	}
-
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)

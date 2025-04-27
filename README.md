@@ -77,14 +77,13 @@ Options:
       --eth-from                         Specify the from address. If specified, must exist in keystore, ledger or match the privkey. (env $HYPERION_ETH_FROM)
       --eth-passphrase                   Passphrase to unlock the private key from armor, if empty then stdin is used. (env $HYPERION_ETH_PASSPHRASE)
       --eth-pk                           Provide a raw Ethereum private key of the validator in hex. USE FOR TESTING ONLY! (env $HYPERION_ETH_PK)
-      --relay_valsets                    If enabled, relayer will relay valsets to ethereum (env $HYPERION_RELAY_VALSETS)
-      --relay_valset_offset_dur          If set, relayer will broadcast valsetUpdate only after relayValsetOffsetDur has passed from time of valsetUpdate creation (env $HYPERION_RELAY_VALSET_OFFSET_DUR) (default "5m")
-      --relay_batches                    If enabled, relayer will relay batches to ethereum (env $HYPERION_RELAY_BATCHES)
-      --relay_batch_offset_dur           If set, relayer will broadcast batches only after relayBatchOffsetDur has passed from time of batch creation (env $HYPERION_RELAY_BATCH_OFFSET_DUR) (default "5m")
-      --relay_pending_tx_wait_duration   If set, relayer will broadcast pending batches/valsetupdate only after pendingTxWaitDuration has passed (env $HYPERION_RELAY_PENDING_TX_WAIT_DURATION) (default "20m")
-      --min_batch_fee_usd                If set, batch request will create batches only if fee threshold exceeds (env $HYPERION_MIN_BATCH_FEE_USD) (default 23.3)
-      --coingecko_api                    Specify HTTP endpoint for coingecko api. (env $HYPERION_COINGECKO_API) (default "https://api.coingecko.com/api/v3")
-      --hyperion-id                      Specify Hyperion ID ecosystem. (env $HYPERION_ID)
+      --relay-valsets                    If enabled, relayer will relay valsets to ethereum (env $HYPERION_RELAY_VALSETS)
+      --relay-valset-offset-dur          If set, relayer will broadcast valsetUpdate only after relayValsetOffsetDur has passed from time of valsetUpdate creation (env $HYPERION_RELAY_VALSET_OFFSET_DUR) (default "5m")
+      --relay-batches                    If enabled, relayer will relay batches to ethereum (env $HYPERION_RELAY_BATCHES)
+      --relay-batch-offset-dur           If set, relayer will broadcast batches only after relayBatchOffsetDur has passed from time of batch creation (env $HYPERION_RELAY_BATCH_OFFSET_DUR) (default "5m")
+      --relay-pending-tx-wait-duration   If set, relayer will broadcast pending batches/valsetupdate only after pendingTxWaitDuration has passed (env $HYPERION_RELAY_PENDING_TX_WAIT_DURATION) (default "20m")
+      --min-batch-fee-usd                If set, batch request will create batches only if fee threshold exceeds (env $HYPERION_MIN_BATCH_FEE_USD) (default 23.3)
+      --coingecko-api                    Specify HTTP endpoint for coingecko api. (env $HYPERION_COINGECKO_API) (default "https://api.coingecko.com/api/v3")
 ```
 
 ## Setup keys
