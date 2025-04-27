@@ -224,7 +224,7 @@ func initConfig(cmd *cli.Cmd) Config {
 	}))
 
 	cfg.ethGasPriceAdjustment = cmd.Float64(cli.Float64Opt{
-		Name:   "eth_gas_price_adjustment",
+		Name:   "eth-gas-price-adjustment",
 		Desc:   "gas price adjustment for Ethereum transactions",
 		EnvVar: "HYPERION_ETH_GAS_PRICE_ADJUSTMENT",
 		Value:  float64(1.3),
@@ -264,42 +264,42 @@ func initConfig(cmd *cli.Cmd) Config {
 	/** Relayer **/
 
 	cfg.relayValsets = cmd.Bool(cli.BoolOpt{
-		Name:   "relay_valsets",
+		Name:   "relay-valsets",
 		Desc:   "If enabled, relayer will relay valsets to ethereum",
 		EnvVar: "HYPERION_RELAY_VALSETS",
 		Value:  false,
 	})
 
 	cfg.relayValsetOffsetDur = cmd.String(cli.StringOpt{
-		Name:   "relay_valset_offset_dur",
+		Name:   "relay-valset-offset-dur",
 		Desc:   "If set, relayer will broadcast valsetUpdate only after relayValsetOffsetDur has passed from time of valsetUpdate creation",
 		EnvVar: "HYPERION_RELAY_VALSET_OFFSET_DUR",
 		Value:  "5m",
 	})
 
 	cfg.relayBatches = cmd.Bool(cli.BoolOpt{
-		Name:   "relay_batches",
+		Name:   "relay-batches",
 		Desc:   "If enabled, relayer will relay batches to ethereum",
 		EnvVar: "HYPERION_RELAY_BATCHES",
 		Value:  false,
 	})
 
 	cfg.relayExternalDatas = cmd.Bool(cli.BoolOpt{
-		Name:   "relay_external_datas",
+		Name:   "relay-external-datas",
 		Desc:   "If enabled, relayer will relay external datas taken on ethereum",
 		EnvVar: "HYPERION_RELAY_EXTERNAL_DATAS",
 		Value:  false,
 	})
 
 	cfg.relayBatchOffsetDur = cmd.String(cli.StringOpt{
-		Name:   "relay_batch_offset_dur",
+		Name:   "relay-batch-offset-dur",
 		Desc:   "If set, relayer will broadcast batches only after relayBatchOffsetDur has passed from time of batch creation",
 		EnvVar: "HYPERION_RELAY_BATCH_OFFSET_DUR",
 		Value:  "5m",
 	})
 
 	cfg.pendingTxWaitDuration = cmd.String(cli.StringOpt{
-		Name:   "relay_pending_tx_wait_duration",
+		Name:   "relay-pending-tx-wait-duration",
 		Desc:   "If set, relayer will broadcast pending batches/valsetupdate only after pendingTxWaitDuration has passed",
 		EnvVar: "HYPERION_RELAY_PENDING_TX_WAIT_DURATION",
 		Value:  "20m",
@@ -308,7 +308,7 @@ func initConfig(cmd *cli.Cmd) Config {
 	/** Batch Requester **/
 
 	cfg.minBatchFeeUSD = cmd.Float64(cli.Float64Opt{
-		Name:   "min_batch_fee_usd",
+		Name:   "min-batch-fee-usd",
 		Desc:   "If set, batch request will create batches only if fee threshold exceeds",
 		EnvVar: "HYPERION_MIN_BATCH_FEE_USD",
 		Value:  float64(23.3),
@@ -317,7 +317,7 @@ func initConfig(cmd *cli.Cmd) Config {
 	/** Coingecko **/
 
 	cfg.coingeckoApi = cmd.String(cli.StringOpt{
-		Name:   "coingecko_api",
+		Name:   "coingecko-api",
 		Desc:   "Specify HTTP endpoint for pricefeed api.",
 		EnvVar: "HYPERION_COINGECKO_API",
 		Value:  "https://api.coingecko.com/api/v3",
@@ -325,14 +325,14 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	/** Testnet **/
 	cfg.testnetAutoRegister = cmd.Bool(cli.BoolOpt{
-		Name:   "testnet_auto_register",
+		Name:   "testnet-auto-register",
 		Desc:   "If enabled, relayer will automatically register the validator on testnet",
 		EnvVar: "TESTNET_ENABLE_AUTO_REGISTER",
 		Value:  false,
 	})
 
 	cfg.testnetForceValset = cmd.Bool(cli.BoolOpt{
-		Name:   "testnet_force_valset",
+		Name:   "testnet-force-valset",
 		Desc:   "If enabled, relayer will force valset update on testnet",
 		EnvVar: "TESTNET_ENABLE_FORCE_SET_VALSET",
 		Value:  false,
