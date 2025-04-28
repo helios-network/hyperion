@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -14,6 +13,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 )
@@ -173,10 +173,17 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			orShutdown(err)
 
 			go func() {
-				if err := hyperion.Run(ctx, heliosNetwork, ethNetwork); err != nil {
-					log.Errorln(err)
-					os.Exit(1)
+				// if err := hyperion.Run(ctx, heliosNetwork, ethNetwork); err != nil {
+				// 	log.Errorln(err)
+				// 	os.Exit(1)
+				// }
+				delay, err := time.ParseDuration("5s")
+				if err != nil {
+					log.WithError(err).Fatalln("unable to parse delay time")
 				}
+				loops.RetryFunction(ctx, func() (error, error) {
+					return nil, hyperion.Run(ctx, heliosNetwork, ethNetwork)
+				}, delay)
 			}()
 
 		}

@@ -43,9 +43,9 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		log.Info("observing")
+		s.logger.Info("observing")
 		err := oracle.observeEthEvents(ctx)
-		log.Info("observing done")
+		s.logger.Info("observing done")
 		return err
 	})
 }
