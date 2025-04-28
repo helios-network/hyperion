@@ -37,9 +37,9 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
-		log.Info("relaying")
+		s.logger.Info("relaying")
 		err := r.relay(ctx)
-		log.Info("relaying done")
+		s.logger.Info("relaying done")
 		return err
 	})
 }
@@ -57,30 +57,30 @@ func (l *relayer) relay(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	log.Info("relaying getLatestEthValset")
+	l.Log().Info("relaying getLatestEthValset")
 
 	ethValset, err := l.getLatestEthValset(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Info("relaying makeCheckpoint")
+	l.Log().Info("relaying makeCheckpoint")
 
 	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
 	if err != nil {
 		return err
 	}
 
-	log.Info("relaying getLastValsetCheckpoint")
+	l.Log().Info("relaying getLastValsetCheckpoint")
 
 	ethCheckpoint, err := l.ethereum.GetLastValsetCheckpoint(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Info("relaying getLastValsetCheckpoint done")
+	l.Log().Info("relaying getLastValsetCheckpoint done")
 
-	log.WithFields(log.Fields{
+	l.Log().WithFields(log.Fields{
 		"Helios": heliosCheckpoint.Hex(),
 		"Eth":    ethCheckpoint.Hex(),
 		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
@@ -96,7 +96,7 @@ func (l *relayer) relay(ctx context.Context) error {
 
 		return nil
 	} else {
-		log.Info("valset is synced")
+		l.Log().Info("valset is synced")
 	}
 
 	// write valset to file
@@ -234,7 +234,7 @@ func (l *relayer) makeCheckpoint(ctx context.Context, valset *hyperiontypes.Vals
 
 	hyperionIDHash, err := l.ethereum.GetHyperionID(ctx)
 	if err != nil {
-		l.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+		l.Log().WithError(err).Fatalln("unable to query hyperion ID from contract")
 	}
 	// Encoder les données
 	checkpoint, err := l.encodeData(
@@ -362,18 +362,18 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	defer doneFn()
 
 	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
-	log.Info("batches: ", batches)
+	l.Log().Info("batches: ", batches)
 	if err != nil {
-		log.Info("failed to get latest transaction batches", err)
+		l.Log().Info("failed to get latest transaction batches", err)
 		return err
 	}
 
 	// latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	// if err != nil {
-	// 	log.Info("failed to get latest ethereum height", err)
+	// 	l.Log().Info("failed to get latest ethereum height", err)
 	// 	return err
 	// }
-	// log.Info("latestEthHeight", latestEthHeight)
+	// l.Log().Info("latestEthHeight", latestEthHeight)
 
 	var (
 		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
@@ -381,7 +381,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	)
 
 	for _, batch := range batches {
-		log.Info("batch details: ", batch)
+		l.Log().Info("batch details: ", batch)
 		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
 		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
 		// 	continue
@@ -392,7 +392,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		}
 
 		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
-		log.Info("sigs", sigs)
+		l.Log().Info("sigs", sigs)
 		if err != nil {
 			return err
 		}
@@ -412,22 +412,22 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		l.Log().Infoln("no token batch to relay")
 		return nil
 	}
-	// log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
+	// l.Log().Info("oldestConfirmedBatch", oldestConfirmedBatch)
 
-	// log.Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
+	// l.Log().Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
 	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
 	// 	return nil
 	// }
 
-	log.Info("latestEthValset", latestEthValset)
-	log.Info("oldestConfirmedBatch", oldestConfirmedBatch)
-	log.Info("confirmations", confirmations)
+	l.Log().Info("latestEthValset", latestEthValset)
+	l.Log().Info("oldestConfirmedBatch", oldestConfirmedBatch)
+	l.Log().Info("confirmations", confirmations)
 
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash
 		// Better to warn the user and try again in the next loop interval
-		log.WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
+		l.Log().WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
 		return nil
 	}
 
@@ -490,7 +490,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		// we take only the first event if we find any at all.
 		event := valsetUpdatedEvents[0]
 
-		log.Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
+		l.Log().Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
 
 		valset := &hyperiontypes.Valset{
 			Nonce:        event.NewValsetNonce.Uint64(),

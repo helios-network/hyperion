@@ -29,6 +29,7 @@ type PriceFeed interface {
 type Config struct {
 	CosmosAddr           cosmostypes.AccAddress
 	HyperionId           uint64
+	ChainId              uint64
 	EthereumAddr         gethcommon.Address
 	MinBatchFeeUSD       float64
 	RelayValsetOffsetDur time.Duration
@@ -58,7 +59,11 @@ func NewOrchestrator(
 	cfg Config,
 ) (*Orchestrator, error) {
 	o := &Orchestrator{
-		logger:      log.DefaultLogger,
+		logger: log.WithFields(log.Fields{
+			"svc":         "hyperion_orchestrator",
+			"chain_id":    cfg.ChainId,
+			"hyperion_id": cfg.HyperionId,
+		}),
 		svcTags:     metrics.Tags{"svc": "hyperion_orchestrator"},
 		helios:      helios,
 		ethereum:    eth,
@@ -74,16 +79,16 @@ func NewOrchestrator(
 // up the Orchestrator, all of these are async loops.
 func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
 	if s.cfg.RelayerMode {
-		return s.startRelayerMode(ctx, helios, eth)
+		return s.startRelayerMode(ctx)
 	}
 
-	return s.startValidatorMode(ctx, helios, eth)
+	return s.startValidatorMode(ctx, eth)
 }
 
 // startValidatorMode runs all orchestrator processes. This is called
 // when hyperion is run alongside a validator helios node.
-func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
-	log.Infoln("running orchestrator in validator mode")
+func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Network) error {
+	s.logger.Infoln("running orchestrator in validator mode")
 
 	// get hyperion ID from contract
 	delay, err := time.ParseDuration("1s")
@@ -95,7 +100,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 	}
 	hyperionID := hyperionIDHash.Big().Uint64()
 
-	log.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
+	s.logger.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
 
 	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
 	if err != nil {
@@ -122,7 +127,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 	}
 
 	if lastEventNonce.Uint64() > lastObservedEventNonce {
-		log.Infoln("lastEventNonce is greater than lastObservedEventNonce, starting from lastObservedEventNonce")
+		s.logger.Infoln("lastEventNonce is greater than lastObservedEventNonce, starting from lastObservedEventNonce")
 		// start from the next block after the last observed height
 		ethereumBlockHeightWhereStart = latestObservedHeight.EthereumBlockHeight + 1
 	}
@@ -140,7 +145,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, helios helios.Net
 // startRelayerMode runs orchestrator processes that only relay specific
 // messages that do not require a validator's signature. This mode is run
 // alongside a non-validator helios node
-func (s *Orchestrator) startRelayerMode(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
+func (s *Orchestrator) startRelayerMode(ctx context.Context) error {
 	log.Infoln("running orchestrator in relayer mode")
 
 	var pg loops.ParanoidGroup

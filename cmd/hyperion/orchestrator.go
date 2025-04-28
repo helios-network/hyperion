@@ -149,6 +149,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 			}
 
 			orchestratorCfg := orchestrator.Config{
+				ChainId:              counterpartyChainParams.BridgeChainId,
 				HyperionId:           uint64(counterpartyChainParams.HyperionId),
 				CosmosAddr:           heliosKeyring.Addr,
 				EthereumAddr:         ethKeyFromAddress,

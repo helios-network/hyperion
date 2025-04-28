@@ -68,7 +68,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	// check if validator is in the active set since claims will fail otherwise
 	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
 	if err != nil {
-		l.logger.WithError(err).Warningln("failed to get active validator set on Helios")
+		l.Log().WithError(err).Warningln("failed to get active validator set on Helios")
 		return err
 	}
 
@@ -80,7 +80,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	if latestObservedHeight.EthereumBlockHeight <= l.cfg.ChainParams.BridgeContractStartHeight { // first time total sync needed
 		l.lastObservedEthHeight = l.cfg.ChainParams.BridgeContractStartHeight
-		l.logger.Info("First Time Hyperion total sync needed BridgeContractStartHeight: ", l.lastObservedEthHeight)
+		l.Log().Info("First Time Hyperion total sync needed BridgeContractStartHeight: ", l.lastObservedEthHeight)
 	}
 
 	// ajouter la possibilite de forcer un restart depuis un certain blockHeight en config
