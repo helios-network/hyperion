@@ -41,49 +41,50 @@ type Network interface {
 }
 
 func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWithoutBroadcast, error) {
+	logger := log.WithField("svc", "MAIN PROCESS")
 	clientCfg := cfg.loadClientConfig()
 
-	log.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
+	logger.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
 
 	clientCtx, err := chain.NewClientContext(clientCfg.ChainId, cfg.ValidatorAddress, k)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln("Context OK")
+	logger.Infoln("Context OK")
 
-	log.Infoln("NodeURI", clientCfg.TmEndpoint)
+	logger.Infoln("NodeURI", clientCfg.TmEndpoint)
 
 	clientCtx.WithNodeURI(clientCfg.TmEndpoint)
 
-	log.Infoln("Node URI OK")
+	logger.Infoln("Node URI OK")
 
 	tmRPC, err := comethttp.New(clientCfg.TmEndpoint, "/websocket")
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln("RPC OK")
+	logger.Infoln("RPC OK")
 
 	clientCtx = clientCtx.WithClient(tmRPC)
 
-	log.Infoln("WithClient OK")
+	logger.Infoln("WithClient OK")
 
-	log.Infoln(fmt.Sprintf("GasPrice CONFIG %s", cfg.GasPrice))
-	log.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
+	logger.Infoln(fmt.Sprintf("GasPrice CONFIG %s", cfg.GasPrice))
+	logger.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
 
 	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas(cfg.Gas))
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln("NewChainClient OK")
+	logger.Infoln("NewChainClient OK")
 
 	time.Sleep(1 * time.Second)
 
 	conn := awaitConnection(chainClient, 1*time.Minute)
 
-	log.Infoln("CON OK")
+	logger.Infoln("CON OK")
 
 	net := struct {
 		hyperion.QueryClient
@@ -93,55 +94,56 @@ func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWi
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 	}
 
-	log.Infoln("NET LOADED")
+	logger.Infoln("NET LOADED")
 
 	return net, nil
 }
 
 func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg NetworkConfig) (Network, error) {
 	clientCfg := cfg.loadClientConfig()
+	logger := log.WithField("svc", "MAIN PROCESS")
 
-	log.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
+	logger.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
 
 	clientCtx, err := chain.NewClientContext(clientCfg.ChainId, cfg.ValidatorAddress, k)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln("Context OK")
+	logger.Infoln("Context OK")
 
-	log.Infoln("NodeURI", clientCfg.TmEndpoint)
+	logger.Infoln("NodeURI", clientCfg.TmEndpoint)
 
 	clientCtx.WithNodeURI(clientCfg.TmEndpoint)
 
-	log.Infoln("Node URI OK")
+	logger.Infoln("Node URI OK")
 
 	tmRPC, err := comethttp.New(clientCfg.TmEndpoint, "/websocket")
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln("RPC OK")
+	logger.Infoln("RPC OK")
 
 	clientCtx = clientCtx.WithClient(tmRPC)
 
-	log.Infoln("WithClient OK")
+	logger.Infoln("WithClient OK")
 
-	log.Infoln(fmt.Sprintf("GasPrice CONFIG %s", cfg.GasPrice))
-	log.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
+	logger.Infoln(fmt.Sprintf("GasPrice CONFIG %s", cfg.GasPrice))
+	logger.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
 
 	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas(cfg.Gas))
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln("NewChainClient OK")
+	logger.Infoln("NewChainClient OK")
 
 	time.Sleep(1 * time.Second)
 
 	conn := awaitConnection(chainClient, 1*time.Minute)
 
-	log.Infoln("CON OK")
+	logger.Infoln("CON OK")
 
 	net := struct {
 		hyperion.QueryClient
@@ -153,12 +155,13 @@ func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignF
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 	}
 
-	log.Infoln("NET LOADED")
+	logger.Infoln("NET LOADED")
 
 	return net, nil
 }
 
 func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.ClientConn {
+	logger := log.WithField("svc", "MAIN PROCESS")
 	ctx, cancelWait := context.WithTimeout(context.Background(), timeout)
 	defer cancelWait()
 
@@ -167,11 +170,11 @@ func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.Clie
 	for {
 		select {
 		case <-ctx.Done():
-			log.Fatalln("GRPC service wait timed out")
+			logger.Fatalln("GRPC service wait timed out")
 		default:
 			state := grpcConn.GetState()
 			if state != connectivity.Ready {
-				log.WithField("state", state.String()).Warningln("state of GRPC connection not ready")
+				logger.WithField("state", state.String()).Warningln("state of GRPC connection not ready")
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -182,13 +185,14 @@ func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.Clie
 }
 
 func (cfg NetworkConfig) loadClientConfig() clientcommon.Network {
+	logger := log.WithField("svc", "MAIN PROCESS")
 	if custom := cfg.HeliosGRPC != "" && cfg.TendermintRPC != ""; custom {
-		log.WithFields(log.Fields{"helios_grpc": cfg.HeliosGRPC, "tendermint_rpc": cfg.TendermintRPC}).Debugln("using custom endpoints for Helios")
+		logger.WithFields(log.Fields{"helios_grpc": cfg.HeliosGRPC, "tendermint_rpc": cfg.TendermintRPC}).Debugln("using custom endpoints for Helios")
 		return customEndpoints(cfg)
 	}
 
 	c := loadBalancedEndpoints(cfg)
-	log.WithFields(log.Fields{"Helios_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Helios")
+	logger.WithFields(log.Fields{"Helios_grpc": c.ChainGrpcEndpoint, "tendermint_rpc": c.TmEndpoint}).Debugln("using load balanced endpoints for Helios")
 
 	return c
 }
@@ -224,13 +228,14 @@ func loadBalancedEndpoints(cfg NetworkConfig) clientcommon.Network {
 }
 
 func HasRegisteredOrchestrator(n Network, hyperionId uint64, ethAddr gethcommon.Address) (cosmostypes.AccAddress, bool) {
+	logger := log.WithField("svc", "MAIN PROCESS")
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFn()
 
-	log.Info("ethAddr: ", ethAddr)
+	logger.Info("ethAddr: ", ethAddr)
 
 	validator, err := n.GetValidatorAddress(ctx, hyperionId, ethAddr)
-	log.Info("validator: ", validator)
+	logger.Info("validator: ", validator)
 	if err != nil {
 		return nil, false
 	}
