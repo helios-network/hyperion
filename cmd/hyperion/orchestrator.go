@@ -117,6 +117,10 @@ func orchestratorCmd(cmd *cli.Cmd) {
 
 			addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(counterpartyChainParams.HyperionId), ethKeyFromAddress)
 
+			// bech32Str, err := sdk.Bech32ifyAddressBytes("helios", ethKeyFromAddress.Bytes())
+			// orShutdown(err)
+			// log.Infoln("bech32Str", bech32Str)
+
 			if *cfg.testnetAutoRegister {
 				log.Printf("auto-registering validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
 				isValidator, err = helios.TestnetAutoRegisterValidator(ctx, int(counterpartyChainParams.HyperionId), heliosNetwork, isValidator, addr, ethKeyFromAddress)

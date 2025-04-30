@@ -145,7 +145,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
-	github.com/joho/godotenv v1.5.1
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
@@ -236,7 +235,7 @@ replace (
 	cosmossdk.io/store => github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20
 	github.com/CosmWasm/wasmd => github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-6
 
-	github.com/Helios-Chain-Labs/sdk-go => github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-54
+	github.com/Helios-Chain-Labs/sdk-go => github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-55
 	github.com/bandprotocol/bandchain-packet => github.com/Helios-Chain-Labs/bandchain-packet v0.50.10-helios-1
 	github.com/cometbft/cometbft => github.com/Helios-Chain-Labs/cometbft v0.50.10-helios-11
 	github.com/cosmos/cosmos-sdk => github.com/Helios-Chain-Labs/cosmos-sdk v0.50.10-helios-67

@@ -38,6 +38,7 @@ type EVMProviders struct {
 	maxRetries  int
 	timeout     time.Duration
 	mu          sync.RWMutex
+	lastUsedRpc string
 }
 
 // NewEVMProviders creates a new EVMProviders instance with the given RPC URLs
@@ -153,6 +154,7 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 			if err == nil {
 				fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
 				p.classifyRpcUrl(rpcUrl, false)
+				p.lastUsedRpc = rpcUrl
 				return nil // Success
 			}
 			lastErr = err

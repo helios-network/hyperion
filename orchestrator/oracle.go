@@ -336,16 +336,16 @@ func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
-		return l.helios.SendDepositClaim(ctx, l.cfg.HyperionId, &ev)
+		return l.helios.SendDepositClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
 	case *valsetUpdate:
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaim(ctx, l.cfg.HyperionId, &ev)
+		return l.helios.SendValsetClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
 	case *withdrawal:
 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaim(ctx, l.cfg.HyperionId, &ev)
+		return l.helios.SendWithdrawalClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
 	case *erc20Deployment:
 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaim(ctx, l.cfg.HyperionId, &ev)
+		return l.helios.SendERC20DeployedClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}

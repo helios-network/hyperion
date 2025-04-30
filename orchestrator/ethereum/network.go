@@ -30,6 +30,8 @@ type NetworkConfig struct {
 
 // Network is the orchestrator's reference endpoint to the Ethereum network
 type Network interface {
+	GetLastUsedRpc() string
+
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
 
@@ -128,6 +130,10 @@ func (n *network) TokenDecimals(ctx context.Context, tokenContract gethcommon.Ad
 	}
 
 	return uint8(big.NewInt(0).SetBytes(res).Uint64()), nil
+}
+
+func (n *network) GetLastUsedRpc() string {
+	return n.Provider().GetLastUsedRpc()
 }
 
 func (n *network) GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error) {

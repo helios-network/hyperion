@@ -27,10 +27,10 @@ type BroadcastClient interface {
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
 	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error
-	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error
-	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error
-	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error
+	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) error
+	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) error
+	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) error
+	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) error
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
 }
@@ -230,7 +230,7 @@ func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyper
 	return nil
 }
 
-func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent) error {
+func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) error {
 	// EthereumBridgeDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
@@ -264,6 +264,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 		Orchestrator:   c.ChainClient.FromAddress().String(),
 		Data:           deposit.Data,
 		TxHash:         deposit.Raw.TxHash.Hex(),
+		RpcUsed:        rpcUsedForObservation,
 	}
 
 	log.WithFields(log.Fields{
@@ -300,7 +301,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 	return nil
 }
 
-func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent) error {
+func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -321,6 +322,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 		TokenContract: withdrawal.Token.Hex(),
 		Orchestrator:  c.FromAddress().String(),
 		TxHash:        withdrawal.Raw.TxHash.Hex(),
+		RpcUsed:       rpcUsedForObservation,
 	}
 
 	log.WithFields(log.Fields{
@@ -343,7 +345,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 	return nil
 }
 
-func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent) error {
+func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -377,6 +379,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 		RewardToken:  vs.RewardToken.Hex(),
 		Members:      members,
 		Orchestrator: c.FromAddress().String(),
+		RpcUsed:      rpcUsedForObservation,
 	}
 
 	log.WithFields(log.Fields{
@@ -413,7 +416,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 	return nil
 }
 
-func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent) error {
+func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -440,6 +443,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 		Symbol:        erc20.Symbol,
 		Decimals:      uint64(erc20.Decimals),
 		Orchestrator:  c.FromAddress().String(),
+		RpcUsed:       rpcUsedForObservation,
 	}
 
 	log.WithFields(log.Fields{

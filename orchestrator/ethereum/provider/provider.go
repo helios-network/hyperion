@@ -21,6 +21,8 @@ type EVMProvider interface {
 	bind.ContractCaller
 	bind.ContractFilterer
 
+	GetLastUsedRpc() string
+
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
 	EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error)
@@ -51,6 +53,10 @@ func NewEVMProvider(rpcUrls []*hyperiontypes.Rpc) EVMProviderWithRet {
 			"svc": string("eth_provider"),
 		},
 	}
+}
+
+func (p *evmProviderWithRet) GetLastUsedRpc() string {
+	return p.pool.lastUsedRpc
 }
 
 func (p *evmProviderWithRet) FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error) {

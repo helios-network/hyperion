@@ -75,8 +75,8 @@ github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20 h1:IrbfnLW0yY7h
 github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20/go.mod h1:ZW4eIE98wivInyQyhxU2nHqEielc/iZAcr41qNyWSrw=
 github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2 h1:os51E5nojjXF2N5NKn0BN8MsLzgZAvueg3SLiUGxGCA=
 github.com/Helios-Chain-Labs/metrics v0.50.10-helios-2/go.mod h1:Za5YrKh2gyP44/7xWLA1+EA9x+dsUEg9o3cD0gcu9pA=
-github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-54 h1:9JxankVnOrwORZPV7T5DhcHR02qxmJvqt+BsRaCPePs=
-github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-54/go.mod h1:6KKWPMzgUaf5VZjcRDJQlKbw7FElf0RL/DlonLY8llg=
+github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-55 h1:iuNmlCeV9fZM7EnJB6NXPIed660BGognjzkVYe4zDbc=
+github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-55/go.mod h1:6KKWPMzgUaf5VZjcRDJQlKbw7FElf0RL/DlonLY8llg=
 github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2 h1:4Z+qXwo6H+rcoIuOLqyRX5qdWS6A0woypOAkkDB5DUo=
 github.com/Helios-Chain-Labs/suplog v0.50.10-helios-2/go.mod h1:cxLwrKnl5QZsljZP/OmH/nEAIj89m4mE0FW5Mn31Nco=
 github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-6 h1:HgLh5ZYtyoc3IrEH2UgR5OgL2Me/ledf1GnhiYYoUZ0=
@@ -598,8 +598,6 @@ github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGw
 github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
 github.com/jmhodges/levigo v1.0.0 h1:q5EC36kV79HWeTBWsod3mG11EgStG3qArTKcvlksN1U=
 github.com/jmhodges/levigo v1.0.0/go.mod h1:Q6Qx+uH3RAqyK4rFQroq9RL7mdkABMcfhEI+nNuzMJQ=
-github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
-github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
 github.com/jrick/logrotate v1.0.0/go.mod h1:LNinyqDIJnpAur+b8yyulnQw/wDuN1+BYKlTRt3OuAQ=
