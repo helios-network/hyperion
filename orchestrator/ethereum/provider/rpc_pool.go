@@ -155,7 +155,11 @@ func (p *EVMProviders) classifyRpcUrl(rpcUrl string, failed bool) {
 	} else if p.reputations[rpcUrl].reputation > 0 {
 		p.reputations[rpcUrl].reputation -= 1
 	}
-	// fmt.Println("rpcUrl: ", rpcUrl, "reputation: ", p.reputations[rpcUrl].reputation)
+
+	if p.reputations[rpcUrl].reputation == 0 {
+		p.RemoveRpc(rpcUrl)
+		fmt.Println("REMOVE rpcUrl: ", rpcUrl, "reputation reached 0")
+	}
 }
 
 // CallEthClientWithRetry executes an operation with the ethclient with retry logic
