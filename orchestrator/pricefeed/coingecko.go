@@ -1,6 +1,7 @@
 package pricefeed
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -11,10 +12,12 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
+	"github.com/xlab/closer"
 	log "github.com/xlab/suplog"
 )
 
@@ -158,7 +161,24 @@ func (cp *CoingeckoPriceFeed) CheckFeeThreshold(erc20Contract common.Address, to
 	doneFn := metrics.ReportFuncTiming(cp.svcTags)
 	defer doneFn()
 
-	tokenPriceInUSD, err := cp.QueryUSDPrice(erc20Contract)
+	ctx, cancelFn := context.WithCancel(context.Background())
+	closer.Bind(cancelFn)
+
+	// retry multiple times with 5 seconds interval
+	retryCount := 5
+	tokenPriceInUSD, err := loops.RetryFunction(ctx, func() (float64, error) {
+		tokenPriceInUSD, err := cp.QueryUSDPrice(erc20Contract)
+		if err != nil {
+			metrics.ReportFuncError(cp.svcTags)
+			retryCount--
+			if retryCount == 0 {
+				return 0, nil
+			}
+			return 0, err
+		}
+		return tokenPriceInUSD, nil
+	}, 5*time.Second)
+
 	if err != nil {
 		metrics.ReportFuncError(cp.svcTags)
 		return false
