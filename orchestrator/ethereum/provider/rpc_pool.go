@@ -84,6 +84,44 @@ func NewEVMProvidersWithOptions(rpcs []*hyperiontypes.Rpc, maxRetries int, timeo
 	}
 }
 
+func (p *EVMProviders) ReduceReputationOfLastRpc() {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	lastUsedRpc := p.lastUsedRpc
+	if lastUsedRpc == "" {
+		return
+	}
+	p.reputations[lastUsedRpc].reputation -= 1
+	if p.reputations[lastUsedRpc].reputation == 0 {
+		p.RemoveRpc(lastUsedRpc)
+	}
+}
+
+func (p *EVMProviders) RemoveRpc(targetUrl string) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for i, url := range p.urls {
+		if url == targetUrl {
+			p.ethClients = append(p.ethClients[:i], p.ethClients[i+1:]...)
+			p.rcs = append(p.rcs[:i], p.rcs[i+1:]...)
+			p.urls = append(p.urls[:i], p.urls[i+1:]...)
+			delete(p.reputations, targetUrl)
+			return true
+		}
+	}
+	return false
+}
+
+func (p *EVMProviders) RemoveLastUsedRpc() {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	p.reputations[p.lastUsedRpc].reputation = 0
+	p.RemoveRpc(p.lastUsedRpc)
+}
+
 // getNextClient returns the next client using round-robin selection
 func (p *EVMProviders) getNextClient() (*ethclient.Client, *rpc.Client) {
 	p.mu.RLock()
@@ -117,7 +155,7 @@ func (p *EVMProviders) classifyRpcUrl(rpcUrl string, failed bool) {
 	} else if p.reputations[rpcUrl].reputation > 0 {
 		p.reputations[rpcUrl].reputation -= 1
 	}
-	fmt.Println("rpcUrl: ", rpcUrl, "reputation: ", p.reputations[rpcUrl].reputation)
+	// fmt.Println("rpcUrl: ", rpcUrl, "reputation: ", p.reputations[rpcUrl].reputation)
 }
 
 // CallEthClientWithRetry executes an operation with the ethclient with retry logic

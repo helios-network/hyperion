@@ -2,10 +2,9 @@ package orchestrator
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
-	"os"
 	"sort"
+	"strings"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
@@ -33,19 +32,21 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 		return nil
 	}
 
-	r := relayer{Orchestrator: s}
+	r := relayer{
+		Orchestrator: s,
+		logEnabled:   strings.Contains(s.cfg.EnabledLogs, "relayer"),
+	}
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
-		s.logger.Info("relaying")
 		err := r.relay(ctx)
-		s.logger.Info("relaying done")
 		return err
 	})
 }
 
 type relayer struct {
 	*Orchestrator
+	logEnabled bool
 }
 
 func (l *relayer) Log() log.Logger {
@@ -57,42 +58,54 @@ func (l *relayer) relay(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	l.Log().Info("relaying getLatestEthValset")
+	if l.logEnabled {
+		l.Log().Info("relaying getLatestEthValset")
+	}
 
 	ethValset, err := l.getLatestEthValset(ctx)
 	if err != nil {
 		return err
 	}
 
-	l.Log().Info("relaying makeCheckpoint")
+	if l.logEnabled {
+		l.Log().Info("relaying makeCheckpoint")
+	}
 
 	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
 	if err != nil {
 		return err
 	}
 
-	l.Log().Info("relaying getLastValsetCheckpoint")
+	if l.logEnabled {
+		l.Log().Info("relaying getLastValsetCheckpoint")
+	}
 
 	ethCheckpoint, err := l.ethereum.GetLastValsetCheckpoint(ctx)
 	if err != nil {
 		return err
 	}
 
-	l.Log().Info("relaying getLastValsetCheckpoint done")
+	if l.logEnabled {
+		l.Log().Info("relaying getLastValsetCheckpoint done")
+	}
 
-	l.Log().WithFields(log.Fields{
-		"Helios": heliosCheckpoint.Hex(),
-		"Eth":    ethCheckpoint.Hex(),
-		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
-	}).Infoln("Relayer: checkpoints")
+	if l.logEnabled {
+		l.Log().WithFields(log.Fields{
+			"Helios": heliosCheckpoint.Hex(),
+			"Eth":    ethCheckpoint.Hex(),
+			"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
+		}).Infoln("Relayer: checkpoints")
+	}
 
 	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
-		l.Log().Infoln("relayer: checkpoint not synced yet waiting (rpc should be untrustable) ...")
-
-		json, err := json.Marshal(ethValset)
-		if err == nil {
-			os.WriteFile("valset-error.json", json, 0644)
+		if l.logEnabled {
+			l.Log().Infoln("relayer: checkpoint not synced yet waiting (rpc should be untrustable) ...")
 		}
+
+		// json, err := json.Marshal(ethValset)
+		// if err == nil {
+		// 	os.WriteFile("valset-error.json", json, 0644)
+		// }
 
 		return nil
 	} else {
@@ -100,10 +113,10 @@ func (l *relayer) relay(ctx context.Context) error {
 	}
 
 	// write valset to file
-	json, err := json.Marshal(ethValset)
-	if err == nil {
-		os.WriteFile("valset.json", json, 0644)
-	}
+	// json, err := json.Marshal(ethValset)
+	// if err == nil {
+	// 	os.WriteFile("valset.json", json, 0644)
+	// }
 
 	var pg loops.ParanoidGroup
 
@@ -234,7 +247,8 @@ func (l *relayer) makeCheckpoint(ctx context.Context, valset *hyperiontypes.Vals
 
 	hyperionIDHash, err := l.ethereum.GetHyperionID(ctx)
 	if err != nil {
-		l.Log().WithError(err).Fatalln("unable to query hyperion ID from contract")
+		l.Log().WithError(err).Errorln("unable to query hyperion ID from contract")
+		return nil, err
 	}
 	// Encoder les données
 	checkpoint, err := l.encodeData(
@@ -409,7 +423,9 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	}
 
 	if oldestConfirmedBatch == nil {
-		l.Log().Infoln("no token batch to relay")
+		if l.logEnabled {
+			l.Log().Infoln("no token batch to relay")
+		}
 		return nil
 	}
 	// l.Log().Info("oldestConfirmedBatch", oldestConfirmedBatch)
@@ -419,9 +435,11 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	// 	return nil
 	// }
 
-	l.Log().Info("latestEthValset", latestEthValset)
-	l.Log().Info("oldestConfirmedBatch", oldestConfirmedBatch)
-	l.Log().Info("confirmations", confirmations)
+	if l.logEnabled {
+		l.Log().Infoln("latestEthValset", latestEthValset)
+		l.Log().Infoln("oldestConfirmedBatch", oldestConfirmedBatch)
+		l.Log().Infoln("confirmations", confirmations)
+	}
 
 	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {

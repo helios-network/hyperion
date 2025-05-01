@@ -27,6 +27,7 @@ type PriceFeed interface {
 }
 
 type Config struct {
+	EnabledLogs          string
 	CosmosAddr           cosmostypes.AccAddress
 	HyperionId           uint64
 	ChainId              uint64
@@ -91,12 +92,9 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Netw
 	s.logger.Infoln("running orchestrator in validator mode")
 
 	// get hyperion ID from contract
-	delay, err := time.ParseDuration("1s")
-	hyperionIDHash, err := loops.RetryFunction(ctx, func() (gethcommon.Hash, error) {
-		return eth.GetHyperionID(ctx)
-	}, delay)
+	hyperionIDHash, err := eth.GetHyperionID(ctx)
 	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query hyperion ID from contract")
+		return errors.Wrap(err, "unable to query hyperion ID from contract")
 	}
 	hyperionID := hyperionIDHash.Big().Uint64()
 
@@ -104,7 +102,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Netw
 
 	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
 	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
+		return errors.Wrap(err, "unable to query hyperion module params, is heliades running?")
 	}
 
 	h, err := s.ethereum.GetHeaderByNumber(ctx, nil)
@@ -118,12 +116,12 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Netw
 
 	lastObservedEventNonce, err := s.helios.QueryGetLastObservedEventNonce(ctx, s.cfg.HyperionId)
 	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query hyperion module params, is heliades running?")
+		return errors.Wrap(err, "unable to query hyperion module params, is heliades running?")
 	}
 
 	lastEventNonce, err := s.ethereum.GetLastEventNonce(ctx)
 	if err != nil {
-		s.logger.WithError(err).Fatalln("unable to query blockchain state_lastEventNonce, is rpc running?")
+		return errors.Wrap(err, "unable to query blockchain state_lastEventNonce, is rpc running?")
 	}
 
 	if lastEventNonce.Uint64() > lastObservedEventNonce {

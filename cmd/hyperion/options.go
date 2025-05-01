@@ -88,6 +88,7 @@ func initStatsdOptions(
 }
 
 type Config struct {
+	enabledLogs *string
 	// Cosmos params
 	heliosChainID   *string
 	heliosGRPC      *string
@@ -105,7 +106,7 @@ type Config struct {
 	heliosPrivKey       *string
 
 	// Ethereum params
-	evmRPCs               map[string][]string
+	evmRPCs               *string
 	ethGasPriceAdjustment *float64
 	ethMaxGasPrice        *string
 
@@ -139,6 +140,13 @@ func initConfig(cmd *cli.Cmd) Config {
 	cfg := Config{}
 
 	/** Helios **/
+
+	cfg.enabledLogs = cmd.String(cli.StringOpt{
+		Name:   "enabled-logs",
+		Desc:   "Specify which logs to enable",
+		EnvVar: "HYPERION_ENABLED_LOGS",
+		Value:  "", // signer,relayer,oracle,batch-creator
+	})
 
 	cfg.heliosChainID = cmd.String(cli.StringOpt{
 		Name:   "helios-chain-id",
@@ -216,12 +224,19 @@ func initConfig(cmd *cli.Cmd) Config {
 
 	/** Ethereum **/
 
-	cfg.evmRPCs = formatRPCs(*cmd.String(cli.StringOpt{
+	// cfg.evmRPCs = formatRPCs(*cmd.String(cli.StringOpt{
+	// 	Name:   "rpcs",
+	// 	Desc:   "Specify HTTP endpoint for an Ethereum node.",
+	// 	EnvVar: "HYPERION_EVM_RPCS",
+	// 	Value:  "1:http://localhost:1317", // 1:http://localhost:1317
+	// }))
+
+	cfg.evmRPCs = cmd.String(cli.StringOpt{
 		Name:   "rpcs",
 		Desc:   "Specify HTTP endpoint for an Ethereum node.",
 		EnvVar: "HYPERION_EVM_RPCS",
-		Value:  "1:http://localhost:1317",
-	}))
+		// Value:  "1:http://localhost:1317", // 1:http://localhost:1317
+	})
 
 	cfg.ethGasPriceAdjustment = cmd.Float64(cli.Float64Opt{
 		Name:   "eth-gas-price-adjustment",

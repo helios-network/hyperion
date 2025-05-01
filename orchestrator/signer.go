@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
@@ -18,6 +19,7 @@ func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash
 	signer := signer{
 		Orchestrator: s,
 		hyperionID:   hyperionID,
+		logEnabled:   strings.Contains(s.cfg.EnabledLogs, "signer"),
 	}
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Signer...")
@@ -33,6 +35,7 @@ func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash
 type signer struct {
 	*Orchestrator
 	hyperionID gethcommon.Hash
+	logEnabled bool
 }
 
 func (l *signer) Log() log.Logger {
@@ -44,16 +47,16 @@ func (l *signer) sign(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	l.Log().Infoln("signing")
+	l.Log().Debugln("signing")
 	if err := l.signValidatorSets(ctx); err != nil {
 		return err
 	}
-	l.Log().Infoln("signing validator sets done")
+	l.Log().Debugln("signing validator sets done")
 
 	if err := l.signNewBatch(ctx); err != nil {
 		return err
 	}
-	l.Log().Infoln("signing new batch done")
+	l.Log().Debugln("signing new batch done")
 	return nil
 }
 
@@ -76,7 +79,9 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 		return nil
 	}
 
-	l.Log().Infoln("signing valsets", len(valsets))
+	if l.logEnabled {
+		l.Log().Infoln("signing valsets", len(valsets))
+	}
 
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
@@ -87,7 +92,9 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 			return err
 		}
 
-		l.Log().WithFields(log.Fields{"valset_nonce": vs.Nonce, "validators": len(vs.Members)}).Infoln("confirmed valset update on Helios")
+		if l.logEnabled {
+			l.Log().WithFields(log.Fields{"valset_nonce": vs.Nonce, "validators": len(vs.Members)}).Infoln("confirmed valset update on Helios")
+		}
 	}
 
 	return nil

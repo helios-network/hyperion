@@ -22,6 +22,9 @@ type EVMProvider interface {
 	bind.ContractFilterer
 
 	GetLastUsedRpc() string
+	ReduceReputationOfLastRpc()
+	RemoveLastUsedRpc()
+	RemoveRpc(targetUrl string) bool
 
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
@@ -57,6 +60,18 @@ func NewEVMProvider(rpcUrls []*hyperiontypes.Rpc) EVMProviderWithRet {
 
 func (p *evmProviderWithRet) GetLastUsedRpc() string {
 	return p.pool.lastUsedRpc
+}
+
+func (p *evmProviderWithRet) ReduceReputationOfLastRpc() {
+	p.pool.ReduceReputationOfLastRpc()
+}
+
+func (p *evmProviderWithRet) RemoveLastUsedRpc() {
+	p.pool.RemoveLastUsedRpc()
+}
+
+func (p *evmProviderWithRet) RemoveRpc(targetUrl string) bool {
+	return p.pool.RemoveRpc(targetUrl)
 }
 
 func (p *evmProviderWithRet) FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error) {

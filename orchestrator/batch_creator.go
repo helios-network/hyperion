@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
@@ -13,7 +14,10 @@ import (
 )
 
 func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
-	bc := batchCreator{Orchestrator: s}
+	bc := batchCreator{
+		Orchestrator: s,
+		logEnabled:   strings.Contains(s.cfg.EnabledLogs, "batch-creator"),
+	}
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting BatchCreator...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
@@ -26,6 +30,7 @@ func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
 
 type batchCreator struct {
 	*Orchestrator
+	logEnabled bool
 }
 
 func (l *batchCreator) Log() log.Logger {
@@ -87,7 +92,9 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 		return
 	}
 
-	l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
+	if l.logEnabled {
+		l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
+	}
 
 	_ = l.helios.SendRequestBatch(ctx, l.cfg.HyperionId, tokenDenom)
 }
@@ -114,11 +121,13 @@ func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddre
 		totalFeeUSD   = decimal.NewFromBigInt(fee.TotalFees.BigInt(), -1*int32(tokenDecimals)).Mul(tokenPriceUSD)
 	)
 
-	l.Log().WithFields(log.Fields{
-		"token_addr": fee.Token,
-		"total_fee":  totalFeeUSD.String() + "USD",
-		"min_fee":    minFeeUSD.String() + "USD",
-	}).Debugln("checking total batch fees")
+	if l.logEnabled {
+		l.Log().WithFields(log.Fields{
+			"token_addr": fee.Token,
+			"total_fee":  totalFeeUSD.String() + "USD",
+			"min_fee":    minFeeUSD.String() + "USD",
+		}).Debugln("checking total batch fees")
+	}
 
 	return !totalFeeUSD.LessThan(minFeeUSD)
 }

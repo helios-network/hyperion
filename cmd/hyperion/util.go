@@ -82,6 +82,7 @@ func orShutdown(err error) {
 }
 
 func formatRPCs(input string) map[string][]string {
+	log.Println("input", input)
 	pairs := strings.Split(input, ",")
 	result := make(map[string][]string)
 

@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -38,6 +39,7 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 		Orchestrator:          s,
 		lastObservedEthHeight: lastObservedBlock,
 		lastResyncWithHelios:  time.Now(),
+		logEnabled:            strings.Contains(s.cfg.EnabledLogs, "oracle"),
 	}
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
@@ -54,6 +56,7 @@ type oracle struct {
 	*Orchestrator
 	lastResyncWithHelios  time.Time
 	lastObservedEthHeight uint64
+	logEnabled            bool
 }
 
 func (l *oracle) Log() log.Logger {
@@ -124,13 +127,17 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		latestHeight = l.lastObservedEthHeight + defaultBlocksToSearch
 	}
 
-	l.Log().Infoln("GET ETHEREUM EVENTS FOR HEIGHT", latestHeight, latestHeight+defaultBlocksToSearch)
+	if l.logEnabled {
+		l.Log().Infoln("GET ETHEREUM EVENTS FOR HEIGHT", latestHeight, latestHeight+defaultBlocksToSearch)
+	}
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, latestHeight)
 	if err != nil {
 		return err
 	}
-	log.Info("events: ", events)
+	if l.logEnabled {
+		l.Log().Infoln("events: ", events)
+	}
 
 	lastObservedEventNonce, err := l.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
@@ -142,17 +149,23 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("lastObservedEventNonce: ", lastObservedEventNonce, " lastEventNonce: ", lastEventNonce)
+	if l.logEnabled {
+		l.Log().Infoln("lastObservedEventNonce: ", lastObservedEventNonce, " lastEventNonce: ", lastEventNonce)
+	}
 	newEvents := filterEvents(events, lastObservedEventNonce)
-	log.Info("newEvents: ", newEvents)
+	if l.logEnabled {
+		l.Log().Infoln("newEvents: ", newEvents)
+	}
 
 	sort.Slice(newEvents, func(i, j int) bool {
 		return newEvents[i].Nonce() < newEvents[j].Nonce()
 	})
 
 	if len(newEvents) == 0 {
-		l.Log().Infoln("NO EVENTS DETECTED 0")
-		l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("oracle no new events on Ethereum")
+		if l.logEnabled {
+			l.Log().Infoln("NO EVENTS DETECTED 0")
+			l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("oracle no new events on Ethereum")
+		}
 		l.lastObservedEthHeight = latestHeight
 		return nil
 	}
@@ -161,7 +174,9 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("SOME EVENTS DETECTED %d", len(newEvents))
 	}
 
-	l.Log().WithFields(log.Fields{"event_helios_nonce": lastObservedEventNonce, "event_ethereum_nonce": newEvents[0].Nonce()}).Infoln("try oracle relay to helios")
+	if l.logEnabled {
+		l.Log().WithFields(log.Fields{"event_helios_nonce": lastObservedEventNonce, "event_ethereum_nonce": newEvents[0].Nonce()}).Infoln("try oracle relay to helios")
+	}
 
 	if newEvents[0].Nonce() > lastObservedEventNonce+1 {
 		// we missed an event
@@ -180,7 +195,9 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return err
 	}
 
-	l.Log().WithFields(log.Fields{"claims": len(newEvents), "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("sent new event claims to Helios")
+	if l.logEnabled {
+		l.Log().WithFields(log.Fields{"claims": len(newEvents), "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("sent new event claims to Helios")
+	}
 	l.lastObservedEthHeight = latestHeight
 
 	if time.Since(l.lastResyncWithHelios) >= resyncInterval {

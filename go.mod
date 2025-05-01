@@ -19,6 +19,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/xlab/closer v0.0.0-20190328110542-03326addb7c2
 	github.com/xlab/suplog v1.3.1
+	google.golang.org/appengine v1.6.8
 	google.golang.org/grpc v1.64.1
 )
 
