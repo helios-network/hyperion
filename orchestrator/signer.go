@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
@@ -25,9 +26,11 @@ func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Signer...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		s.logger.Info("signing")
+		// if !s.isRegistered() {
+		// 	signer.Log().Infoln("Orchestrator not registered, skipping...")
+		// 	return nil
+		// }
 		err := signer.sign(ctx)
-		s.logger.Info("signing done")
 		return err
 	})
 }
@@ -63,24 +66,16 @@ func (l *signer) sign(ctx context.Context) error {
 func (l *signer) signValidatorSets(ctx context.Context) error {
 	var valsets []*hyperiontypes.Valset
 	fn := func() error {
-		l.Log().Infoln("getting oldest unsigned valsets")
 		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
-		l.Log().Infoln("getting oldest unsigned valsets done")
 		return nil
 	}
 
 	if err := l.retry(ctx, fn); err != nil {
-		l.Log().Infoln("getting oldest unsigned valsets failed")
-		return err
+		return errors.Wrap(err, "getting oldest unsigned valsets failed")
 	}
 
 	if len(valsets) == 0 {
-		l.Log().Infoln("no validator set to confirm")
 		return nil
-	}
-
-	if l.logEnabled {
-		l.Log().Infoln("signing valsets", len(valsets))
 	}
 
 	for _, vs := range valsets {
@@ -115,7 +110,9 @@ func (l *signer) signNewBatch(ctx context.Context) error {
 	}
 
 	if oldestUnsignedBatch == nil {
-		l.Log().Infoln("no token batch to confirm")
+		if l.logEnabled {
+			l.Log().Infoln("no token batch to confirm")
+		}
 		return nil
 	}
 

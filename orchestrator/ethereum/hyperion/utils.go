@@ -2,13 +2,11 @@ package hyperion
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 )
 
@@ -88,8 +86,6 @@ func (s *hyperionContract) GetLastValsetCheckpoint(
 	for _, b := range checkpointBytes {
 		bts = append(bts, b)
 	}
-
-	fmt.Println("checkpointBytes: ", hexutil.Encode(bts))
 
 	checkpoint := common.BytesToHash(checkpointBytes[:])
 	return &checkpoint, nil

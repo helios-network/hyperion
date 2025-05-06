@@ -18,6 +18,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcchainlist"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 )
 
@@ -40,19 +41,19 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 		return errors.Wrap(err, fmt.Sprintf("failed to initialize helios network for chain %d", counterpartyChainParams.BridgeChainId))
 	}
 
-	cfg.chainParams = counterpartyChainParams
-
 	var (
-		hyperionContractAddr = gethcommon.HexToAddress(cfg.chainParams.BridgeCounterpartyAddress)
+		hyperionContractAddr = gethcommon.HexToAddress(counterpartyChainParams.BridgeCounterpartyAddress)
 	)
 
-	log.WithFields(log.Fields{"hyperion_contract": hyperionContractAddr.String()}).Debugln("loaded Hyperion module params")
+	log.WithFields(log.Fields{"hyperion_contract": hyperionContractAddr.String()}).Infoln("loaded Hyperion module params")
 
 	rpcs := counterpartyChainParams.Rpcs
 
 	log.Println("cfg.evmRPCs", cfg.evmRPCs)
 
 	formattedRPCs := formatRPCs(*cfg.evmRPCs)
+
+	log.Println("formattedRPCs", formattedRPCs)
 
 	if ok := formattedRPCs[fmt.Sprintf("%d", counterpartyChainParams.BridgeChainId)]; ok != nil {
 		for _, rpc := range formattedRPCs[fmt.Sprintf("%d", counterpartyChainParams.BridgeChainId)] {
@@ -63,6 +64,22 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 				LastHeightUsed: 1,
 			})
 		}
+	}
+
+	rpcChainListFeed := rpcchainlist.NewRpcChainListFeed()
+
+	rpcsFromChainList, err := rpcChainListFeed.QueryRpcs(counterpartyChainParams.BridgeChainId)
+	if err == nil {
+		for _, rpc := range rpcsFromChainList {
+			log.Println("rpc", rpc)
+			rpcs = append(rpcs, &hyperiontypes.Rpc{
+				Url:            rpc,
+				Reputation:     1,
+				LastHeightUsed: 1,
+			})
+		}
+	} else {
+		log.Println("Error fetching rpcs from chain list", err)
 	}
 
 	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethereum.NetworkConfig{
@@ -130,6 +147,7 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 	orchestratorCfg := orchestrator.Config{
 		EnabledLogs:          *cfg.enabledLogs,
 		ChainId:              counterpartyChainParams.BridgeChainId,
+		ChainName:            counterpartyChainParams.BridgeChainName,
 		HyperionId:           uint64(counterpartyChainParams.HyperionId),
 		CosmosAddr:           heliosKeyring.Addr,
 		EthereumAddr:         ethKeyFromAddress,
@@ -140,7 +158,7 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 		RelayBatches:         *cfg.relayBatches,
 		RelayExternalDatas:   *cfg.relayExternalDatas,
 		RelayerMode:          !isValidator,
-		ChainParams:          cfg.chainParams,
+		ChainParams:          counterpartyChainParams,
 	}
 
 	// Create hyperion and run it
@@ -155,15 +173,19 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 	}
 
 	// run orchestrator and retry if it fails
-	delay, _ := time.ParseDuration("5s")
-	loops.RetryFunction(*ctx, func() (error, error) {
-		err = hyperion.Run(*ctx, heliosNetwork, ethNetwork)
-		if err != nil {
-			ethNetwork.RemoveLastUsedRpc() // remove the last used rpc who is in cause of the error then retry
-			return nil, err
-		}
-		return nil, nil
-	}, delay)
+	go func() {
+		delay, _ := time.ParseDuration("10s")
+		loops.RetryFunction(*ctx, func() (error, error) {
+
+			err = hyperion.Run(*ctx, heliosNetwork, ethNetwork)
+			if err != nil {
+				log.Infoln("Error Removing RPC", ethNetwork.GetLastUsedRpc())
+				ethNetwork.RemoveLastUsedRpc() // remove the last used rpc who is in cause of the error then retry
+				return nil, err
+			}
+			return nil, nil
+		}, delay)
+	}()
 
 	return nil
 }

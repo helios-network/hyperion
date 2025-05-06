@@ -24,6 +24,7 @@ type EVMProvider interface {
 	GetLastUsedRpc() string
 	ReduceReputationOfLastRpc()
 	RemoveLastUsedRpc()
+	TestRpcs(ctx context.Context, operation func(*ethclient.Client, string) error) bool
 	RemoveRpc(targetUrl string) bool
 
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
@@ -68,6 +69,10 @@ func (p *evmProviderWithRet) ReduceReputationOfLastRpc() {
 
 func (p *evmProviderWithRet) RemoveLastUsedRpc() {
 	p.pool.RemoveLastUsedRpc()
+}
+
+func (p *evmProviderWithRet) TestRpcs(ctx context.Context, operation func(*ethclient.Client, string) error) bool {
+	return p.pool.TestRpcs(ctx, operation)
 }
 
 func (p *evmProviderWithRet) RemoveRpc(targetUrl string) bool {

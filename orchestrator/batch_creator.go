@@ -21,9 +21,11 @@ func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting BatchCreator...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		s.logger.Info("requesting token batches")
+		// if !s.isRegistered() {
+		// 	bc.Log().Infoln("Orchestrator not registered, skipping...")
+		// 	return nil
+		// }
 		err := bc.requestTokenBatches(ctx)
-		s.logger.Info("requesting token batches done")
 		return err
 	})
 }

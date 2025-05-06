@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,9 +46,13 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
 
 	return loops.RunLoop(ctx, defaultLoopDur, func() error {
-		s.logger.Info("observing")
+
+		// if !s.isRegistered() {
+		// 	oracle.Log().Infoln("Orchestrator not registered, skipping...")
+		// 	return nil
+		// }
+
 		err := oracle.observeEthEvents(ctx)
-		s.logger.Info("observing done")
 		return err
 	})
 }
@@ -81,9 +86,10 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return errors.Wrap(err, "failed to get latest valsets on Helios")
 	}
 
-	if latestObservedHeight.EthereumBlockHeight <= l.cfg.ChainParams.BridgeContractStartHeight { // first time total sync needed
+	if latestObservedHeight.EthereumBlockHeight <= l.cfg.ChainParams.BridgeContractStartHeight && !l.firstTimeSync { // first time total sync needed
 		l.lastObservedEthHeight = l.cfg.ChainParams.BridgeContractStartHeight
 		l.Log().Info("First Time Hyperion total sync needed BridgeContractStartHeight: ", l.lastObservedEthHeight)
+		l.firstTimeSync = true
 	}
 
 	// ajouter la possibilite de forcer un restart depuis un certain blockHeight en config
@@ -106,37 +112,35 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	latestHeight, err := l.getLatestEthHeight(ctx)
 	if err != nil {
+		l.Log().WithError(err).Errorln("failed to get latest ethereum height")
 		return err
 	}
 
+	targetHeight := latestHeight
+
 	// not enough blocks on ethereum yet
-	if latestHeight <= ethBlockConfirmationDelay {
-		l.Log().Debugln("not enough blocks on Ethereum")
+	if targetHeight <= ethBlockConfirmationDelay {
+		l.Log().Debugln("not enough blocks on " + l.cfg.ChainName)
 		return nil
 	}
 
 	// ensure that latest block has minimum confirmations
-	latestHeight = latestHeight - ethBlockConfirmationDelay
-	if latestHeight <= l.lastObservedEthHeight {
-		l.Log().WithFields(log.Fields{"latest": latestHeight, "observed": l.lastObservedEthHeight}).Debugln("latest Ethereum height already observed")
+	targetHeight = targetHeight - ethBlockConfirmationDelay
+	if targetHeight <= l.lastObservedEthHeight {
+		l.Log().Infoln("Synced", l.lastObservedEthHeight, "to", targetHeight)
 		return nil
 	}
 
 	// ensure the block range is within defaultBlocksToSearch
-	if latestHeight > l.lastObservedEthHeight+defaultBlocksToSearch {
-		latestHeight = l.lastObservedEthHeight + defaultBlocksToSearch
+	if targetHeight > l.lastObservedEthHeight+defaultBlocksToSearch {
+		targetHeight = l.lastObservedEthHeight + defaultBlocksToSearch
 	}
 
-	if l.logEnabled {
-		l.Log().Infoln("GET ETHEREUM EVENTS FOR HEIGHT", latestHeight, latestHeight+defaultBlocksToSearch)
-	}
+	l.Log().Infoln("Sync", strconv.FormatUint(targetHeight-l.lastObservedEthHeight, 10), "Blocks", strconv.FormatUint(l.lastObservedEthHeight, 10)+"("+strconv.FormatUint(((l.lastObservedEthHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%) to", strconv.FormatUint(targetHeight, 10)+"("+strconv.FormatUint(((targetHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%)")
 
-	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, latestHeight)
+	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
 	if err != nil {
 		return err
-	}
-	if l.logEnabled {
-		l.Log().Infoln("events: ", events)
 	}
 
 	lastObservedEventNonce, err := l.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
@@ -152,6 +156,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if l.logEnabled {
 		l.Log().Infoln("lastObservedEventNonce: ", lastObservedEventNonce, " lastEventNonce: ", lastEventNonce)
 	}
+	l.Log().Infoln("events Before Filter", events)
 	newEvents := filterEvents(events, lastObservedEventNonce)
 	if l.logEnabled {
 		l.Log().Infoln("newEvents: ", newEvents)
@@ -162,11 +167,11 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	})
 
 	if len(newEvents) == 0 {
+		l.Log().Infoln("NO EVENTS DETECTED 0", l.ethereum.GetLastUsedRpc())
 		if l.logEnabled {
-			l.Log().Infoln("NO EVENTS DETECTED 0")
 			l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("oracle no new events on Ethereum")
 		}
-		l.lastObservedEthHeight = latestHeight
+		l.lastObservedEthHeight = targetHeight
 		return nil
 	}
 
@@ -198,7 +203,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if l.logEnabled {
 		l.Log().WithFields(log.Fields{"claims": len(newEvents), "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("sent new event claims to Helios")
 	}
-	l.lastObservedEthHeight = latestHeight
+	l.lastObservedEthHeight = targetHeight
 
 	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
 		if err := l.autoResync(ctx); err != nil {

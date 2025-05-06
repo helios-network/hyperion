@@ -39,6 +39,10 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
 	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
+		// if !s.isRegistered() {
+		// 	r.Log().Infoln("Orchestrator not registered, skipping...")
+		// 	return nil
+		// }
 		err := r.relay(ctx)
 		return err
 	})
@@ -109,7 +113,9 @@ func (l *relayer) relay(ctx context.Context) error {
 
 		return nil
 	} else {
-		l.Log().Info("valset is synced")
+		if l.logEnabled {
+			l.Log().Info("valset is synced")
+		}
 	}
 
 	// write valset to file
@@ -274,9 +280,13 @@ func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset
 	fn := func() error {
 		vs, err := l.findLatestValsetOnEth(ctx)
 		if err != nil {
+			l.Log().Infoln("findLatestValsetOnEth - 8")
+			if strings.Contains(err.Error(), "failed to get") {
+				l.ethereum.RemoveLastUsedRpc()
+				return err
+			}
 			return err
 		}
-
 		latestEthValset = vs
 		return nil
 	}
@@ -323,7 +333,9 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 
 	shouldRelay := l.shouldRelayValset(ctx, latestConfirmedValset)
 
-	l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "hls_nonce": latestConfirmedValset.Nonce, "sigs": len(confirmations), "should_relay": shouldRelay, "synched": latestEthValset.Nonce == latestConfirmedValset.Nonce}).Infoln("relayer try relay Valset")
+	if l.logEnabled {
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "hls_nonce": latestConfirmedValset.Nonce, "sigs": len(confirmations), "should_relay": shouldRelay, "synched": latestEthValset.Nonce == latestConfirmedValset.Nonce}).Infoln("relayer try relay Valset")
+	}
 
 	if !shouldRelay {
 		return nil
@@ -376,7 +388,9 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	defer doneFn()
 
 	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
-	l.Log().Info("batches: ", batches)
+	if l.logEnabled {
+		l.Log().Info("batches: ", batches)
+	}
 	if err != nil {
 		l.Log().Info("failed to get latest transaction batches", err)
 		return err
@@ -480,7 +494,7 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get latest valset nonce on Ethereum")
+		return nil, errors.Wrap(err, "failed to get latest valset nonce")
 	}
 
 	cosmosValset, err := l.helios.ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
@@ -489,10 +503,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 	}
 
 	if lastValsetUpdatedEventHeight.Uint64() > 0 {
-
 		valsetUpdatedEvents, err := l.ethereum.GetValsetUpdatedEventsAtSpecificBlock(lastValsetUpdatedEventHeight.Uint64())
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events from Ethereum")
+			return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events")
 		}
 
 		// by default the lowest found valset goes first, we want the highest
@@ -501,14 +514,17 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 		// we could access just the latest element later.
 		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
 
-		if len(valsetUpdatedEvents) == 0 {
-			return nil, errors.Wrap(err, "failed to get Eth valset")
+		if len(valsetUpdatedEvents) == 0 { // return the cosmos valset if no event is found
+			return cosmosValset, nil
+			// return nil, errors.New("failed to get latest valset (Maybe rpc not answering correctly?)")
 		}
 
 		// we take only the first event if we find any at all.
 		event := valsetUpdatedEvents[0]
 
-		l.Log().Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
+		if l.logEnabled {
+			l.Log().Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
+		}
 
 		valset := &hyperiontypes.Valset{
 			Nonce:        event.NewValsetNonce.Uint64(),
@@ -524,7 +540,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 			})
 		}
 
-		checkIfValsetsDiffer(cosmosValset, valset)
+		if l.logEnabled {
+			checkIfValsetsDiffer(cosmosValset, valset)
+		}
 
 		return valset, nil
 

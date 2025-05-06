@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -63,6 +64,7 @@ func NewEVMProvidersWithOptions(rpcs []*hyperiontypes.Rpc, maxRetries int, timeo
 		rcs = append(rcs, client)
 		ethClients = append(ethClients, ethClient)
 		validUrls = append(validUrls, rpcReputation.Url)
+		log.Println("Pool RPC: ", rpcReputation.Url)
 		reputations[rpcReputation.Url] = &RPCReputation{
 			rpcUrl:     rpcReputation.Url,
 			reputation: rpcReputation.Reputation,
@@ -118,8 +120,46 @@ func (p *EVMProviders) RemoveLastUsedRpc() {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	p.reputations[p.lastUsedRpc].reputation = 0
-	p.RemoveRpc(p.lastUsedRpc)
+	lastUsedRpc := p.lastUsedRpc
+	if lastUsedRpc == "" {
+		return
+	}
+
+	p.reputations[lastUsedRpc].reputation = 0
+	p.RemoveRpc(lastUsedRpc)
+}
+
+func (p *EVMProviders) TestRpcs(ctx context.Context, operation func(*ethclient.Client, string) error) bool {
+
+	rpcToRemove := []string{}
+
+	for i, client := range p.ethClients {
+		url := p.urls[i]
+		err := operation(client, p.urls[i])
+		p.lastUsedRpc = url
+
+		if err != nil {
+			found := false
+			for _, u := range rpcToRemove {
+				if u == url {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				rpcToRemove = append(rpcToRemove, url)
+			}
+		} else {
+			log.Println("TESTED rpcUrl: ", url)
+		}
+	}
+
+	for _, url := range rpcToRemove {
+		p.RemoveRpc(url)
+	}
+
+	return true
 }
 
 // getNextClient returns the next client using round-robin selection
@@ -162,6 +202,47 @@ func (p *EVMProviders) classifyRpcUrl(rpcUrl string, failed bool) {
 	}
 }
 
+func (p *EVMProviders) CallEthClientWithSpecificClient(ctx context.Context, client *ethclient.Client, operation func(*ethclient.Client) error) error {
+
+	var lastErr error
+	for attempt := 0; attempt < 1; attempt++ {
+		// Get next client using round-robin
+		ethClient := client
+		if ethClient == nil {
+			return ErrNoClientsAvailable
+		}
+
+		// Create a context with timeout
+		timeoutCtx, cancel := context.WithTimeout(ctx, p.timeout)
+
+		// Execute the operation
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- operation(ethClient)
+		}()
+
+		// Wait for either the result or timeout
+		select {
+		case err := <-errCh:
+			cancel()
+			if err == nil {
+				return nil // Success
+			}
+			lastErr = err
+			// Continue to next attempt
+		case <-timeoutCtx.Done():
+			cancel()
+			lastErr = timeoutCtx.Err()
+			// Continue to next attempt
+		}
+	}
+
+	if lastErr != nil {
+		return lastErr
+	}
+	return ErrAllAttemptsFailed
+}
+
 // CallEthClientWithRetry executes an operation with the ethclient with retry logic
 func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation func(*ethclient.Client) error) error {
 	p.mu.RLock()
@@ -194,19 +275,19 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 		case err := <-errCh:
 			cancel()
 			if err == nil {
-				fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
+				// fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
 				p.classifyRpcUrl(rpcUrl, false)
 				p.lastUsedRpc = rpcUrl
 				return nil // Success
 			}
 			lastErr = err
-			fmt.Println("ERRORrpcUrl: ", rpcUrl)
+			// fmt.Println("ERRORrpcUrl: ", rpcUrl)
 			p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		case <-timeoutCtx.Done():
 			cancel()
 			lastErr = timeoutCtx.Err()
-			fmt.Println("TIMEOUTrpcUrl: ", rpcUrl)
+			// fmt.Println("TIMEOUTrpcUrl: ", rpcUrl)
 			p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		}

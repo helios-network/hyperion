@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
@@ -30,10 +31,12 @@ type NetworkConfig struct {
 
 // Network is the orchestrator's reference endpoint to the Ethereum network
 type Network interface {
+	FromAddress() gethcommon.Address
 	GetLastUsedRpc() string
 	ReduceReputationOfLastRpc()
 	RemoveLastUsedRpc()
 	RemoveRpc(targetUrl string) bool
+	TestRpcs(ctx context.Context) bool
 
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
@@ -135,6 +138,10 @@ func (n *network) TokenDecimals(ctx context.Context, tokenContract gethcommon.Ad
 	return uint8(big.NewInt(0).SetBytes(res).Uint64()), nil
 }
 
+func (n *network) FromAddress() gethcommon.Address {
+	return n.FromAddr
+}
+
 func (n *network) GetLastUsedRpc() string {
 	return n.Provider().GetLastUsedRpc()
 }
@@ -147,6 +154,12 @@ func (n *network) RemoveLastUsedRpc() {
 	n.Provider().RemoveLastUsedRpc()
 }
 
+func (n *network) TestRpcs(ctx context.Context) bool {
+	return n.Provider().TestRpcs(ctx, func(client *ethclient.Client, url string) error {
+		_, err := client.HeaderByNumber(ctx, nil)
+		return err
+	})
+}
 func (n *network) RemoveRpc(targetUrl string) bool {
 	return n.Provider().RemoveRpc(targetUrl)
 }
@@ -189,8 +202,6 @@ func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperio
 		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
 	}
 
-	log.Infof("GetSendToHeliosEvents %d %d", startBlock, endBlock)
-
 	iter, err := hyperionFilterer.FilterSendToHeliosEvent(&bind.FilterOpts{
 		Start: startBlock,
 		End:   &endBlock,
@@ -207,7 +218,6 @@ func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperio
 
 	var sendToHeliosEvents []*hyperionevents.HyperionSendToHeliosEvent
 	for iter.Next() {
-		log.Infof("NEW EVENTS OF SEND TO HELIOS FILTERED")
 		sendToHeliosEvents = append(sendToHeliosEvents, iter.Event)
 	}
 
@@ -287,6 +297,8 @@ func (n *network) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperi
 			return nil, errors.New("no iterator returned")
 		}
 	}
+
+	log.Infoln("GetValsetUpdatedEventsAtSpecificBlock", n.Provider().GetLastUsedRpc())
 
 	defer iter.Close()
 

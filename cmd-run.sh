@@ -24,5 +24,4 @@ hyperion  \
   --min-batch-fee-usd="0" \
   --relay-pending-tx-wait-duration="20m" \
   --testnet-auto-register="true" \
-  --testnet-force-valset="true" \
-  --rpcs="80002:https://sepolia.drpc.org"
+  --testnet-force-valset="true"

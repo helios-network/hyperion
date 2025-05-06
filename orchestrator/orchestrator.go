@@ -30,6 +30,7 @@ type Config struct {
 	EnabledLogs          string
 	CosmosAddr           cosmostypes.AccAddress
 	HyperionId           uint64
+	ChainName            string
 	ChainId              uint64
 	EthereumAddr         gethcommon.Address
 	MinBatchFeeUSD       float64
@@ -48,9 +49,10 @@ type Orchestrator struct {
 	cfg         Config
 	maxAttempts uint
 
-	helios    helios.Network
-	ethereum  ethereum.Network
-	priceFeed PriceFeed
+	helios        helios.Network
+	ethereum      ethereum.Network
+	priceFeed     PriceFeed
+	firstTimeSync bool
 }
 
 func NewOrchestrator(
@@ -61,16 +63,15 @@ func NewOrchestrator(
 ) (*Orchestrator, error) {
 	o := &Orchestrator{
 		logger: log.WithFields(log.Fields{
-			"svc":         "hyperion_orchestrator",
-			"chain_id":    cfg.ChainId,
-			"hyperion_id": cfg.HyperionId,
+			"chain": cfg.ChainName,
 		}),
-		svcTags:     metrics.Tags{"svc": "hyperion_orchestrator"},
-		helios:      helios,
-		ethereum:    eth,
-		priceFeed:   priceFeed,
-		cfg:         cfg,
-		maxAttempts: 10,
+		svcTags:       metrics.Tags{"svc": "hyperion_orchestrator"},
+		helios:        helios,
+		ethereum:      eth,
+		priceFeed:     priceFeed,
+		cfg:           cfg,
+		maxAttempts:   10,
+		firstTimeSync: false,
 	}
 
 	return o, nil
@@ -79,8 +80,9 @@ func NewOrchestrator(
 // Run starts all major loops required to make
 // up the Orchestrator, all of these are async loops.
 func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
-	if s.cfg.RelayerMode {
-		return s.startRelayerMode(ctx)
+
+	if !eth.TestRpcs(ctx) {
+		return errors.New("failed to test rpc", 1, "failed to test rpc")
 	}
 
 	return s.startValidatorMode(ctx, eth)
@@ -173,4 +175,9 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		retry.OnRetry(func(n uint, err error) {
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)
 		}))
+}
+
+func (s *Orchestrator) isRegistered() bool {
+	_, isValidator := helios.HasRegisteredOrchestrator(s.helios, uint64(s.cfg.HyperionId), s.ethereum.FromAddress())
+	return isValidator
 }
