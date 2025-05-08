@@ -39,6 +39,7 @@ type Network interface {
 	TestRpcs(ctx context.Context) bool
 
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
+	GetNativeBalance(ctx context.Context) (*big.Int, error)
 	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
 
 	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
@@ -166,6 +167,10 @@ func (n *network) RemoveRpc(targetUrl string) bool {
 
 func (n *network) GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error) {
 	return n.Provider().HeaderByNumber(ctx, number)
+}
+
+func (n *network) GetNativeBalance(ctx context.Context) (*big.Int, error) {
+	return n.Provider().Balance(ctx, n.FromAddr)
 }
 
 func (n *network) GetHyperionID(ctx context.Context) (gethcommon.Hash, error) {

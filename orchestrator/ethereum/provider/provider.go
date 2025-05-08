@@ -36,6 +36,7 @@ type EVMProvider interface {
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	Balance(ctx context.Context, account common.Address) (*big.Int, error)
 }
 
 type EVMProviderWithRet interface {
@@ -239,4 +240,14 @@ func (p *evmProviderWithRet) HeaderByNumber(ctx context.Context, number *big.Int
 		return err
 	})
 	return header, err
+}
+
+func (p *evmProviderWithRet) Balance(ctx context.Context, account common.Address) (*big.Int, error) {
+	var balance *big.Int
+	err := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		var err error
+		balance, err = client.BalanceAt(ctx, account, nil)
+		return err
+	})
+	return balance, err
 }

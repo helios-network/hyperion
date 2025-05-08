@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -94,6 +95,14 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 
 	if !ethNetwork.TestRpcs(*ctx) {
 		return errors.New("failed to test rpc")
+	}
+
+	balance, err := ethNetwork.GetNativeBalance(*ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get native balance")
+	}
+	if balance.Cmp(big.NewInt(0)) == 0 {
+		return errors.New("Please fund your account with native tokens")
 	}
 
 	log.WithFields(log.Fields{
