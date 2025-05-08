@@ -92,6 +92,10 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 		return errors.Wrap(err, fmt.Sprintf("failed to initialize ethereum network for chain %d", counterpartyChainParams.BridgeChainId))
 	}
 
+	if !ethNetwork.TestRpcs(*ctx) {
+		return errors.New("failed to test rpc")
+	}
+
 	log.WithFields(log.Fields{
 		"chain_id":             counterpartyChainParams.BridgeChainId,
 		"rpcs":                 counterpartyChainParams.Rpcs,

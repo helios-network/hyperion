@@ -15,7 +15,7 @@ hyperion  \
   --eth-from="0x17267eB1FEC301848d4B5140eDDCFC48945427Ab" \
   --eth-pk="2c37c3d09d7a1c957f01ad200cec69bc287d0a9cc85b4dce694611a4c9c24036" \
   --eth-gas-price-adjustment="1.3" \
-  --eth-max-gas-price="50gwei" \
+  --eth-max-gas-price="100gwei" \
   --relay-valsets="true" \
   --relay-valset-offset-dur="5m" \
   --relay-batches="true" \

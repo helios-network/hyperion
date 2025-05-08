@@ -80,11 +80,6 @@ func NewOrchestrator(
 // Run starts all major loops required to make
 // up the Orchestrator, all of these are async loops.
 func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
-
-	if !eth.TestRpcs(ctx) {
-		return errors.New("failed to test rpc", 1, "failed to test rpc")
-	}
-
 	return s.startValidatorMode(ctx, eth)
 }
 
