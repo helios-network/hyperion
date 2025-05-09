@@ -158,7 +158,17 @@ func (n *network) RemoveLastUsedRpc() {
 func (n *network) TestRpcs(ctx context.Context) bool {
 	return n.Provider().TestRpcs(ctx, func(client *ethclient.Client, url string) error {
 		_, err := client.HeaderByNumber(ctx, nil)
-		return err
+		if err != nil {
+			return err
+		}
+		balance, err := client.BalanceAt(ctx, n.FromAddr, nil)
+		if err != nil {
+			return err
+		}
+		if balance.Cmp(big.NewInt(0)) == 0 {
+			return errors.New("native balance is 0")
+		}
+		return nil
 	})
 }
 func (n *network) RemoveRpc(targetUrl string) bool {

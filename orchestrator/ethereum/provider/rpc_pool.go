@@ -190,6 +190,11 @@ func (p *EVMProviders) getRandomClient() (*ethclient.Client, *rpc.Client, string
 }
 
 func (p *EVMProviders) classifyRpcUrl(rpcUrl string, failed bool) {
+
+	if p.reputations[rpcUrl] == nil {
+		return
+	}
+
 	if !failed {
 		p.reputations[rpcUrl].reputation += 1
 	} else if p.reputations[rpcUrl].reputation > 0 {
