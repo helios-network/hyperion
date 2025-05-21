@@ -18,6 +18,7 @@ type QueryClient interface {
 	HyperionParams(ctx context.Context) (*hyperiontypes.Params, error)
 	LastClaimEventByAddr(ctx context.Context, hyperionId uint64, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddress(ctx context.Context, hyperionId uint64, addr gethcommon.Address) (cosmostypes.AccAddress, error)
+	GetListOfNetworksWhereRegistered(ctx context.Context, addr gethcommon.Address) ([]uint64, error)
 
 	ValsetAt(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error)
 	CurrentValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error)
@@ -35,6 +36,8 @@ type QueryClient interface {
 
 	QueryTokenAddressToDenom(ctx context.Context, hyperionId uint64, tokenAddress gethcommon.Address) (string, bool, error)
 	QueryDenomToTokenAddress(ctx context.Context, hyperionId uint64, denom string) (gethcommon.Address, bool, error)
+
+	LatestTransactionExternalCallDataTxs(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingExternalDataTx, error)
 }
 
 type queryClient struct {
@@ -207,6 +210,27 @@ func (c queryClient) LatestTransactionBatches(ctx context.Context, hyperionId ui
 	return resp.Batches, nil
 }
 
+func (c queryClient) LatestTransactionExternalCallDataTxs(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingExternalDataTx, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	resp, err := c.QueryClient.OutgoingExternalDataTxs(ctx, &hyperiontypes.QueryOutgoingExternalDataTxsRequest{
+		HyperionId: hyperionId,
+	})
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query OutgoingExternalDataTxs from daemon")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.Txs, nil
+}
+
 func (c queryClient) UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
@@ -326,6 +350,31 @@ func (c queryClient) GetValidatorAddress(ctx context.Context, hyperionId uint64,
 	}
 
 	return valAddr, nil
+}
+
+func (c queryClient) GetListOfNetworksWhereRegistered(ctx context.Context, addr gethcommon.Address) ([]uint64, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryGetDelegateKeysByAddressRequest{
+		EthAddress: addr.Hex(),
+	}
+
+	log.Info("req: ", req)
+
+	resp, err := c.QueryClient.QueryGetDelegateKeysByAddress(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.ChainIds, nil
 }
 
 func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context, hyperionId uint64) (*hyperiontypes.LastObservedEthereumBlockHeight, error) {

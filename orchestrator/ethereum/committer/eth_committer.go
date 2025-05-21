@@ -80,11 +80,22 @@ func (e *ethCommitter) Provider() provider.EVMProvider {
 	return e.evmProvider
 }
 
+func (e *ethCommitter) GetTransactOpts(ctx context.Context) *bind.TransactOpts {
+	return &bind.TransactOpts{
+		From:   e.fromAddress,
+		Signer: e.fromSigner,
+
+		GasPrice: e.committerOpts.GasPrice.BigInt(),
+		GasLimit: e.committerOpts.GasLimit,
+		Context:  ctx, // with RPC timeout
+	}
+}
+
 func (e *ethCommitter) SendTx(
 	ctx context.Context,
 	recipient common.Address,
 	txData []byte,
-) (txHash common.Hash, err error) {
+) (txHash common.Hash, cost *big.Int, err error) {
 	metrics.ReportFuncCall(e.svcTags)
 	doneFn := metrics.ReportFuncTiming(e.svcTags)
 	defer doneFn()
@@ -102,7 +113,7 @@ func (e *ethCommitter) SendTx(
 	suggestedGasPrice, err := e.evmProvider.SuggestGasPrice(opts.Context)
 	if err != nil {
 		metrics.ReportFuncError(e.svcTags)
-		return common.Hash{}, errors.Errorf("failed to suggest gas price: %v", err)
+		return common.Hash{}, big.NewInt(0), errors.Errorf("failed to suggest gas price: %v", err)
 	}
 
 	// Suggested gas price is not accurate. Increment by multiplying with gasprice adjustment factor
@@ -117,7 +128,7 @@ func (e *ethCommitter) SendTx(
 	//The gas price should be less than max gas price
 	maxGasPrice := big.NewInt(int64(e.ethMaxGasPrice))
 	if opts.GasPrice.Cmp(maxGasPrice) > 0 {
-		return common.Hash{}, errors.Errorf("Suggested gas price %v is greater than max gas price %v", opts.GasPrice.Int64(), maxGasPrice.Int64())
+		return common.Hash{}, big.NewInt(0), errors.Errorf("Suggested gas price %v is greater than max gas price %v", opts.GasPrice.Int64(), maxGasPrice.Int64())
 	}
 
 	// estimate gas limit
@@ -131,7 +142,7 @@ func (e *ethCommitter) SendTx(
 
 	gasLimit, err := e.evmProvider.EstimateGas(opts.Context, msg)
 	if err != nil {
-		return common.Hash{}, errors.Wrap(err, "failed to estimate gas")
+		return common.Hash{}, big.NewInt(0), errors.Wrap(err, "failed to estimate gas")
 	}
 
 	opts.GasLimit = gasLimit
@@ -184,6 +195,7 @@ func (e *ethCommitter) SendTx(
 			}
 
 			txHash = signedTx.Hash()
+			cost = signedTx.Cost()
 
 			txHashRet, err := e.evmProvider.SendTransactionWithRet(opts.Context, signedTx)
 			if err == nil {
@@ -257,8 +269,8 @@ func (e *ethCommitter) SendTx(
 
 		log.WithError(err).Errorln("SendTx serialize failed")
 
-		return common.Hash{}, err
+		return common.Hash{}, big.NewInt(0), err
 	}
 
-	return txHash, nil
+	return txHash, cost, nil
 }

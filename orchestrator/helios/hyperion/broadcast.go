@@ -2,8 +2,10 @@ package hyperion
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
@@ -23,15 +25,18 @@ import (
 )
 
 type BroadcastClient interface {
+	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
 	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
-	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) error
-	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) error
-	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) error
-	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) error
+	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
+	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
+	SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
+	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
+	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
+	SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
 }
 
@@ -95,17 +100,38 @@ func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64,
 	return nil
 }
 
+func sigToVRS(sigHex string) (v uint8, r, s gethcommon.Hash) {
+	signatureBytes := gethcommon.FromHex(sigHex)
+	vParam := signatureBytes[64]
+	if vParam == byte(0) {
+		vParam = byte(27)
+	} else if vParam == byte(1) {
+		vParam = byte(28)
+	}
+
+	v = vParam
+	r = gethcommon.BytesToHash(signatureBytes[0:32])
+	s = gethcommon.BytesToHash(signatureBytes[32:64])
+
+	return
+}
+
 func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
 	confirmHash := hyperion.EncodeTxBatchConfirm(hyperionID, batch)
+	log.Info("confirmHash: ", confirmHash, "batch: ", batch, "hyperionID: ", hyperionID, "ethFrom: ", ethFrom.Hex())
+	log.Info("confirmHashLength: ", len(confirmHash.Bytes()))
 	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return errors.New("failed to sign validator address")
 	}
+
+	sigV, sigR, sigS := sigToVRS(gethcommon.Bytes2Hex(signature))
+	log.Info("sigV: ", sigV, "sigR: ", sigR, "sigS: ", sigS)
 
 	// MsgConfirmBatch
 	// When validators observe a MsgRequestBatch they form a batch by ordering
@@ -194,6 +220,14 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64
 	return nil
 }
 
+func (c broadcastClient) GetTxCost(ctx context.Context, txHash string) (*big.Int, error) {
+	tx, err := c.ChainClient.GetTx(ctx, txHash)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Tx.AuthInfo.Fee.Amount[0].Amount.BigInt(), nil
+}
+
 func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
@@ -230,7 +264,40 @@ func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyper
 	return nil
 }
 
-func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) error {
+func (c broadcastClient) SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	// MsgUnSetOrchestratorAddresses
+	// Permit to unset the orchestrator address on the hyperion module
+	// -------------
+	msg := &hyperiontypes.MsgUnSetOrchestratorAddresses{
+		Sender:     c.FromAddress().String(),
+		HyperionId: hyperionId,
+		EthAddress: ethAddress,
+	}
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgUnSetOrchestratorAddresses failed")
+	}
+
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"tx_hash": resp.TxResponse.TxHash,
+			"code":    resp.TxResponse.Code,
+			"Error":   "insufficient fee",
+		}).Infoln("EthOracle sent MsgUnSetOrchestratorAddresses")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgUnSetOrchestratorAddresses failed")
+	}
+
+	time.Sleep(10 * time.Second)
+
+	return nil
+}
+
+func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
 	// EthereumBridgeDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
@@ -276,8 +343,18 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgDepositClaim failed")
+		return nil, errors.Wrap(err, "broadcasting MsgDepositClaim failed")
 	}
+
+	// cost := big.NewInt(0)
+	// gasFee, err := c.ChainClient.GetGasFee()//client.HeaderByNumber(ctx, nil)
+	// if err == nil {
+	// 	gasUsed := resp.TxResponse.GasUsed
+	// 	// calculate the cost of the transaction
+	// 	gasFeeBig := new(big.Int)
+	// 	gasFeeBig, _ = gasFeeBig.SetString(gasFee, 10)
+	// 	cost = cost.Mul(gasFeeBig, big.NewInt(gasUsed))
+	// }
 
 	if resp.TxResponse.Code == 13 {
 		log.WithFields(log.Fields{
@@ -287,7 +364,7 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 			"code":         resp.TxResponse.Code,
 			"Error":        "insufficient fee",
 		}).Infoln("EthOracle sent MsgDepositClaim")
-		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgDepositClaim failed")
+		return nil, errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgDepositClaim failed")
 	}
 
 	log.WithFields(log.Fields{
@@ -298,10 +375,10 @@ func (c broadcastClient) SendDepositClaim(_ context.Context, hyperionId uint64, 
 		"GasUsed":      resp.TxResponse.GasUsed,
 	}).Infoln("EthOracle sent MsgDepositClaim")
 
-	return nil
+	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) error {
+func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -333,7 +410,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgWithdrawClaim failed")
+		return nil, errors.Wrap(err, "broadcasting MsgWithdrawClaim failed")
 	}
 
 	log.WithFields(log.Fields{
@@ -342,10 +419,56 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 		"tx_hash":      resp.TxResponse.TxHash,
 	}).Infoln("EthOracle sent MsgWithdrawClaim")
 
-	return nil
+	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) error {
+func (c broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.WithFields(log.Fields{
+		"tx_nonce":          nonce,
+		"tx_height":         blockHeight,
+		"external_contract": externalContractAddress,
+	}).Debugln("observed ExternalDataClaim")
+
+	// MsgExternalDataClaim claims that a batch of external data
+	// was executed.
+	// -------------
+	msg := &hyperiontypes.MsgExternalDataClaim{
+		HyperionId:              hyperionId,
+		TxNonce:                 nonce,
+		BlockHeight:             blockHeight,
+		ExternalContractAddress: externalContractAddress,
+		Orchestrator:            c.FromAddress().String(),
+		CallDataResult:          hex.EncodeToString(callData),
+		CallDataResultError:     hex.EncodeToString(callErr),
+		RpcUsed:                 rpcUsedForObservation,
+	}
+
+	log.WithFields(log.Fields{
+		"tx_height": msg.BlockHeight,
+		"tx_nonce":  msg.TxNonce,
+		"call_data": msg.CallDataResult,
+	}).Infoln("Oracle sending MsgExternalDataClaim")
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "broadcasting MsgExternalDataClaim failed")
+	}
+
+	log.WithFields(log.Fields{
+		"tx_height": msg.BlockHeight,
+		"tx_nonce":  msg.TxNonce,
+		"tx_hash":   resp.TxResponse.TxHash,
+	}).Infoln("EthOracle sent MsgExternalDataClaim")
+
+	return resp.TxResponse, nil
+}
+
+func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -391,7 +514,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgValsetUpdatedClaim failed")
+		return nil, errors.Wrap(err, "broadcasting MsgValsetUpdatedClaim failed")
 	}
 
 	log.WithFields(log.Fields{
@@ -413,10 +536,10 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 	// 	"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
 	// }).Infoln("Oracle Comfirmed MsgValsetUpdatedClaim")
 
-	return nil
+	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) error {
+func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -454,7 +577,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgERC20DeployedClaim failed")
+		return nil, errors.Wrap(err, "broadcasting MsgERC20DeployedClaim failed")
 	}
 
 	log.WithFields(log.Fields{
@@ -463,7 +586,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 		"tx_hash":      resp.TxResponse.TxHash,
 	}).Infoln("Oracle sent MsgERC20DeployedClaim")
 
-	return nil
+	return resp.TxResponse, nil
 }
 
 func (c broadcastClient) SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error {

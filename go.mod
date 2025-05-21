@@ -235,7 +235,7 @@ replace (
 	cosmossdk.io/store => github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20
 	github.com/CosmWasm/wasmd => github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-6
 
-	github.com/Helios-Chain-Labs/sdk-go => github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-58
+	github.com/Helios-Chain-Labs/sdk-go => github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-63
 	github.com/bandprotocol/bandchain-packet => github.com/Helios-Chain-Labs/bandchain-packet v0.50.10-helios-1
 	github.com/cometbft/cometbft => github.com/Helios-Chain-Labs/cometbft v0.50.10-helios-11
 	github.com/cosmos/cosmos-sdk => github.com/Helios-Chain-Labs/cosmos-sdk v0.50.10-helios-67

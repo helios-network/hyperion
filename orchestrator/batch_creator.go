@@ -20,7 +20,7 @@ func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
 	}
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting BatchCreator...")
 
-	return loops.RunLoop(ctx, defaultLoopDur, func() error {
+	return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
 		// if !s.isRegistered() {
 		// 	bc.Log().Infoln("Orchestrator not registered, skipping...")
 		// 	return nil

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"cosmossdk.io/errors"
@@ -168,6 +169,9 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		retry.Delay(200*time.Millisecond),
 		retry.Attempts(s.maxAttempts),
 		retry.OnRetry(func(n uint, err error) {
+			if strings.Contains(err.Error(), "unavailable on our public API") { // remove rpc if it's unavailable
+				s.ethereum.RemoveLastUsedRpc()
+			}
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)
 		}))
 }

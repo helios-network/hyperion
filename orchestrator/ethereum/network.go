@@ -53,7 +53,7 @@ type Network interface {
 		oldValset *hyperiontypes.Valset,
 		newValset *hyperiontypes.Valset,
 		confirms []*hyperiontypes.MsgValsetConfirm,
-	) (*gethcommon.Hash, error)
+	) (*gethcommon.Hash, *big.Int, error)
 
 	GetLastEventNonce(ctx context.Context) (*big.Int, error)
 	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
@@ -65,9 +65,10 @@ type Network interface {
 		currentValset *hyperiontypes.Valset,
 		batch *hyperiontypes.OutgoingTxBatch,
 		confirms []*hyperiontypes.MsgConfirmBatch,
-	) (*gethcommon.Hash, error)
+	) (*gethcommon.Hash, *big.Int, error)
 
 	TokenDecimals(ctx context.Context, tokenContract gethcommon.Address) (uint8, error)
+	ExecuteExternalDataTx(ctx context.Context, address gethcommon.Address, txAbi []byte, blockNumber *big.Int) ([]byte, []byte, string, error)
 }
 
 type network struct {
@@ -99,7 +100,7 @@ func NewNetwork(
 		return nil, err
 	}
 
-	hyperionContract, err := hyperion.NewHyperionContract(ethCommitter, hyperionContractAddr, hyperion.PendingTxInputList{}, pendingTxDuration)
+	hyperionContract, err := hyperion.NewHyperionContract(context.Background(), ethCommitter, hyperionContractAddr, hyperion.PendingTxInputList{}, pendingTxDuration)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +162,7 @@ func (n *network) TestRpcs(ctx context.Context) bool {
 		if err != nil {
 			return err
 		}
+
 		balance, err := client.BalanceAt(ctx, n.FromAddr, nil)
 		if err != nil {
 			return err
@@ -313,8 +315,6 @@ func (n *network) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperi
 		}
 	}
 
-	log.Infoln("GetValsetUpdatedEventsAtSpecificBlock", n.Provider().GetLastUsedRpc())
-
 	defer iter.Close()
 
 	var valsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
@@ -365,4 +365,16 @@ func isUnknownBlockErr(err error) bool {
 	}
 
 	return false
+}
+
+func (n *network) ExecuteExternalDataTx(ctx context.Context, address gethcommon.Address, txAbi []byte, blockNumber *big.Int) ([]byte, []byte, string, error) {
+	msg := ethereum.CallMsg{
+		To:   &address,
+		Data: txAbi,
+	}
+	result, err := n.Provider().CallContract(ctx, msg, blockNumber)
+	if err != nil {
+		return []byte{}, []byte(err.Error()), n.Provider().GetLastUsedRpc(), err
+	}
+	return result, []byte{}, n.Provider().GetLastUsedRpc(), nil
 }

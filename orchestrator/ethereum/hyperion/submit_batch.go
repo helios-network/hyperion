@@ -18,7 +18,7 @@ func (s *hyperionContract) SendTransactionBatch(
 	currentValset *types.Valset,
 	batch *types.OutgoingTxBatch,
 	confirms []*types.MsgConfirmBatch,
-) (*common.Hash, error) {
+) (*common.Hash, *big.Int, error) {
 	metrics.ReportFuncCall(s.svcTags)
 	doneFn := metrics.ReportFuncTiming(s.svcTags)
 	defer doneFn()
@@ -31,12 +31,12 @@ func (s *hyperionContract) SendTransactionBatch(
 		"confirmations":  len(confirms),
 	}).Infoln("checking signatures and submitting batch")
 
-	validators, powers, sigV, sigR, sigS, _ := checkBatchSigsAndRepack(currentValset, confirms)
-	// if err != nil {
-	// 	metrics.ReportFuncError(s.svcTags)
-	// 	err = errors.Wrap(err, "submit_batch.go confirmations check failed")
-	// 	return nil, err
-	// }
+	validators, powers, sigV, sigR, sigS, err := checkBatchSigsAndRepack(currentValset, confirms)
+	if err != nil {
+		metrics.ReportFuncError(s.svcTags)
+		err = errors.Wrap(err, "submit_batch.go confirmations check failed")
+		return nil, big.NewInt(0), err
+	}
 
 	amounts, destinations, fees := getBatchCheckpointValues(batch)
 	currentValsetNonce := new(big.Int).SetUint64(currentValset.Nonce)
@@ -94,18 +94,18 @@ func (s *hyperionContract) SendTransactionBatch(
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		log.WithError(err).Errorln("ABI Pack (Hyperion submitBatch) method")
-		return nil, err
+		return nil, big.NewInt(0), err
 	}
 
 	// Checking in pending txs(mempool) if tx with same input is already submitted
 	if s.pendingTxInputList.IsPendingTxInput(txData, s.pendingTxWaitDuration) {
-		return nil, errors.New("Transaction with same batch input data is already present in mempool")
+		return nil, big.NewInt(0), errors.New("Transaction with same batch input data is already present in mempool")
 	}
 
-	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
+	txHash, cost, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
-		return nil, err
+		return nil, big.NewInt(0), err
 	}
 
 	//     let before_nonce = get_tx_batch_nonce(
@@ -159,7 +159,7 @@ func (s *hyperionContract) SendTransactionBatch(
 	//     }
 	//     Ok(())
 
-	return &txHash, nil
+	return &txHash, cost, nil
 }
 
 func getBatchCheckpointValues(batch *types.OutgoingTxBatch) (amounts []*big.Int, destinations []common.Address, fees []*big.Int) {

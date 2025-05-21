@@ -87,11 +87,11 @@ func NewEVMProvidersWithOptions(rpcs []*hyperiontypes.Rpc, maxRetries int, timeo
 }
 
 func (p *EVMProviders) ReduceReputationOfLastRpc() {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
 	lastUsedRpc := p.lastUsedRpc
 	if lastUsedRpc == "" {
+		return
+	}
+	if p.reputations[lastUsedRpc] == nil {
 		return
 	}
 	p.reputations[lastUsedRpc].reputation -= 1
@@ -117,11 +117,12 @@ func (p *EVMProviders) RemoveRpc(targetUrl string) bool {
 }
 
 func (p *EVMProviders) RemoveLastUsedRpc() {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
 	lastUsedRpc := p.lastUsedRpc
 	if lastUsedRpc == "" {
+		return
+	}
+
+	if p.reputations[lastUsedRpc] == nil {
 		return
 	}
 
@@ -262,6 +263,7 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 	for attempt := 0; attempt < p.maxRetries; attempt++ {
 		// Get next client using round-robin
 		ethClient, _, rpcUrl := p.getRandomClient()
+		p.lastUsedRpc = rpcUrl
 		if ethClient == nil {
 			return ErrNoClientsAvailable
 		}
@@ -282,7 +284,6 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 			if err == nil {
 				// fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
 				p.classifyRpcUrl(rpcUrl, false)
-				p.lastUsedRpc = rpcUrl
 				return nil // Success
 			}
 			lastErr = err

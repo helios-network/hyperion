@@ -90,7 +90,7 @@ func EncodeTxBatchConfirm(hyperionID common.Hash, batch *types.OutgoingTxBatch) 
 	for i, tx := range batch.Transactions {
 		txAmounts[i] = tx.Token.Amount.BigInt()
 		txDestinations[i] = common.HexToAddress(tx.DestAddress)
-		txFees[i] = tx.Token.Amount.BigInt()
+		txFees[i] = tx.Fee.Amount.BigInt()
 	}
 
 	// the methodName needs to be the same as the 'name' above in the checkpointAbiJson

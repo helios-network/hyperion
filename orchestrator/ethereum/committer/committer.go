@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -22,7 +23,8 @@ type EVMCommitter interface {
 		ctx context.Context,
 		recipient common.Address,
 		txData []byte,
-	) (txHash common.Hash, err error)
+	) (txHash common.Hash, cost *big.Int, err error)
+	GetTransactOpts(ctx context.Context) *bind.TransactOpts
 }
 
 type EVMCommitterOption func(o *options) error

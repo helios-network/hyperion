@@ -2,7 +2,10 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -18,8 +21,10 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
+	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
@@ -28,7 +33,7 @@ const (
 )
 
 func (s *Orchestrator) runRelayer(ctx context.Context) error {
-	if noRelay := !s.cfg.RelayValsets && !s.cfg.RelayBatches; noRelay {
+	if noRelay := !s.cfg.RelayValsets && !s.cfg.RelayBatches && !s.cfg.RelayExternalDatas; noRelay {
 		return nil
 	}
 
@@ -38,7 +43,7 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	}
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
-	return loops.RunLoop(ctx, defaultRelayerLoopDur, func() error {
+	return loops.RunLoop(ctx, s.ethereum, defaultRelayerLoopDur, func() error {
 		// if !s.isRegistered() {
 		// 	r.Log().Infoln("Orchestrator not registered, skipping...")
 		// 	return nil
@@ -62,8 +67,18 @@ func (l *relayer) relay(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
+	var pg loops.ParanoidGroup
+
 	if l.logEnabled {
 		l.Log().Info("relaying getLatestEthValset")
+	}
+
+	if l.cfg.RelayExternalDatas {
+		pg.Go(func() error {
+			return l.retry(ctx, func() error {
+				return l.relayExternalData(ctx)
+			})
+		})
 	}
 
 	ethValset, err := l.getLatestEthValset(ctx)
@@ -124,8 +139,6 @@ func (l *relayer) relay(ctx context.Context) error {
 	// 	os.WriteFile("valset.json", json, 0644)
 	// }
 
-	var pg loops.ParanoidGroup
-
 	if l.cfg.RelayValsets {
 		pg.Go(func() error {
 			return l.retry(ctx, func() error {
@@ -138,14 +151,6 @@ func (l *relayer) relay(ctx context.Context) error {
 		pg.Go(func() error {
 			return l.retry(ctx, func() error {
 				return l.relayTokenBatch(ctx, ethValset)
-			})
-		})
-	}
-
-	if l.cfg.RelayExternalDatas {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayExternalData(ctx, ethValset)
 			})
 		})
 	}
@@ -281,7 +286,7 @@ func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset
 		vs, err := l.findLatestValsetOnEth(ctx)
 		if err != nil {
 			l.Log().Infoln("findLatestValsetOnEth - 8")
-			if strings.Contains(err.Error(), "failed to get") {
+			if strings.Contains(err.Error(), "failed to get") || strings.Contains(err.Error(), "attempting to unmarshall") {
 				l.ethereum.RemoveLastUsedRpc()
 				return err
 			}
@@ -341,10 +346,12 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 		return nil
 	}
 
-	txHash, err := l.ethereum.SendEthValsetUpdate(ctx, latestEthValset, latestConfirmedValset, confirmations)
+	txHash, cost, err := l.ethereum.SendEthValsetUpdate(ctx, latestEthValset, latestConfirmedValset, confirmations)
 	if err != nil {
 		return err
 	}
+
+	storage.UpdateFeesFile(latestEthValset.RewardAmount.BigInt(), latestEthValset.RewardToken, cost, txHash.Hex(), latestEthValset.Height, l.cfg.ChainId)
 
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent validator set update to Ethereum")
 
@@ -354,13 +361,16 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
-		l.Log().WithError(err).Warningln("failed to get latest valset nonce from Ethereum")
+		l.Log().WithError(err).Warningln("failed to get latest valset nonce from " + l.cfg.ChainName)
+		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
+			l.ethereum.RemoveLastUsedRpc()
+		}
 		return false
 	}
 
 	// Check if other validators already updated the valset
 	if vs.Nonce <= latestEthereumValsetNonce.Uint64() {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthereumValsetNonce, "helios_nonce": vs.Nonce}).Debugln("validator set already updated on Ethereum")
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthereumValsetNonce, "helios_nonce": vs.Nonce}).Infoln("validator set already updated on " + l.cfg.ChainName)
 		return false
 	}
 
@@ -396,12 +406,11 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		return err
 	}
 
-	// latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
-	// if err != nil {
-	// 	l.Log().Info("failed to get latest ethereum height", err)
-	// 	return err
-	// }
-	// l.Log().Info("latestEthHeight", latestEthHeight)
+	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
+		return err
+	}
 
 	var (
 		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
@@ -410,12 +419,13 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 
 	for _, batch := range batches {
 		l.Log().Info("batch details: ", batch)
-		// if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
-		// 	l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
-		// 	continue
-		// }
 
 		if batch.HyperionId != l.cfg.HyperionId {
+			continue
+		}
+
+		if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
+			l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
 			continue
 		}
 
@@ -449,29 +459,150 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	// 	return nil
 	// }
 
-	if l.logEnabled {
-		l.Log().Infoln("latestEthValset", latestEthValset)
-		l.Log().Infoln("oldestConfirmedBatch", oldestConfirmedBatch)
-		l.Log().Infoln("confirmations", confirmations)
-	}
+	// if l.logEnabled {
+	l.Log().Infoln("latestEthValset", latestEthValset)
+	l.Log().Infoln("oldestConfirmedBatch", oldestConfirmedBatch)
+	l.Log().Infoln("confirmations", confirmations)
+	// }
 
-	txHash, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
+	txHash, cost, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash
 		// Better to warn the user and try again in the next loop interval
-		l.Log().WithError(err).Warningln("failed to send outgoing tx batch to Ethereum")
+
+		l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
 		return nil
 	}
 
-	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to Ethereum")
+	feesTaken := oldestConfirmedBatch.GetFees().BigInt()
+	// TODO: save fees taken and expenses
+	storage.UpdateFeesFile(feesTaken, oldestConfirmedBatch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId)
+	///////
+
+	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)
 
 	return nil
 }
 
-func (l *relayer) relayExternalData(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+// func (l *relayer) testRelayExternalData(ctx context.Context) {
+
+// 	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+// 	if err != nil {
+// 		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
+// 		return
+// 	}
+// 	//0x3931ab520000000000000000000000000000000000000000000000000000000000000000
+// 	data, err := hex.DecodeString("3931ab520000000000000000000000000000000000000000000000000000000000000000")
+// 	if err != nil {
+// 		l.Log().Info("failed to decode abi call hex", err)
+// 		return
+// 	}
+// 	callData, callErr, rpcUsed, _ := l.ethereum.ExecuteExternalDataTx(ctx, gethcommon.HexToAddress("0x61F2AB7B0C0E10E18a3ed1C3bC7958540374A8DC"), data, latestEthHeight.Number)
+// 	l.Log().Info("callData", callData, "callErr", callErr, "rpcUsed", rpcUsed)
+// }
+
+func (l *relayer) selectBestClaimFromListOfClaims(claims []*types.MsgExternalDataClaim) *types.MsgExternalDataClaim {
+	// If no claims, return nil
+	if len(claims) == 0 {
+		return nil
+	}
+
+	// If only one claim, return it
+	if len(claims) == 1 {
+		return claims[0]
+	}
+
+	// Map to store frequency of each combination
+	frequencies := make(map[string]int)
+	claimsByKey := make(map[string]*types.MsgExternalDataClaim)
+
+	// Count frequencies of each unique combination
+	for _, claim := range claims {
+		// Create a unique key combining the relevant fields
+		key := fmt.Sprintf("%d|%s|%s",
+			claim.TxNonce,
+			claim.CallDataResult,
+			claim.CallDataResultError,
+		)
+
+		frequencies[key]++
+		claimsByKey[key] = claim
+	}
+
+	// Find the key with highest frequency
+	var maxFreq int
+	var bestKey string
+	for key, freq := range frequencies {
+		if freq > maxFreq {
+			maxFreq = freq
+			bestKey = key
+		}
+	}
+
+	// Return the claim corresponding to the most frequent combination
+	return claimsByKey[bestKey]
+}
+
+func (l *relayer) relayExternalData(ctx context.Context) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
+
+	txs, err := l.helios.LatestTransactionExternalCallDataTxs(ctx, l.cfg.HyperionId)
+	if l.logEnabled {
+		l.Log().Info("txs: ", txs)
+	}
+	if err != nil {
+		l.Log().Info("failed to get latest transaction external call data txs", err)
+		return err
+	}
+
+	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
+		return err
+	}
+
+	for _, tx := range txs {
+		l.Log().Info("tx details: ", tx)
+
+		if tx.HyperionId != l.cfg.HyperionId {
+			continue
+		}
+
+		targetHeight := latestEthHeight.Number.Uint64()
+
+		if slices.Contains(tx.Votes, l.ethereum.FromAddress().Hex()) {
+			l.Log().Info("skipping already claimed tx", tx.Id)
+			continue
+		}
+
+		bestClaim := l.selectBestClaimFromListOfClaims(tx.Claims)
+
+		if bestClaim != nil {
+			targetHeight = bestClaim.BlockHeight
+		}
+
+		data, err := hex.DecodeString(strings.TrimPrefix(tx.AbiCallHex, "0x"))
+		if err != nil {
+			l.Log().Info("failed to decode abi call hex", err, "tx_id", tx.Id)
+			continue
+		}
+		callData, callErr, rpcUsed, err := l.ethereum.ExecuteExternalDataTx(ctx, gethcommon.HexToAddress(tx.ExternalContractAddress), data, big.NewInt(int64(targetHeight)))
+		l.Log().Info("callData", callData, "callErr", callErr)
+
+		if err != nil {
+			l.Log().Info("failed to execute external data tx with rpc", err, "rpcUsed", rpcUsed)
+			continue
+		}
+
+		_, err = l.helios.SendExternalDataClaim(ctx, l.cfg.HyperionId, tx.Nonce, latestEthHeight.Number.Uint64(), tx.ExternalContractAddress, callData, callErr, rpcUsed)
+
+		if err != nil {
+			l.Log().Info("failed to send external data claim", err)
+			continue
+		}
+	}
 
 	// TODO: get external data batch from helios (maybe edit batch_creator for build special batch who contains only external data)
 	// TODO: format abi from tx information then call external data on ethereum
@@ -494,6 +625,9 @@ func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Val
 
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
+		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
+			l.ethereum.RemoveLastUsedRpc()
+		}
 		return nil, errors.Wrap(err, "failed to get latest valset nonce")
 	}
 

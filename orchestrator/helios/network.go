@@ -242,3 +242,17 @@ func HasRegisteredOrchestrator(n Network, hyperionId uint64, ethAddr gethcommon.
 
 	return validator, true
 }
+
+func GetListOfNetworksWhereRegistered(n Network, ethAddr gethcommon.Address) ([]uint64, bool) {
+	logger := log.WithField("svc", "MAIN PROCESS")
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	networks, err := n.GetListOfNetworksWhereRegistered(ctx, ethAddr)
+	if err != nil {
+		logger.Info("err: ", err.Error())
+		return make([]uint64, 0), false
+	}
+
+	return networks, true
+}

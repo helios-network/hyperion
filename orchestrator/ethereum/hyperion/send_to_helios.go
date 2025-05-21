@@ -50,7 +50,7 @@ func (s *hyperionContract) SendToHelios(
 			return nil, err
 		}
 
-		txHash, err := s.SendTx(ctx, erc20, txData)
+		txHash, _, err := s.SendTx(ctx, erc20, txData)
 		if err != nil {
 			metrics.ReportFuncError(s.svcTags)
 			log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (ERC20 approve) to EVM")
@@ -76,7 +76,7 @@ func (s *hyperionContract) SendToHelios(
 		return nil, err
 	}
 
-	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
+	txHash, _, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion sendToHelios) to EVM")

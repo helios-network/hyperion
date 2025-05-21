@@ -1,19 +1,21 @@
 hyperion  \
   --env="local" \
-  --log-level="info" \
+  --log-level="error" \
   --svc-wait-timeout="1m" \
-  orchestrator \
+  query list-operative-chains \
   --helios-chain-id="42000" \
   --helios-grpc="tcp://testnet1.helioschainlabs.org:9090" \
   --tendermint-rpc="http://testnet1.helioschainlabs.org:26657" \
   --helios-gas-prices="2000000000ahelios" \
   --helios-gas="2000000" \
+  --helios-keyring="local" \
   --helios-from="0x17267eB1FEC301848d4B5140eDDCFC48945427Ab" \
   --helios-pk="2c37c3d09d7a1c957f01ad200cec69bc287d0a9cc85b4dce694611a4c9c24036" \
+  --coingecko-api="https://api.coingecko.com/api/v3" \
   --eth-from="0x17267eB1FEC301848d4B5140eDDCFC48945427Ab" \
   --eth-pk="2c37c3d09d7a1c957f01ad200cec69bc287d0a9cc85b4dce694611a4c9c24036" \
   --eth-gas-price-adjustment="1.3" \
-  --eth-max-gas-price="300gwei" \
+  --eth-max-gas-price="100gwei" \
   --relay-valsets="true" \
   --relay-valset-offset-dur="5m" \
   --relay-batches="true" \

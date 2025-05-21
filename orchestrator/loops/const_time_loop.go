@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
+
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 )
 
 // ErrGracefulStop is a special error, if returned from within loop function, will stop that loop without
@@ -17,7 +20,7 @@ var ErrGracefulStop = errors.New("stop")
 // Loop runs a function in the loop with a consistent interval. If execution takes longer,
 // the waiting time between iteration decreases. A single iteration has a deadline and cannot run longer
 // than interval itself. There is a protection from panic which could crash adjacent loops.
-func RunLoop(ctx context.Context, interval time.Duration, fn func() error) (err error) {
+func RunLoop(ctx context.Context, ethereum ethereum.Network, interval time.Duration, fn func() error) (err error) {
 	defer panicRecover(&err)
 
 	delayTimer := time.NewTimer(0)
@@ -27,11 +30,11 @@ func RunLoop(ctx context.Context, interval time.Duration, fn func() error) (err 
 			var start = time.Now()
 			if fnErr := fn(); fnErr != nil {
 				log.WithError(fnErr).Errorln("loop function returned an error")
-				// if fnErr == ErrGracefulStop {
-				// 	return nil
-				// }
 
-				// return fnErr
+				if strings.Contains(fnErr.Error(), "unavailable on our public API") || strings.Contains(fnErr.Error(), "connection refused") || strings.Contains(fnErr.Error(), "attempting to unmarshall") || strings.Contains(fnErr.Error(), "Too Many Requests") {
+					ethereum.RemoveLastUsedRpc()
+				}
+
 			}
 
 			if elapsed := time.Since(start); elapsed >= interval {

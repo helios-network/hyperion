@@ -25,7 +25,7 @@ func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Signer...")
 
-	return loops.RunLoop(ctx, defaultLoopDur, func() error {
+	return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
 		// if !s.isRegistered() {
 		// 	signer.Log().Infoln("Orchestrator not registered, skipping...")
 		// 	return nil

@@ -41,14 +41,14 @@ type HyperionContract interface {
 		currentValset *types.Valset,
 		batch *types.OutgoingTxBatch,
 		confirms []*types.MsgConfirmBatch,
-	) (*common.Hash, error)
+	) (*common.Hash, *big.Int, error)
 
 	SendEthValsetUpdate(
 		ctx context.Context,
 		oldValset *types.Valset,
 		newValset *types.Valset,
 		confirms []*types.MsgValsetConfirm,
-	) (*common.Hash, error)
+	) (*common.Hash, *big.Int, error)
 
 	GetTxBatchNonce(
 		ctx context.Context,
@@ -97,12 +97,15 @@ type HyperionContract interface {
 }
 
 func NewHyperionContract(
+	ctx context.Context,
 	ethCommitter committer.EVMCommitter,
 	hyperionAddress common.Address,
 	pendingTxInputList PendingTxInputList,
 	pendingTxWaitDuration time.Duration,
 ) (HyperionContract, error) {
 	fmt.Println("Contract hyperionAddress", hyperionAddress.String())
+	// wrappers.DeployHyperion(ethCommitter.GetTransactOpts(ctx), ethCommitter.Provider())
+
 	ethHyperion, err := wrappers.NewHyperion(hyperionAddress, ethCommitter.Provider())
 	if err != nil {
 		return nil, err

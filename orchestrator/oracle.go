@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,7 +11,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
+	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -45,7 +49,7 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
 
-	return loops.RunLoop(ctx, defaultLoopDur, func() error {
+	return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
 
 		// if !s.isRegistered() {
 		// 	oracle.Log().Infoln("Orchestrator not registered, skipping...")
@@ -316,8 +320,13 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 		}
 
 		for _, event := range newEvents {
-			if err := l.sendEthEventClaim(ctx, event); err != nil {
+			resp, err := l.sendEthEventClaim(ctx, event)
+			if err != nil {
 				return err
+			}
+			cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
+			if err == nil {
+				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000))
 			}
 
 			// Considering block time ~1s on Helios chain, adding Sleep to make sure new event is sent
@@ -354,7 +363,7 @@ func (l *oracle) autoResync(ctx context.Context) error {
 	return nil
 }
 
-func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) error {
+func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) (*cosmostypes.TxResponse, error) {
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)

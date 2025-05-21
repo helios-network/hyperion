@@ -2,8 +2,9 @@ package helios
 
 import (
 	"context"
+
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
-	
+
 	sdkmath "cosmossdk.io/math"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	log "github.com/xlab/suplog"

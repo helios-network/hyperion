@@ -27,7 +27,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	oldValset *types.Valset,
 	newValset *types.Valset,
 	confirms []*types.MsgValsetConfirm,
-) (*common.Hash, error) {
+) (*common.Hash, *big.Int, error) {
 	metrics.ReportFuncCall(s.svcTags)
 	doneFn := metrics.ReportFuncTiming(s.svcTags)
 	defer doneFn()
@@ -35,7 +35,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	if newValset.Nonce <= oldValset.Nonce {
 		metrics.ReportFuncError(s.svcTags)
 		err := errors.New("new valset nonce should be greater than old valset nonce")
-		return nil, err
+		return nil, big.NewInt(0), err
 	}
 
 	log.WithFields(log.Fields{
@@ -61,7 +61,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		err = errors.Wrap(err, "valset_update.go confirmations check failed")
-		return nil, err
+		return nil, big.NewInt(0), err
 	}
 	currentValsetNonce := new(big.Int).SetUint64(oldValset.Nonce)
 	currentValsetArgs := ValsetArgs{
@@ -99,19 +99,19 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		log.WithError(err).Errorln("ABI Pack (Hyperion updateValset) method")
-		return nil, err
+		return nil, big.NewInt(0), err
 	}
 
 	// Checking in pending txs(mempool) if tx with same input is already submitted
 	if s.pendingTxInputList.IsPendingTxInput(txData, s.pendingTxWaitDuration) {
-		return nil, errors.New("Transaction with same valset input data is already present in mempool")
+		return nil, big.NewInt(0), errors.New("Transaction with same valset input data is already present in mempool")
 	}
 
-	txHash, err := s.SendTx(ctx, s.hyperionAddress, txData)
+	txHash, cost, err := s.SendTx(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion updateValset) to EVM")
-		return nil, err
+		return nil, big.NewInt(0), err
 	}
 
 	//     let before_nonce = get_valset_nonce(hyperion_contract_address, eth_address, web3).await?;
@@ -156,7 +156,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	//     }
 	//     Ok(())
 
-	return &txHash, nil
+	return &txHash, cost, nil
 }
 
 func validatorsAndPowers(valset *types.Valset) (

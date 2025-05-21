@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	cli "github.com/jawher/mow.cli"
 	"github.com/pkg/errors"
@@ -16,6 +19,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
@@ -23,19 +27,18 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 )
 
-func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Keyring, heliosNetworkCfg *helios.NetworkConfig, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) error {
+func runOrchestrator(
+	ctx *context.Context,
+	cfg *Config,
+	heliosKeyring *helios.Keyring,
+	heliosNetworkCfg *helios.NetworkConfig,
+	counterpartyChainParams *hyperiontypes.CounterpartyChainParams,
+	ethKeyFromAddress gethcommon.Address,
+	signerFn bind.SignerFn,
+	personalSignFn keystore.PersonalSignFn,
+) error {
 
 	log.WithFields(log.Fields{"addr": heliosKeyring.Addr.String(), "hex": heliosKeyring.HexAddr.String()}).Infoln("Initialized Helios keyring")
-	ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
-		uint64(counterpartyChainParams.BridgeChainId),
-		cfg.ethKeystoreDir,
-		cfg.ethKeyFrom,
-		cfg.ethPassphrase,
-		cfg.ethPrivKey,
-	)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to initialize ethereum accounts manager for chain %d", counterpartyChainParams.BridgeChainId))
-	}
 
 	heliosNetwork, err := helios.NewNetworkWithBroadcast(heliosKeyring, personalSignFn, *heliosNetworkCfg)
 	if err != nil {
@@ -113,6 +116,10 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 	}).Infoln("connected to Ethereum network")
 
 	addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(counterpartyChainParams.HyperionId), ethKeyFromAddress)
+
+	if !isValidator {
+		return nil
+	}
 
 	// bech32Str, err := sdk.Bech32ifyAddressBytes("helios", ethKeyFromAddress.Bytes())
 	// orShutdown(err)
@@ -192,6 +199,10 @@ func runOrchestrator(ctx *context.Context, cfg *Config, heliosKeyring *helios.Ke
 
 			err = hyperion.Run(*ctx, heliosNetwork, ethNetwork)
 			if err != nil {
+
+				if strings.Contains(err.Error(), "connection refused") {
+					return nil, err
+				}
 				log.Infoln("Error Removing RPC", ethNetwork.GetLastUsedRpc())
 				ethNetwork.RemoveLastUsedRpc() // remove the last used rpc who is in cause of the error then retry
 				return nil, err
@@ -258,11 +269,31 @@ func orchestratorCmd(cmd *cli.Cmd) {
 		hyperionParams, err := heliosNetwork.HyperionParams(ctx)
 		orShutdown(errors.Wrap(err, "failed to query hyperion params, is heliades running?"))
 
+		networks, err := heliosNetwork.GetListOfNetworksWhereRegistered(ctx, gethcommon.HexToAddress(*cfg.ethKeyFrom))
+		orShutdown(errors.Wrap(err, "failed to get list of networks where registered"))
+
 		for _, counterpartyChainParams := range hyperionParams.CounterpartyChainParams {
+
+			if !slices.Contains(networks, uint64(counterpartyChainParams.BridgeChainId)) {
+				continue
+			}
+
+			ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
+				uint64(counterpartyChainParams.BridgeChainId),
+				cfg.ethKeystoreDir,
+				cfg.ethKeyFrom,
+				cfg.ethPassphrase,
+				cfg.ethPrivKey,
+			)
+
+			if err != nil {
+				orShutdown(errors.Wrap(err, fmt.Sprintf("failed to initialize ethereum accounts manager for chain %d", counterpartyChainParams.BridgeChainId)))
+			}
+
 			go func() {
 				delay, _ := time.ParseDuration("5s")
 				loops.RetryFunction(ctx, func() (error, error) {
-					return nil, runOrchestrator(&ctx, &cfg, &heliosKeyring, &heliosNetworkCfg, counterpartyChainParams)
+					return nil, runOrchestrator(&ctx, &cfg, &heliosKeyring, &heliosNetworkCfg, counterpartyChainParams, ethKeyFromAddress, signerFn, personalSignFn)
 				}, delay)
 			}()
 		}
