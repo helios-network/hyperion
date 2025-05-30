@@ -16,6 +16,7 @@ var ErrNotFound = errors.New("not found")
 
 type QueryClient interface {
 	HyperionParams(ctx context.Context) (*hyperiontypes.Params, error)
+	GetCounterpartyChainParamsByChainId(ctx context.Context, chainId uint64) (*hyperiontypes.CounterpartyChainParams, error)
 	LastClaimEventByAddr(ctx context.Context, hyperionId uint64, validatorAccountAddress cosmostypes.AccAddress) (*hyperiontypes.LastClaimEvent, error)
 	GetValidatorAddress(ctx context.Context, hyperionId uint64, addr gethcommon.Address) (cosmostypes.AccAddress, error)
 	GetListOfNetworksWhereRegistered(ctx context.Context, addr gethcommon.Address) ([]uint64, error)
@@ -321,6 +322,29 @@ func (c queryClient) HyperionParams(ctx context.Context) (*hyperiontypes.Params,
 	}
 
 	return &resp.Params, nil
+}
+
+func (c queryClient) GetCounterpartyChainParamsByChainId(ctx context.Context, chainId uint64) (*hyperiontypes.CounterpartyChainParams, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.Println("Try to get GetCounterpartyChainParamsByChainId")
+
+	resp, err := c.QueryClient.QueryGetCounterpartyChainParamsByChainId(ctx, &hyperiontypes.QueryGetCounterpartyChainParamsByChainIdRequest{
+		ChainId: chainId,
+	})
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query GetCounterpartyChainParamsByChainId from daemon")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.CounterpartyChainParams, nil
 }
 
 func (c queryClient) GetValidatorAddress(ctx context.Context, hyperionId uint64, addr gethcommon.Address) (cosmostypes.AccAddress, error) {

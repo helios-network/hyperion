@@ -10,7 +10,9 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 
@@ -49,6 +51,15 @@ type HyperionContract interface {
 		newValset *types.Valset,
 		confirms []*types.MsgValsetConfirm,
 	) (*common.Hash, *big.Int, error)
+
+	SendInitializeBlockchainTx(
+		ctx context.Context,
+		callerAddress common.Address,
+		hyperionId [32]byte,
+		powerThreshold *big.Int,
+		validators []common.Address,
+		powers []*big.Int,
+	) (*gethtypes.Transaction, error)
 
 	GetTxBatchNonce(
 		ctx context.Context,
@@ -102,6 +113,7 @@ func NewHyperionContract(
 	hyperionAddress common.Address,
 	pendingTxInputList PendingTxInputList,
 	pendingTxWaitDuration time.Duration,
+	signerFn bind.SignerFn,
 ) (HyperionContract, error) {
 	fmt.Println("Contract hyperionAddress", hyperionAddress.String())
 	// wrappers.DeployHyperion(ethCommitter.GetTransactOpts(ctx), ethCommitter.Provider())
@@ -117,6 +129,7 @@ func NewHyperionContract(
 		ethHyperion:           ethHyperion,
 		pendingTxInputList:    pendingTxInputList,
 		pendingTxWaitDuration: pendingTxWaitDuration,
+		signerFn:              signerFn,
 		svcTags: metrics.Tags{
 			"svc": "hyperion_contract",
 		},
@@ -134,6 +147,8 @@ type hyperionContract struct {
 
 	pendingTxInputList    PendingTxInputList
 	pendingTxWaitDuration time.Duration
+
+	signerFn bind.SignerFn
 
 	svcTags metrics.Tags
 }

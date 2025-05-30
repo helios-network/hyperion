@@ -55,6 +55,15 @@ type Network interface {
 		confirms []*hyperiontypes.MsgValsetConfirm,
 	) (*gethcommon.Hash, *big.Int, error)
 
+	SendInitializeBlockchainTx(
+		ctx context.Context,
+		callerAddress gethcommon.Address,
+		hyperionId [32]byte,
+		powerThreshold *big.Int,
+		validators []gethcommon.Address,
+		powers []*big.Int,
+	) (*gethtypes.Transaction, error)
+
 	GetLastEventNonce(ctx context.Context) (*big.Int, error)
 	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
 	GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error)
@@ -100,7 +109,7 @@ func NewNetwork(
 		return nil, err
 	}
 
-	hyperionContract, err := hyperion.NewHyperionContract(context.Background(), ethCommitter, hyperionContractAddr, hyperion.PendingTxInputList{}, pendingTxDuration)
+	hyperionContract, err := hyperion.NewHyperionContract(context.Background(), ethCommitter, hyperionContractAddr, hyperion.PendingTxInputList{}, pendingTxDuration, signerFn)
 	if err != nil {
 		return nil, err
 	}

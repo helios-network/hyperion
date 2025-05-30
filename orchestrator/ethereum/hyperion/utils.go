@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 )
 
@@ -168,4 +169,33 @@ func (s *hyperionContract) GetERC20Symbol(
 	symbol = *abi.ConvertType(out[0], new(string)).(*string)
 
 	return symbol, nil
+}
+
+func (s *hyperionContract) SendInitializeBlockchainTx(
+	ctx context.Context,
+	callerAddress common.Address,
+	hyperionId [32]byte,
+	powerThreshold *big.Int,
+	validators []common.Address,
+	powers []*big.Int,
+) (*gethtypes.Transaction, error) {
+
+	tx, err := s.ethHyperion.Initialize(&bind.TransactOpts{
+		From:    callerAddress,
+		Context: ctx,
+		Signer:  s.signerFn,
+	}, hyperionId, powerThreshold, validators, powers)
+
+	if err != nil {
+		err = errors.Wrap(err, "Initialize call failed")
+		return nil, err
+	}
+
+	_, _, err = s.EVMCommitter.SendTx(ctx, s.hyperionAddress, tx.Data())
+	if err != nil {
+		err = errors.Wrap(err, "SendTx call failed")
+		return nil, err
+	}
+
+	return tx, nil
 }

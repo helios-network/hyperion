@@ -115,9 +115,10 @@ func runOrchestrator(
 		"gas_price_adjustment": *cfg.ethGasPriceAdjustment,
 	}).Infoln("connected to Ethereum network")
 
-	addr, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(counterpartyChainParams.HyperionId), ethKeyFromAddress)
+	_, isValidator := helios.HasRegisteredOrchestrator(heliosNetwork, uint64(counterpartyChainParams.HyperionId), ethKeyFromAddress)
 
 	if !isValidator {
+		log.Infoln("not a validator")
 		return nil
 	}
 
@@ -125,13 +126,13 @@ func runOrchestrator(
 	// orShutdown(err)
 	// log.Infoln("bech32Str", bech32Str)
 
-	if *cfg.testnetAutoRegister {
-		log.Printf("auto-registering validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
-		isValidator, err = helios.TestnetAutoRegisterValidator(*ctx, int(counterpartyChainParams.HyperionId), heliosNetwork, isValidator, addr, ethKeyFromAddress)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to auto-register validator %s with orchestrator %s", ethKeyFromAddress.String(), heliosKeyring.Addr.String()))
-		}
-	}
+	// if *cfg.testnetAutoRegister {
+	// 	log.Printf("auto-registering validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
+	// 	isValidator, err = helios.TestnetAutoRegisterValidator(*ctx, int(counterpartyChainParams.HyperionId), heliosNetwork, isValidator, addr, ethKeyFromAddress)
+	// 	if err != nil {
+	// 		return errors.Wrap(err, fmt.Sprintf("failed to auto-register validator %s with orchestrator %s", ethKeyFromAddress.String(), heliosKeyring.Addr.String()))
+	// 	}
+	// }
 
 	if *cfg.testnetForceValset {
 		log.Printf("force-updating valset for validator %s with orchestrator %s\n", ethKeyFromAddress.String(), heliosKeyring.Addr.String())
