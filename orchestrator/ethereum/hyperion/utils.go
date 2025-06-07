@@ -83,10 +83,10 @@ func (s *hyperionContract) GetLastValsetCheckpoint(
 		return nil, err
 	}
 
-	bts := []byte{}
-	for _, b := range checkpointBytes {
-		bts = append(bts, b)
-	}
+	// bts := []byte{}
+	// for _, b := range checkpointBytes {
+	// 	bts = append(bts, b)
+	// }
 
 	checkpoint := common.BytesToHash(checkpointBytes[:])
 	return &checkpoint, nil
