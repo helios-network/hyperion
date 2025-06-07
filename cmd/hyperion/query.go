@@ -160,6 +160,7 @@ func initializeBlockchainCmd(cmd *cli.Cmd) {
 
 		if counterpartyChainParams == nil {
 			orShutdown(errors.New("chain not found on helios please create a new proposal before using this command"))
+			return
 		}
 
 		ethKeyFromAddress, signerFn, _, err := initEthereumAccountsManager(

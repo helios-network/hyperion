@@ -107,6 +107,46 @@ type HyperionContract interface {
 	) (*big.Int, error)
 }
 
+func DeployHyperionContract(
+	ctx context.Context,
+	ethCommitter committer.EVMCommitter,
+) (common.Address, error, bool) {
+	auth := ethCommitter.GetTransactOpts(ctx)
+	hyperionAddress, tx, _, err := wrappers.DeployHyperion(auth, ethCommitter.Provider())
+	if err != nil {
+		return common.Address{}, err, false
+	}
+	// wait for the transaction to be handled
+	time.Sleep(1 * time.Second)
+
+	tx, isPending, err := ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+	if err != nil {
+		fmt.Println("Error getting transaction by hash:", err)
+		return common.Address{}, err, false
+	}
+
+	if isPending {
+		for isPending {
+			time.Sleep(1 * time.Second)
+			tx, isPending, err = ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+			if err != nil {
+				fmt.Println("Error getting transaction by hash:", err)
+				return common.Address{}, err, false
+			}
+		}
+	}
+
+	receipt, err := ethCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
+	if err != nil {
+		return common.Address{}, err, false
+	}
+	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+		return common.Address{}, errors.New("transaction failed"), false
+	}
+
+	return hyperionAddress, nil, true
+}
+
 func NewHyperionContract(
 	ctx context.Context,
 	ethCommitter committer.EVMCommitter,
@@ -162,7 +202,7 @@ var maxUintAllowance = big.NewInt(0).Sub(big.NewInt(0).Exp(big.NewInt(2), big.Ne
 
 var (
 	hyperionABI, _ = abi.JSON(strings.NewReader(wrappers.HyperionABI))
-	erc20ABI, _    = abi.JSON(strings.NewReader(wrappers.ERC20ABI))
+	erc20ABI, _    = abi.JSON(strings.NewReader(wrappers.HeliosERC20ABI))
 )
 
 func sigToVRS(sigHex string) (v uint8, r, s common.Hash) {

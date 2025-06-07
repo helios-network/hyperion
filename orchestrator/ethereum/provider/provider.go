@@ -26,6 +26,7 @@ type EVMProvider interface {
 	RemoveLastUsedRpc()
 	TestRpcs(ctx context.Context, operation func(*ethclient.Client, string) error) bool
 	RemoveRpc(targetUrl string) bool
+	GetRpcs() []*hyperiontypes.Rpc
 
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
@@ -74,6 +75,10 @@ func (p *evmProviderWithRet) RemoveLastUsedRpc() {
 
 func (p *evmProviderWithRet) TestRpcs(ctx context.Context, operation func(*ethclient.Client, string) error) bool {
 	return p.pool.TestRpcs(ctx, operation)
+}
+
+func (p *evmProviderWithRet) GetRpcs() []*hyperiontypes.Rpc {
+	return p.pool.GetRpcs()
 }
 
 func (p *evmProviderWithRet) RemoveRpc(targetUrl string) bool {
@@ -135,6 +140,15 @@ func (p *evmProviderWithRet) CallContract(ctx context.Context, call ethereum.Cal
 }
 
 func (p *evmProviderWithRet) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+	var err error
+	p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		err = client.SendTransaction(ctx, tx)
+		return err
+	})
+	if err != nil {
+		metrics.ReportFuncError(p.svcTags)
+		return err
+	}
 	return nil
 }
 

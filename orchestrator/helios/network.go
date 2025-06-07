@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/gov"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/tendermint"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -14,6 +15,7 @@ import (
 	comethttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 	"google.golang.org/grpc"
@@ -31,12 +33,15 @@ type NetworkConfig struct {
 
 type NetworkWithoutBroadcast interface {
 	hyperion.QueryClient
+	gov.QClient
 	tendermint.Client
 }
 
 type Network interface {
 	hyperion.QueryClient
 	hyperion.BroadcastClient
+	gov.QClient
+	gov.BClient
 	tendermint.Client
 }
 
@@ -88,9 +93,11 @@ func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWi
 
 	net := struct {
 		hyperion.QueryClient
+		gov.QClient
 		tendermint.Client
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 	}
 
@@ -149,10 +156,14 @@ func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignF
 		hyperion.QueryClient
 		hyperion.BroadcastClient
 		tendermint.Client
+		gov.QClient
+		gov.BClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
 		hyperion.NewBroadcastClient(chainClient, ethSignFn),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
+		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
+		gov.NewBroadcastClient(chainClient, ethSignFn),
 	}
 
 	logger.Infoln("NET LOADED")

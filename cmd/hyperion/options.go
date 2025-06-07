@@ -1,7 +1,6 @@
 package main
 
 import (
-	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	cli "github.com/jawher/mow.cli"
 )
 
@@ -132,8 +131,6 @@ type Config struct {
 	// Testnet config
 	testnetAutoRegister *bool
 	testnetForceValset  *bool
-
-	chainParams *hyperiontypes.CounterpartyChainParams
 }
 
 func initConfig(cmd *cli.Cmd) Config {
@@ -166,20 +163,21 @@ func initConfig(cmd *cli.Cmd) Config {
 		Name:   "tendermint-rpc",
 		Desc:   "Tendermint RPC endpoint",
 		EnvVar: "HYPERION_TENDERMINT_RPC",
+		Value:  "http://localhost:26657",
 	})
 
 	cfg.heliosGasPrices = cmd.String(cli.StringOpt{
 		Name:   "helios-gas-prices",
 		Desc:   "Specify Helios chain transaction fees as DecCoins gas prices",
 		EnvVar: "HYPERION_HELIOS_GAS_PRICES",
-		Value:  "", // example: 500000000ahelios
+		Value:  "500000000ahelios", // example: 500000000ahelios
 	})
 
 	cfg.heliosGas = cmd.String(cli.StringOpt{
 		Name:   "helios-gas",
 		Desc:   "Specify Helios chain transaction gas",
 		EnvVar: "HYPERION_HELIOS_GAS",
-		Value:  "", // example: 2000000
+		Value:  "2000000", // example: 2000000
 	})
 
 	cfg.heliosKeyringBackend = cmd.String(cli.StringOpt{

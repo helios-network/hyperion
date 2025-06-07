@@ -545,7 +545,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 	defer doneFn()
 
 	log.WithFields(log.Fields{
-		"cosmos_denom":   erc20.CosmosDenom,
+		"helios_denom":   erc20.HeliosDenom,
 		"token_contract": erc20.TokenContract.Hex(),
 		"name":           erc20.Name,
 		"symbol":         erc20.Symbol,
@@ -560,7 +560,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 		HyperionId:    hyperionId,
 		EventNonce:    erc20.EventNonce.Uint64(),
 		BlockHeight:   erc20.Raw.BlockNumber,
-		CosmosDenom:   erc20.CosmosDenom,
+		CosmosDenom:   erc20.HeliosDenom,
 		TokenContract: erc20.TokenContract.Hex(),
 		Name:          erc20.Name,
 		Symbol:        erc20.Symbol,

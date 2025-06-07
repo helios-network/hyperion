@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -163,4 +165,72 @@ func getHeliosNetworkFromConfig(cfg *Config) (*helios.Network, error) {
 		return nil, errors.Wrap(err, "failed to initialize Helios network")
 	}
 	return &heliosNetwork, nil
+}
+
+func getRpcsFromStorge(chainId uint64) ([]string, time.Duration, error) {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+
+	rpcsDirPath := filepath.Join(dirPath, "rpcs")
+	if _, err := os.Stat(rpcsDirPath); os.IsNotExist(err) {
+		os.MkdirAll(rpcsDirPath, 0755)
+	}
+
+	joinPath := filepath.Join(rpcsDirPath, strconv.FormatUint(chainId, 10)+".json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("[]"), 0644)
+	}
+
+	baseFile, err := os.ReadFile(joinPath)
+
+	if err != nil {
+		baseFile = []byte("[]")
+	}
+
+	var baseFileArray []string
+	json.Unmarshal(baseFile, &baseFileArray)
+
+	stat, _ := os.Stat(joinPath)
+
+	stat.ModTime()
+
+	return baseFileArray, time.Since(stat.ModTime()), nil
+}
+
+func updateRpcsToStorge(chainId uint64, rpcs []string) error {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+
+	rpcsDirPath := filepath.Join(dirPath, "rpcs")
+	if _, err := os.Stat(rpcsDirPath); os.IsNotExist(err) {
+		os.MkdirAll(rpcsDirPath, 0755)
+	}
+
+	joinPath := filepath.Join(rpcsDirPath, strconv.FormatUint(chainId, 10)+".json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("[]"), 0644)
+	}
+
+	jsonData, err := json.Marshal(rpcs)
+	if err != nil {
+		return err
+	}
+
+	os.WriteFile(joinPath, jsonData, 0644)
+
+	return nil
 }

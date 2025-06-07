@@ -56,6 +56,10 @@ func NewKeyring(cfg KeyringConfig) (Keyring, error) {
 	return newKeyringFromDir(cfg)
 }
 
+func NewKeyringFromPrivateKey(privateKey string) (Keyring, error) {
+	return newInMemoryKeyring(KeyringConfig{PrivateKey: privateKey})
+}
+
 func newInMemoryKeyring(cfg KeyringConfig) (Keyring, error) {
 
 	pk := strings.TrimPrefix(cfg.PrivateKey, "0x")

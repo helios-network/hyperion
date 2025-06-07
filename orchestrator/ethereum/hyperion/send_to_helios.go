@@ -27,7 +27,7 @@ func (s *hyperionContract) SendToHelios(
 	doneFn := metrics.ReportFuncTiming(s.svcTags)
 	defer doneFn()
 
-	erc20Wrapper, err := wrappers.NewERC20(erc20, s.ethProvider)
+	erc20Wrapper, err := wrappers.NewHeliosERC20(erc20, s.ethProvider)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		err = errors.Wrap(err, "failed to get ERC20 wrapper")

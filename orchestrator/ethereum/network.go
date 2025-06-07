@@ -2,6 +2,7 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -37,10 +38,12 @@ type Network interface {
 	RemoveLastUsedRpc()
 	RemoveRpc(targetUrl string) bool
 	TestRpcs(ctx context.Context) bool
+	GetRpcs() []*hyperiontypes.Rpc
 
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetNativeBalance(ctx context.Context) (*big.Int, error)
 	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
+	GetGasPrice(ctx context.Context) (*big.Int, error)
 
 	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
@@ -86,11 +89,33 @@ type network struct {
 	FromAddr gethcommon.Address
 }
 
+func DeployNewHyperionContract(
+	fromAddr gethcommon.Address,
+	signerFn bind.SignerFn,
+	cfg NetworkConfig,
+	options ...committer.EVMCommitterOption,
+) (gethcommon.Address, error, bool) {
+	ethCommitter, err := committer.NewEthCommitter(
+		fromAddr,
+		cfg.GasPriceAdjustment,
+		cfg.MaxGasPrice,
+		signerFn,
+		provider.NewEVMProvider(cfg.EthNodeRPCs),
+		options...,
+	)
+	if err != nil {
+		return gethcommon.Address{}, err, false
+	}
+	fmt.Println("Deploying Hyperion contract...", cfg.EthNodeRPCs)
+	return hyperion.DeployHyperionContract(context.Background(), ethCommitter)
+}
+
 func NewNetwork(
 	hyperionContractAddr,
 	fromAddr gethcommon.Address,
 	signerFn bind.SignerFn,
 	cfg NetworkConfig,
+	options ...committer.EVMCommitterOption,
 ) (Network, error) {
 	log.Info("fromAddr: ", fromAddr)
 	ethCommitter, err := committer.NewEthCommitter(
@@ -99,6 +124,7 @@ func NewNetwork(
 		cfg.MaxGasPrice,
 		signerFn,
 		provider.NewEVMProvider(cfg.EthNodeRPCs),
+		options...,
 	)
 	if err != nil {
 		return nil, err
@@ -122,6 +148,8 @@ func NewNetwork(
 	// 	}).Infoln("subscribing to Alchemy websocket")
 	// 	go hyperionContract.SubscribeToPendingTxs(cfg.EthNodeAlchemyWS)
 	// }
+
+	//ethCommitter.Provider().CallContract(context.Background(), ethereum.CallMsg{}, nil)
 
 	n := &network{
 		HyperionContract: hyperionContract,
@@ -165,6 +193,10 @@ func (n *network) RemoveLastUsedRpc() {
 	n.Provider().RemoveLastUsedRpc()
 }
 
+func (n *network) GetGasPrice(ctx context.Context) (*big.Int, error) {
+	return n.Provider().SuggestGasPrice(ctx)
+}
+
 func (n *network) TestRpcs(ctx context.Context) bool {
 	return n.Provider().TestRpcs(ctx, func(client *ethclient.Client, url string) error {
 		_, err := client.HeaderByNumber(ctx, nil)
@@ -172,16 +204,19 @@ func (n *network) TestRpcs(ctx context.Context) bool {
 			return err
 		}
 
-		balance, err := client.BalanceAt(ctx, n.FromAddr, nil)
+		_, err = client.BalanceAt(ctx, n.FromAddr, nil)
 		if err != nil {
 			return err
 		}
-		if balance.Cmp(big.NewInt(0)) == 0 {
-			return errors.New("native balance is 0")
-		}
+		fmt.Println("ok: ", url)
 		return nil
 	})
 }
+
+func (n *network) GetRpcs() []*hyperiontypes.Rpc {
+	return n.Provider().GetRpcs()
+}
+
 func (n *network) RemoveRpc(targetUrl string) bool {
 	return n.Provider().RemoveRpc(targetUrl)
 }

@@ -20,6 +20,68 @@ import (
 
 var emptyEthAddress = ethcmn.Address{}
 
+func initEthereumAccountsManagerWithRandomKey(
+	ethChainID uint64,
+) (
+	ethKeyFromAddress ethcmn.Address,
+	signerFn bind.SignerFn,
+	personalSignFn keystore.PersonalSignFn,
+	err error,
+) {
+	ethPk, err := ethcrypto.GenerateKey()
+	if err != nil {
+		return emptyEthAddress, nil, nil, err
+	}
+
+	ethAddressFromPk := ethcrypto.PubkeyToAddress(ethPk.PublicKey)
+
+	txOpts, err := bind.NewKeyedTransactorWithChainID(ethPk, new(big.Int).SetUint64(ethChainID))
+	if err != nil {
+		err = errors.New("failed to init NewKeyedTransactorWithChainID")
+		return emptyEthAddress, nil, nil, err
+	}
+
+	personalSignFn, err = keystore.PrivateKeyPersonalSignFn(ethPk)
+	if err != nil {
+		err = errors.New("failed to init PrivateKeyPersonalSignFn")
+		return emptyEthAddress, nil, nil, err
+	}
+
+	return ethAddressFromPk, txOpts.Signer, personalSignFn, nil
+}
+
+func initEthereumAccountsManagerWithPrivateKey(
+	ethPrivKey *string,
+	ethChainID uint64,
+) (
+	ethKeyFromAddress ethcmn.Address,
+	signerFn bind.SignerFn,
+	personalSignFn keystore.PersonalSignFn,
+	err error,
+) {
+	ethPk, err := ethcrypto.HexToECDSA(*ethPrivKey)
+	if err != nil {
+		err = errors.Wrap(err, "failed to hex-decode Ethereum ECDSA Private Key")
+		return emptyEthAddress, nil, nil, err
+	}
+
+	ethAddressFromPk := ethcrypto.PubkeyToAddress(ethPk.PublicKey)
+
+	txOpts, err := bind.NewKeyedTransactorWithChainID(ethPk, new(big.Int).SetUint64(ethChainID))
+	if err != nil {
+		err = errors.New("failed to init NewKeyedTransactorWithChainID")
+		return emptyEthAddress, nil, nil, err
+	}
+
+	personalSignFn, err = keystore.PrivateKeyPersonalSignFn(ethPk)
+	if err != nil {
+		err = errors.New("failed to init PrivateKeyPersonalSignFn")
+		return emptyEthAddress, nil, nil, err
+	}
+
+	return ethAddressFromPk, txOpts.Signer, personalSignFn, nil
+}
+
 func initEthereumAccountsManager(
 	ethChainID uint64,
 	ethKeystoreDir *string,
