@@ -124,7 +124,7 @@ require (
 	github.com/google/pprof v0.0.0-20230817174616-7a8ec2ada47b // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
+	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
@@ -235,9 +235,9 @@ replace (
 	cosmossdk.io/store => github.com/Helios-Chain-Labs/cosmos-sdk/store v0.50.10-helios-20
 	github.com/CosmWasm/wasmd => github.com/Helios-Chain-Labs/wasmd v0.50.10-helios-6
 
-	github.com/Helios-Chain-Labs/sdk-go => github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-65
+	github.com/Helios-Chain-Labs/sdk-go => github.com/Helios-Chain-Labs/sdk-go v0.50.10-helios-66
 	github.com/bandprotocol/bandchain-packet => github.com/Helios-Chain-Labs/bandchain-packet v0.50.10-helios-1
-	github.com/cometbft/cometbft => github.com/Helios-Chain-Labs/cometbft v0.50.10-helios-11
-	github.com/cosmos/cosmos-sdk => github.com/Helios-Chain-Labs/cosmos-sdk v0.50.10-helios-67
+	github.com/cometbft/cometbft => github.com/Helios-Chain-Labs/cometbft v0.50.10-helios-13
+	github.com/cosmos/cosmos-sdk => github.com/Helios-Chain-Labs/cosmos-sdk v0.50.10-helios-104
 	github.com/ethereum/go-ethereum => github.com/ethereum/go-ethereum v1.12.0
 )
