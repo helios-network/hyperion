@@ -83,7 +83,21 @@ func (g *Global) GetMinBatchFeeUSD() float64 {
 	return 0.0
 }
 
+func (g *Global) StartRunnersAtStartUp(runHyperion func(ctx context.Context, g *Global, chainId uint64) error) {
+	runners, err := storage.GetRunners()
+	if err != nil {
+		return
+	}
+	for _, runner := range runners {
+		err := runHyperion(context.Background(), g, uint64(runner["chainId"].(float64)))
+		if err != nil {
+			fmt.Println("Error running hyperion:", err)
+		}
+	}
+}
+
 func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc) {
+	storage.SetRunner(chainId)
 	g.runners[chainId] = cancel
 }
 
@@ -94,6 +108,7 @@ func (g *Global) GetRunner(chainId uint64) context.CancelFunc {
 func (g *Global) CancelRunner(chainId uint64) {
 	g.runners[chainId]()
 	delete(g.runners, chainId)
+	storage.RemoveRunner(chainId)
 }
 
 func (g *Global) InitHeliosNetwork(linkChainId uint64) (*helios.Network, error) {

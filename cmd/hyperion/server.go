@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
+	globaltypes "github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	"github.com/gorilla/mux"
@@ -30,7 +30,7 @@ type Response struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-func injectGlobalMiddleware(next http.HandlerFunc, global *global.Global, ctxGlobal context.Context) http.HandlerFunc {
+func injectGlobalMiddleware(next http.HandlerFunc, global *globaltypes.Global, ctxGlobal context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), GlobalKey, global)
 		ctx = context.WithValue(ctx, CtxKey, ctxGlobal)
@@ -51,7 +51,7 @@ func startServer(cmd *cli.Cmd) {
 
 		router := mux.NewRouter()
 
-		global := global.NewGlobal(&global.Config{
+		global := globaltypes.NewGlobal(&globaltypes.Config{
 			PrivateKey:            *cfg.heliosPrivKey,
 			HeliosChainID:         *cfg.heliosChainID,
 			HeliosGRPC:            *cfg.heliosGRPC,
@@ -66,6 +66,10 @@ func startServer(cmd *cli.Cmd) {
 
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
+
+		global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
+			return queries.RunHyperion(ctx, g, chainId)
+		})
 
 		// Query endpoints
 		router.HandleFunc("/api/query", injectGlobalMiddleware(handleQueryGet, global, ctx)).Methods("GET")
@@ -98,7 +102,7 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 	// Execute query-get command
 	// Implementation details here
-	global := r.Context().Value(GlobalKey).(*global.Global)
+	global := r.Context().Value(GlobalKey).(*globaltypes.Global)
 	query := r.URL.Query()
 	queryType := query.Get("type")
 
@@ -126,7 +130,7 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 	// Execute query-post command
 	// Implementation details here
-	global := r.Context().Value(GlobalKey).(*global.Global)
+	global := r.Context().Value(GlobalKey).(*globaltypes.Global)
 	query := r.URL.Query()
 	queryType := query.Get("type")
 

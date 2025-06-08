@@ -179,5 +179,11 @@ func initConfig(cmd *cli.Cmd) Config {
 		Value:  float64(23.3),
 	})
 
+	cfg.pendingTxWaitDuration = cmd.String(cli.StringOpt{
+		Name:   "relay-pending-tx-wait-duration",
+		Desc:   "Specify the wait duration for pending transactions",
+		EnvVar: "HYPERION_RELAY_PENDING_TX_WAIT_DURATION",
+		Value:  "20m",
+	})
 	return cfg
 }

@@ -212,3 +212,81 @@ func AddOneNewHyperionDeployedAddress(hyperion map[string]interface{}) error {
 
 	return UpdateMyHyperionsDeployedAddresses(hyperions)
 }
+
+func GetRunners() ([]map[string]interface{}, error) {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+
+	joinPath := filepath.Join(dirPath, "runners.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("[]"), 0644)
+	}
+
+	baseFile, err := os.ReadFile(joinPath)
+
+	if err != nil {
+		baseFile = []byte("[]")
+	}
+
+	var baseFileArray []map[string]interface{}
+	json.Unmarshal(baseFile, &baseFileArray)
+
+	return baseFileArray, nil
+}
+
+func SetRunner(chainId uint64) error {
+	runners, err := GetRunners()
+	if err != nil {
+		return err
+	}
+	runners = append(runners, map[string]interface{}{
+		"chainId": chainId,
+	})
+	return UpdateRunners(runners)
+}
+
+func RemoveRunner(chainId uint64) error {
+	runners, err := GetRunners()
+	if err != nil {
+		return err
+	}
+	for i, runner := range runners {
+		if uint64(runner["chainId"].(float64)) == chainId {
+			runners = append(runners[:i], runners[i+1:]...)
+		}
+	}
+	return UpdateRunners(runners)
+}
+
+func UpdateRunners(runners []map[string]interface{}) error {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+
+	joinPath := filepath.Join(dirPath, "runners.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("[]"), 0644)
+	}
+
+	jsonData, err := json.Marshal(runners)
+	if err != nil {
+		return err
+	}
+
+	os.WriteFile(joinPath, jsonData, 0644)
+
+	return nil
+}
