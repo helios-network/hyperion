@@ -30,8 +30,6 @@ func main() {
 		log.DefaultLogger.SetLevel(logLevel(*appLogLevel))
 	}
 
-	app.Command("orchestrator", "Starts the orchestrator main loop.", orchestratorCmd)
-	app.Command("q query", "Query commands that can get state info from Hyperion.", queryCmdSubset)
 	app.Command("version", "Print the version information and exit.", versionCmd)
 	app.Command("server", "Starts the server.", startServer)
 

@@ -8,9 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/keys"
-	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 	"google.golang.org/grpc"
 )
@@ -121,47 +118,4 @@ func formatHyperionIds(input string) map[int]int {
 	}
 
 	return result
-}
-
-func getHeliosNetworkFromConfig(cfg *Config) (*helios.Network, error) {
-	var (
-		heliosKeyringCfg = helios.KeyringConfig{
-			KeyringDir:     *cfg.heliosKeyringDir,
-			KeyringAppName: *cfg.heliosKeyringAppName,
-			KeyringBackend: *cfg.heliosKeyringBackend,
-			KeyFrom:        *cfg.heliosKeyFrom,
-			KeyPassphrase:  *cfg.heliosKeyPassphrase,
-			PrivateKey:     *cfg.heliosPrivKey,
-		}
-		heliosNetworkCfg = helios.NetworkConfig{
-			ChainID:       *cfg.heliosChainID,
-			HeliosGRPC:    *cfg.heliosGRPC,
-			TendermintRPC: *cfg.tendermintRPC,
-			GasPrice:      *cfg.heliosGasPrices,
-			Gas:           *cfg.heliosGas,
-		}
-	)
-
-	heliosKeyring, err := helios.NewKeyring(heliosKeyringCfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize Helios keyring")
-	}
-
-	heliosNetworkCfg.ValidatorAddress = heliosKeyring.Addr.String()
-	_, _, personalSignFn, err := keys.InitEthereumAccountsManager(
-		1, // not important for heliosClient
-		cfg.ethKeystoreDir,
-		cfg.ethKeyFrom,
-		cfg.ethPassphrase,
-		cfg.ethPrivKey,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize External chain Account")
-	}
-
-	heliosNetwork, err := helios.NewNetworkWithBroadcast(heliosKeyring, personalSignFn, heliosNetworkCfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize Helios network")
-	}
-	return &heliosNetwork, nil
 }

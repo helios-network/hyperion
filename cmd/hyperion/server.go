@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,6 +17,13 @@ import (
 	log "github.com/xlab/suplog"
 )
 
+type contextKey string
+
+const (
+	GlobalKey contextKey = "global"
+	CtxKey    contextKey = "ctx"
+)
+
 type Response struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
@@ -26,8 +32,8 @@ type Response struct {
 
 func injectGlobalMiddleware(next http.HandlerFunc, global *global.Global, ctxGlobal context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), "global", global)
-		ctx = context.WithValue(ctx, "ctx", ctxGlobal)
+		ctx := context.WithValue(r.Context(), GlobalKey, global)
+		ctx = context.WithValue(ctx, CtxKey, ctxGlobal)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
@@ -61,8 +67,6 @@ func startServer(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		log.Infof("Enabled logs: %s", *cfg.enabledLogs)
-
 		// Query endpoints
 		router.HandleFunc("/api/query", injectGlobalMiddleware(handleQueryGet, global, ctx)).Methods("GET")
 		router.HandleFunc("/api/query", injectGlobalMiddleware(handleQueryPost, global, ctx)).Methods("POST")
@@ -85,123 +89,16 @@ func startServer(cmd *cli.Cmd) {
 	}
 }
 
-func handleUnsetOrchestrator(w http.ResponseWriter, r *http.Request) {
-	// Parse request body for parameters
-	var params struct {
-		ChainID uint64 `json:"chain_id"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		sendError(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Execute command
-	cmd := cli.App("hyperion", "")
-	cmd.Command("q query", "", queryCmdSubset)
-
-	// Call unset-orchestrator with params
-	// Implementation details here
-
-	sendSuccess(w, "Orchestrator unset successfully", nil)
-}
-
-func handleSetOrchestrator(w http.ResponseWriter, r *http.Request) {
-	var params struct {
-		ChainID uint64 `json:"chain_id"`
-		Address string `json:"address"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		sendError(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Execute set-orchestrator command
-	// Implementation details here
-
-	sendSuccess(w, "Orchestrator set successfully", nil)
-}
-
-// func handleListOperativeChains(w http.ResponseWriter, r *http.Request) {
-// 	// Execute list-operative-chains command
-// 	// Implementation details here
-
-// 	global := r.Context().Value("global").(*global.Global)
-
-// 	// global.TestRpcsAndGetRpcs(1, []string{})
-// 	_, err := global.InitHeliosNetwork(1)
-// 	if err != nil {
-// 		sendError(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	proposalId, err := global.CreateNewBlockchainProposal()
-// 	if err != nil {
-// 		sendError(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-// 	fmt.Println("Proposal ID:", proposalId)
-
-// 	proposal, err := global.GetProposal(proposalId)
-// 	if err != nil {
-// 		sendError(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	decoded := map[string]interface{}{
-// 		"status":           proposal.Status,
-// 		"title":            proposal.Title,
-// 		"proposer":         proposal.Proposer,
-// 		"deposit_end_time": proposal.VotingEndTime,
-// 	}
-
-// 	// chains := []string{"chain1", "chain2"} // Example response
-// 	sendSuccess(w, decoded, nil)
-// }
-
-func handleInitializeBlockchain(w http.ResponseWriter, r *http.Request) {
-	var params struct {
-		ChainID uint64 `json:"chain_id"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		sendError(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Execute initialize-blockchain command
-	// Implementation details here
-
-	sendSuccess(w, "Blockchain initialized successfully", nil)
-}
-
 func handleVersion(w http.ResponseWriter, r *http.Request) {
 	// Get version info
 	version := version.Version()
 	sendSuccess(w, version, nil)
 }
 
-func handleDeployHyperion(w http.ResponseWriter, r *http.Request) {
-	// Execute deploy-hyperion command
-	// Implementation details here
-	global := r.Context().Value("global").(*global.Global)
-
-	address, _, success := global.DeployNewHyperionContract(11155111)
-	if !success {
-		sendError(w, "Failed to deploy Hyperion", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println("Hyperion deployed to:", address.String())
-
-	sendSuccess(w, address.String(), nil)
-}
-
 func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 	// Execute query-get command
 	// Implementation details here
-	global := r.Context().Value("global").(*global.Global)
+	global := r.Context().Value(GlobalKey).(*global.Global)
 	query := r.URL.Query()
 	queryType := query.Get("type")
 
@@ -229,7 +126,7 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 	// Execute query-post command
 	// Implementation details here
-	global := r.Context().Value("global").(*global.Global)
+	global := r.Context().Value(GlobalKey).(*global.Global)
 	query := r.URL.Query()
 	queryType := query.Get("type")
 
@@ -279,7 +176,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		ctxGlobal := r.Context().Value("ctx").(context.Context)
+		ctxGlobal := r.Context().Value(CtxKey).(context.Context)
 
 		err := queries.RunHyperion(ctxGlobal, global, params.ChainID)
 		if err != nil {
@@ -297,7 +194,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		ctxGlobal := r.Context().Value("ctx").(context.Context)
+		ctxGlobal := r.Context().Value(CtxKey).(context.Context)
 		err := queries.StopHyperion(ctxGlobal, global, params.ChainID)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
@@ -313,7 +210,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		ctxGlobal := r.Context().Value("ctx").(context.Context)
+		ctxGlobal := r.Context().Value(CtxKey).(context.Context)
 		err := queries.RegisterHyperion(ctxGlobal, global, params.ChainID)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
@@ -329,13 +226,32 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		ctxGlobal := r.Context().Value("ctx").(context.Context)
+		ctxGlobal := r.Context().Value(CtxKey).(context.Context)
 		err := queries.UnRegisterHyperion(ctxGlobal, global, params.ChainID)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		sendSuccess(w, "Hyperion unregistered successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "deploy-erc20":
+		var params struct {
+			ChainID  uint64 `json:"chain_id"`
+			Denom    string `json:"denom"`
+			Name     string `json:"name"`
+			Symbol   string `json:"symbol"`
+			Decimals uint8  `json:"decimals"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.DeployHeliosTokenToChain(r.Context(), global, params.ChainID, params.Denom, params.Name, params.Symbol, params.Decimals)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
 		return
 	}
 	sendSuccess(w, "404", nil)

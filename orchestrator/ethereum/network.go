@@ -67,6 +67,15 @@ type Network interface {
 		powers []*big.Int,
 	) (*gethtypes.Transaction, uint64, error)
 
+	DeployERC20(
+		ctx context.Context,
+		callerAddress gethcommon.Address,
+		denom string,
+		name string,
+		symbol string,
+		decimals uint8,
+	) (*gethtypes.Transaction, uint64, error)
+
 	GetLastEventNonce(ctx context.Context) (*big.Int, error)
 	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
 	GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error)

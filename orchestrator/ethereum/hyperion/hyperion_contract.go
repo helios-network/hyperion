@@ -61,6 +61,15 @@ type HyperionContract interface {
 		powers []*big.Int,
 	) (*gethtypes.Transaction, uint64, error)
 
+	DeployERC20(
+		ctx context.Context,
+		callerAddress common.Address,
+		denom string,
+		name string,
+		symbol string,
+		decimals uint8,
+	) (*gethtypes.Transaction, uint64, error)
+
 	GetTxBatchNonce(
 		ctx context.Context,
 		erc20ContractAddress common.Address,

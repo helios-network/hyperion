@@ -193,6 +193,8 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 		return nil, 0, err
 	}
 
+	time.Sleep(5 * time.Second)
+
 	tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 	if err != nil {
 		fmt.Println("Error getting transaction by hash:", err)
@@ -214,6 +216,54 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 	if err != nil {
 		return nil, 0, err
 	}
+	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+		return nil, 0, errors.New("transaction failed")
+	}
+
+	return tx, receipt.BlockNumber.Uint64(), nil
+}
+
+func (s *hyperionContract) DeployERC20(
+	ctx context.Context,
+	callerAddress common.Address,
+	denom string,
+	name string,
+	symbol string,
+	decimals uint8,
+) (*gethtypes.Transaction, uint64, error) {
+
+	tx, err := s.ethHyperion.DeployERC20(&bind.TransactOpts{
+		From:    callerAddress,
+		Context: ctx,
+		Signer:  s.signerFn,
+	}, denom, name, symbol, decimals)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	time.Sleep(5 * time.Second)
+
+	tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if isPending {
+		for isPending {
+			time.Sleep(1 * time.Second)
+			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+			if err != nil {
+				fmt.Println("Error getting transaction by hash:", err)
+				return nil, 0, err
+			}
+		}
+	}
+
+	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
+	if err != nil {
+		return nil, 0, err
+	}
+
 	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
 		return nil, 0, errors.New("transaction failed")
 	}
