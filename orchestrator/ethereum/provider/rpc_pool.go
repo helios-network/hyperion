@@ -327,9 +327,9 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 				p.classifyRpcUrl(rpcUrl, false)
 				return nil // Success
 			}
-			if strings.Contains(err.Error(), "limit") {
+			if strings.Contains(err.Error(), "limit") || strings.Contains(err.Error(), "Too Many Requests") || strings.Contains(err.Error(), "cannot unmarshal") || strings.Contains(err.Error(), "500 Internal Server Error") || strings.Contains(err.Error(), "transactions allowed") {
 				fmt.Println("WARNING rpcUrl: ", rpcUrl)
-				p.classifyRpcUrl(rpcUrl, false)
+				p.classifyRpcUrl(rpcUrl, true)
 				continue
 			}
 			lastErr = err

@@ -65,7 +65,7 @@ type Network interface {
 		powerThreshold *big.Int,
 		validators []gethcommon.Address,
 		powers []*big.Int,
-	) (*gethtypes.Transaction, error)
+	) (*gethtypes.Transaction, uint64, error)
 
 	GetLastEventNonce(ctx context.Context) (*big.Int, error)
 	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
@@ -94,7 +94,7 @@ func DeployNewHyperionContract(
 	signerFn bind.SignerFn,
 	cfg NetworkConfig,
 	options ...committer.EVMCommitterOption,
-) (gethcommon.Address, error, bool) {
+) (gethcommon.Address, uint64, error, bool) {
 	ethCommitter, err := committer.NewEthCommitter(
 		fromAddr,
 		cfg.GasPriceAdjustment,
@@ -104,7 +104,7 @@ func DeployNewHyperionContract(
 		options...,
 	)
 	if err != nil {
-		return gethcommon.Address{}, err, false
+		return gethcommon.Address{}, 0, err, false
 	}
 	fmt.Println("Deploying Hyperion contract...", cfg.EthNodeRPCs)
 	return hyperion.DeployHyperionContract(context.Background(), ethCommitter)

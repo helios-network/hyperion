@@ -21,6 +21,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/keys"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcchainlist"
@@ -279,7 +280,7 @@ func orchestratorCmd(cmd *cli.Cmd) {
 				continue
 			}
 
-			ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManager(
+			ethKeyFromAddress, signerFn, personalSignFn, err := keys.InitEthereumAccountsManager(
 				uint64(counterpartyChainParams.BridgeChainId),
 				cfg.ethKeystoreDir,
 				cfg.ethKeyFrom,

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -88,6 +89,8 @@ func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ether
 // when hyperion is run alongside a validator helios node.
 func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Network) error {
 	s.logger.Infoln("running orchestrator in validator mode")
+
+	fmt.Println("startValidatorMode")
 
 	// get hyperion ID from contract
 	hyperionIDHash, err := eth.GetHyperionID(ctx)

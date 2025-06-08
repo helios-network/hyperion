@@ -2,7 +2,9 @@ package hyperion
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -178,7 +180,7 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 	powerThreshold *big.Int,
 	validators []common.Address,
 	powers []*big.Int,
-) (*gethtypes.Transaction, error) {
+) (*gethtypes.Transaction, uint64, error) {
 
 	tx, err := s.ethHyperion.Initialize(&bind.TransactOpts{
 		From:    callerAddress,
@@ -188,14 +190,33 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 
 	if err != nil {
 		err = errors.Wrap(err, "Initialize call failed")
-		return nil, err
+		return nil, 0, err
 	}
 
-	_, _, err = s.EVMCommitter.SendTx(ctx, s.hyperionAddress, tx.Data())
+	tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 	if err != nil {
-		err = errors.Wrap(err, "SendTx call failed")
-		return nil, err
+		fmt.Println("Error getting transaction by hash:", err)
+		return nil, 0, err
 	}
 
-	return tx, nil
+	if isPending {
+		for isPending {
+			time.Sleep(1 * time.Second)
+			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+			if err != nil {
+				fmt.Println("Error getting transaction by hash:", err)
+				return nil, 0, err
+			}
+		}
+	}
+
+	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
+	if err != nil {
+		return nil, 0, err
+	}
+	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+		return nil, 0, errors.New("transaction failed")
+	}
+
+	return tx, receipt.BlockNumber.Uint64(), nil
 }

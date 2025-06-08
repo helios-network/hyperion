@@ -1,4 +1,4 @@
-package main
+package keys
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 
 var emptyEthAddress = ethcmn.Address{}
 
-func initEthereumAccountsManagerWithRandomKey(
+func InitEthereumAccountsManagerWithRandomKey(
 	ethChainID uint64,
 ) (
 	ethKeyFromAddress ethcmn.Address,
@@ -50,7 +50,7 @@ func initEthereumAccountsManagerWithRandomKey(
 	return ethAddressFromPk, txOpts.Signer, personalSignFn, nil
 }
 
-func initEthereumAccountsManagerWithPrivateKey(
+func InitEthereumAccountsManagerWithPrivateKey(
 	ethPrivKey *string,
 	ethChainID uint64,
 ) (
@@ -82,7 +82,7 @@ func initEthereumAccountsManagerWithPrivateKey(
 	return ethAddressFromPk, txOpts.Signer, personalSignFn, nil
 }
 
-func initEthereumAccountsManager(
+func InitEthereumAccountsManager(
 	ethChainID uint64,
 	ethKeystoreDir *string,
 	ethKeyFrom *string,

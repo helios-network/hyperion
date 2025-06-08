@@ -1,10 +1,14 @@
-package main
+package global
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"slices"
+	"strconv"
 	"time"
 
 	"cosmossdk.io/math"
@@ -14,12 +18,30 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcchainlist"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
+	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
+	keys "github.com/Helios-Chain-Labs/hyperion/orchestrator/keys"
 )
+
+type Config struct {
+	PrivateKey      string
+	HeliosChainID   string
+	HeliosGRPC      string
+	TendermintRPC   string
+	HeliosGasPrices string
+	HeliosGas       string
+
+	EthGasPriceAdjustment float64
+	EthMaxGasPrice        string
+	PendingTxWaitDuration string
+}
 
 type Global struct {
 	cfg           *Config
@@ -30,10 +52,12 @@ type Global struct {
 	accAddress        cosmostypes.AccAddress
 	signerFn          bind.SignerFn
 	personalSignFn    keystore.PersonalSignFn
+
+	runners map[uint64]context.CancelFunc
 }
 
 func NewGlobal(cfg *Config) *Global {
-	return &Global{cfg: cfg}
+	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelFunc, 0)}
 }
 
 func (g *Global) GetConfig() *Config {
@@ -41,12 +65,40 @@ func (g *Global) GetConfig() *Config {
 }
 
 func (g *Global) GetHeliosNetwork() *helios.Network {
+	if g.heliosNetwork == nil {
+		g.InitHeliosNetwork(0)
+	}
 	return g.heliosNetwork
+}
+
+func (g *Global) GetAddress() gethcommon.Address {
+	return g.ethKeyFromAddress
+}
+
+func (g *Global) GetCosmosAddress() cosmostypes.AccAddress {
+	return g.accAddress
+}
+
+func (g *Global) GetMinBatchFeeUSD() float64 {
+	return 0.0
+}
+
+func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc) {
+	g.runners[chainId] = cancel
+}
+
+func (g *Global) GetRunner(chainId uint64) context.CancelFunc {
+	return g.runners[chainId]
+}
+
+func (g *Global) CancelRunner(chainId uint64) {
+	g.runners[chainId]()
+	delete(g.runners, chainId)
 }
 
 func (g *Global) InitHeliosNetwork(linkChainId uint64) (*helios.Network, error) {
 
-	heliosKeyring, err := helios.NewKeyringFromPrivateKey(*g.cfg.heliosPrivKey)
+	heliosKeyring, err := helios.NewKeyringFromPrivateKey(g.cfg.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -55,16 +107,16 @@ func (g *Global) InitHeliosNetwork(linkChainId uint64) (*helios.Network, error) 
 
 	var (
 		heliosNetworkCfg = helios.NetworkConfig{
-			ChainID:          *g.cfg.heliosChainID,
-			HeliosGRPC:       *g.cfg.heliosGRPC,
-			TendermintRPC:    *g.cfg.tendermintRPC,
-			GasPrice:         *g.cfg.heliosGasPrices,
-			Gas:              *g.cfg.heliosGas,
+			ChainID:          g.cfg.HeliosChainID,
+			HeliosGRPC:       g.cfg.HeliosGRPC,
+			TendermintRPC:    g.cfg.TendermintRPC,
+			GasPrice:         g.cfg.HeliosGasPrices,
+			Gas:              g.cfg.HeliosGas,
 			ValidatorAddress: heliosKeyring.Addr.String(),
 		}
 	)
 
-	ethKeyFromAddress, signerFn, personalSignFn, err := initEthereumAccountsManagerWithPrivateKey(g.cfg.heliosPrivKey, linkChainId)
+	ethKeyFromAddress, signerFn, personalSignFn, err := keys.InitEthereumAccountsManagerWithPrivateKey(&g.cfg.PrivateKey, linkChainId)
 	if err != nil {
 		fmt.Println("Error initializing ethereum accounts manager:", err)
 		return nil, err
@@ -91,13 +143,13 @@ func (g *Global) GetGasPrice(chainId uint64) string {
 		return "0"
 	}
 
-	ethKeyFromAddress, signerFn, _, _ := initEthereumAccountsManagerWithRandomKey(chainId)
+	ethKeyFromAddress, signerFn, _, _ := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
 
 	ethNetwork, _ := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, ethereum.NetworkConfig{
 		EthNodeRPCs:           rpcs,
-		GasPriceAdjustment:    *g.cfg.ethGasPriceAdjustment,
-		MaxGasPrice:           *g.cfg.ethMaxGasPrice,
-		PendingTxWaitDuration: *g.cfg.pendingTxWaitDuration,
+		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
+		MaxGasPrice:           g.cfg.EthMaxGasPrice,
+		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
 	})
 
 	gasPrice, err := ethNetwork.GetGasPrice(context.Background())
@@ -108,7 +160,7 @@ func (g *Global) GetGasPrice(chainId uint64) string {
 }
 
 func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*hyperiontypes.Rpc, error) {
-	rpcs, timeSinceLastUpdate, err := getRpcsFromStorge(chainId)
+	rpcs, timeSinceLastUpdate, err := storage.GetRpcsFromStorge(chainId)
 	if err != nil {
 		rpcs = make([]string, 0)
 	}
@@ -161,13 +213,13 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 		})
 	}
 
-	ethKeyFromAddress, signerFn, _, _ := initEthereumAccountsManagerWithRandomKey(chainId)
+	ethKeyFromAddress, signerFn, _, _ := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
 
 	ethNetwork, _ := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, ethereum.NetworkConfig{
 		EthNodeRPCs:           rpcList,
-		GasPriceAdjustment:    *g.cfg.ethGasPriceAdjustment,
-		MaxGasPrice:           *g.cfg.ethMaxGasPrice,
-		PendingTxWaitDuration: *g.cfg.pendingTxWaitDuration,
+		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
+		MaxGasPrice:           g.cfg.EthMaxGasPrice,
+		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
 	})
 
 	ethNetwork.TestRpcs(context.Background())
@@ -179,7 +231,7 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 		rpcsToSave = append(rpcsToSave, rpc.Url)
 	}
 
-	updateRpcsToStorge(chainId, rpcsToSave)
+	storage.UpdateRpcsToStorge(chainId, rpcsToSave)
 
 	rpcFinalList := make([]*hyperiontypes.Rpc, 0)
 	for _, rpc := range rpcsToSave {
@@ -207,12 +259,18 @@ func (g *Global) InitTargetNetwork(counterpartyChainParams *hyperiontypes.Counte
 		return nil, err
 	}
 
+	gasPrice := g.GetGasPrice(counterpartyChainParams.BridgeChainId)
+	options := []committer.EVMCommitterOption{
+		committer.OptionGasPriceFromString(gasPrice),
+		committer.OptionGasLimit(5000000),
+	}
+
 	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, g.ethKeyFromAddress, g.signerFn, ethereum.NetworkConfig{
 		EthNodeRPCs:           rpcs,
-		GasPriceAdjustment:    *g.cfg.ethGasPriceAdjustment,
-		MaxGasPrice:           *g.cfg.ethMaxGasPrice,
-		PendingTxWaitDuration: *g.cfg.pendingTxWaitDuration,
-	})
+		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
+		MaxGasPrice:           g.cfg.EthMaxGasPrice,
+		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
+	}, options...)
 
 	if err != nil {
 		return nil, err
@@ -228,18 +286,24 @@ func (g *Global) GetEVMProvider(chainId uint64) (provider.EVMProvider, error) {
 	return provider.NewEVMProvider(rpcs), nil
 }
 
-func (g *Global) CreateNewBlockchainProposal() (uint64, error) {
-	title := "Add EthereumSepolia as a counterparty chain"
-	description := "Add EthereumSepolia as a counterparty chain"
+func (g *Global) CreateNewBlockchainProposal(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
+	_, err := g.InitHeliosNetwork(0)
+	if err != nil {
+		return 0, err
+	}
+
+	hash := sha256.Sum256([]byte(wrappers.HyperionBin))
+	hashString := hex.EncodeToString(hash[:])
+
 	contentI := map[string]interface{}{
 		"@type": "/helios.hyperion.v1.MsgAddCounterpartyChainParams",
 		"counterparty_chain_params": map[string]interface{}{
-			"hyperion_id":                      11155111,
-			"contract_source_hash":             "05649bbd4cea9b99354570631c1d935aad20faee",
-			"bridge_counterparty_address":      "0xB8ed88AcD8b7ac80d9f546F4D75F33DD19dD5746",
-			"bridge_chain_id":                  11155111,
-			"bridge_chain_name":                "EthereumSepolia",
-			"bridge_chain_logo":                "45fa0204dcbb461f9899168a8b56162ecc832919b0c8b81b85f7de2abba408aa",
+			"hyperion_id":                      counterpartyChainParams.HyperionId,
+			"contract_source_hash":             hashString,
+			"bridge_counterparty_address":      counterpartyChainParams.BridgeCounterpartyAddress,
+			"bridge_chain_id":                  counterpartyChainParams.BridgeChainId,
+			"bridge_chain_name":                counterpartyChainParams.BridgeChainName,
+			"bridge_chain_logo":                counterpartyChainParams.BridgeChainLogo,
 			"bridge_chain_type":                "evm",
 			"signed_valsets_window":            25000,
 			"signed_batches_window":            25000,
@@ -247,42 +311,42 @@ func (g *Global) CreateNewBlockchainProposal() (uint64, error) {
 			"target_batch_timeout":             36000000, // 10 hours
 			"target_outgoing_tx_timeout":       36000000, // 10 hours
 			"average_block_time":               2000,
-			"average_counterparty_block_time":  12000,
+			"average_counterparty_block_time":  counterpartyChainParams.AverageCounterpartyBlockTime,
 			"slash_fraction_valset":            "0.001",
 			"slash_fraction_batch":             "0.001",
 			"slash_fraction_claim":             "0.001",
 			"slash_fraction_conflicting_claim": "0.001",
 			"unbond_slashing_valsets_window":   25000,
 			"slash_fraction_bad_eth_signature": "0.001",
-			"bridge_contract_start_height":     8434556,
+			"bridge_contract_start_height":     counterpartyChainParams.BridgeContractStartHeight,
 			"valset_reward": map[string]interface{}{
 				"denom":  "ahelios",
 				"amount": "0",
 			},
-			"initializer": g.ethKeyFromAddress.Hex(),
+			"initializer":    g.ethKeyFromAddress.Hex(),
 			"default_tokens": []interface{}{
-				map[string]interface{}{
-					"token_address_to_denom": map[string]interface{}{
-						"denom":                "ahelios",
-						"token_address":        "0x507ABEA5D8d39E1880E0fd7620fe433B5797A284",
-						"is_cosmos_originated": true,
-						"is_concensus_token":   true,
-						"symbol":               "HLS",
-						"decimals":             18,
-					},
-					"default_holders": []interface{}{},
-				},
-				map[string]interface{}{
-					"token_address_to_denom": map[string]interface{}{
-						"denom":                "ueth",
-						"token_address":        "0x959FA4351fA64aad2aE9e55FFd77f341459a012b",
-						"is_cosmos_originated": false,
-						"is_concensus_token":   false,
-						"symbol":               "ETH",
-						"decimals":             18,
-					},
-					"default_holders": []interface{}{},
-				},
+				// map[string]interface{}{
+				// 	"token_address_to_denom": map[string]interface{}{
+				// 		"denom":                "ahelios",
+				// 		"token_address":        "0x507ABEA5D8d39E1880E0fd7620fe433B5797A284",
+				// 		"is_cosmos_originated": true,
+				// 		"is_concensus_token":   true,
+				// 		"symbol":               "HLS",
+				// 		"decimals":             18,
+				// 	},
+				// 	"default_holders": []interface{}{},
+				// },
+				// map[string]interface{}{
+				// 	"token_address_to_denom": map[string]interface{}{
+				// 		"denom":                "ueth",
+				// 		"token_address":        "0x959FA4351fA64aad2aE9e55FFd77f341459a012b",
+				// 		"is_cosmos_originated": false,
+				// 		"is_concensus_token":   false,
+				// 		"symbol":               "ETH",
+				// 		"decimals":             18,
+				// 	},
+				// 	"default_holders": []interface{}{},
+				// },
 			},
 			"rpcs":                       []interface{}{},
 			"offset_valset_nonce":        0,
@@ -298,16 +362,14 @@ func (g *Global) CreateNewBlockchainProposal() (uint64, error) {
 	return proposalId, nil
 }
 
-func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, bool) {
+func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, uint64, bool) {
 	rpcs, err := g.TestRpcsAndGetRpcs(chainId, []string{})
 	if err != nil {
-		return gethcommon.Address{}, false
+		return gethcommon.Address{}, 0, false
 	}
-	if g.signerFn == nil {
-		_, err := g.InitHeliosNetwork(chainId)
-		if err != nil {
-			return gethcommon.Address{}, false
-		}
+	_, err = g.InitHeliosNetwork(chainId)
+	if err != nil {
+		return gethcommon.Address{}, 0, false
 	}
 
 	gasPrice := g.GetGasPrice(chainId)
@@ -317,20 +379,59 @@ func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, 
 	}
 
 	fmt.Println("Deploying Hyperion contract...", g.ethKeyFromAddress.Hex())
-	address, err, success := ethereum.DeployNewHyperionContract(g.ethKeyFromAddress, g.signerFn, ethereum.NetworkConfig{
+	address, blockNumber, err, success := ethereum.DeployNewHyperionContract(g.ethKeyFromAddress, g.signerFn, ethereum.NetworkConfig{
 		EthNodeRPCs:           rpcs,
-		GasPriceAdjustment:    *g.cfg.ethGasPriceAdjustment,
-		MaxGasPrice:           *g.cfg.ethMaxGasPrice,
-		PendingTxWaitDuration: *g.cfg.pendingTxWaitDuration,
+		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
+		MaxGasPrice:           g.cfg.EthMaxGasPrice,
+		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
 	}, options...)
 	if err != nil {
 		fmt.Println("Error deploying Hyperion contract:", err)
-		return gethcommon.Address{}, false
+		return gethcommon.Address{}, 0, false
 	}
 	if !success {
-		return gethcommon.Address{}, false
+		return gethcommon.Address{}, 0, false
 	}
-	return address, true
+	return address, blockNumber, true
+}
+
+func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (uint64, error) {
+	_, err := g.InitHeliosNetwork(chainId)
+	if err != nil {
+		return 0, err
+	}
+	hyperionContractInfo, err := storage.GetHyperionContractInfo(chainId)
+	if err != nil {
+		return 0, err
+	}
+
+	targetNetwork, err := g.InitTargetNetwork(&hyperiontypes.CounterpartyChainParams{
+		BridgeChainId:             chainId,
+		BridgeCounterpartyAddress: hyperionContractInfo["hyperionAddress"].(string),
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	// default valset only for initial deployment
+	hyperionIdHash := common.HexToHash(strconv.FormatUint(chainId, 16))
+	powerThreshold := big.NewInt(1431655765)
+	validators := make([]gethcommon.Address, 1)
+	powers := make([]*big.Int, 1)
+	validators[0] = g.ethKeyFromAddress
+	powers[0] = big.NewInt(2147483647)
+
+	_, blockNumber, err := (*targetNetwork).SendInitializeBlockchainTx(context.Background(), g.ethKeyFromAddress, hyperionIdHash, powerThreshold, validators, powers)
+	if err != nil {
+		return 0, err
+	}
+
+	storage.UpdateHyperionContractInfo(chainId, hyperionContractInfo["hyperionAddress"].(string), map[string]interface{}{
+		"initializedAtBlockNumber": blockNumber,
+	})
+
+	return blockNumber, nil
+
 }
 
 func (g *Global) GetProposal(proposalId uint64) (*govtypes.Proposal, error) {
@@ -342,7 +443,11 @@ func (g *Global) GetProposal(proposalId uint64) (*govtypes.Proposal, error) {
 }
 
 func (g *Global) VoteOnProposal(proposalId uint64) error {
-	err := (*g.heliosNetwork).VoteOnProposal(context.Background(), proposalId, g.accAddress)
+	_, err := g.InitHeliosNetwork(0)
+	if err != nil {
+		return err
+	}
+	err = (*g.heliosNetwork).VoteOnProposal(context.Background(), proposalId, g.accAddress)
 	if err != nil {
 		return err
 	}

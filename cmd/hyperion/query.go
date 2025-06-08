@@ -9,6 +9,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/keys"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/ethereum/go-ethereum/common"
 	cli "github.com/jawher/mow.cli"
@@ -163,7 +164,7 @@ func initializeBlockchainCmd(cmd *cli.Cmd) {
 			return
 		}
 
-		ethKeyFromAddress, signerFn, _, err := initEthereumAccountsManager(
+		ethKeyFromAddress, signerFn, _, err := keys.InitEthereumAccountsManager(
 			uint64(counterpartyChainParams.BridgeChainId),
 			cfg.ethKeystoreDir,
 			cfg.ethKeyFrom,
@@ -263,7 +264,7 @@ func initializeBlockchainCmd(cmd *cli.Cmd) {
 		}
 		fmt.Println("balance: ", balance)
 
-		tx, err := ethNetwork.SendInitializeBlockchainTx(ctx, common.HexToAddress(*cfg.ethKeyFrom), hyperionIdHash, powerThreshold, validators, powers)
+		tx, _, err := ethNetwork.SendInitializeBlockchainTx(ctx, common.HexToAddress(*cfg.ethKeyFrom), hyperionIdHash, powerThreshold, validators, powers)
 		if err != nil {
 			orShutdown(errors.Wrap(err, fmt.Sprintf("failed to send initialize blockchain tx for chain %d", counterpartyChainParams.BridgeChainId)))
 		}

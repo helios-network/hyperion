@@ -59,7 +59,7 @@ type HyperionContract interface {
 		powerThreshold *big.Int,
 		validators []common.Address,
 		powers []*big.Int,
-	) (*gethtypes.Transaction, error)
+	) (*gethtypes.Transaction, uint64, error)
 
 	GetTxBatchNonce(
 		ctx context.Context,
@@ -110,11 +110,11 @@ type HyperionContract interface {
 func DeployHyperionContract(
 	ctx context.Context,
 	ethCommitter committer.EVMCommitter,
-) (common.Address, error, bool) {
+) (common.Address, uint64, error, bool) {
 	auth := ethCommitter.GetTransactOpts(ctx)
 	hyperionAddress, tx, _, err := wrappers.DeployHyperion(auth, ethCommitter.Provider())
 	if err != nil {
-		return common.Address{}, err, false
+		return common.Address{}, 0, err, false
 	}
 	// wait for the transaction to be handled
 	time.Sleep(1 * time.Second)
@@ -122,7 +122,7 @@ func DeployHyperionContract(
 	tx, isPending, err := ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 	if err != nil {
 		fmt.Println("Error getting transaction by hash:", err)
-		return common.Address{}, err, false
+		return common.Address{}, 0, err, false
 	}
 
 	if isPending {
@@ -131,20 +131,20 @@ func DeployHyperionContract(
 			tx, isPending, err = ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 			if err != nil {
 				fmt.Println("Error getting transaction by hash:", err)
-				return common.Address{}, err, false
+				return common.Address{}, 0, err, false
 			}
 		}
 	}
 
 	receipt, err := ethCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
 	if err != nil {
-		return common.Address{}, err, false
+		return common.Address{}, 0, err, false
 	}
 	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
-		return common.Address{}, errors.New("transaction failed"), false
+		return common.Address{}, 0, errors.New("transaction failed"), false
 	}
 
-	return hyperionAddress, nil, true
+	return hyperionAddress, receipt.BlockNumber.Uint64(), nil, true
 }
 
 func NewHyperionContract(
