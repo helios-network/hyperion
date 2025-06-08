@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperion Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+        .chain-card {
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        <v-app>
+            <!-- Login Page -->
+            <v-container v-if="!isAuthenticated" fluid class="fill-height">
+                <v-row align="center" justify="center">
+                    <v-col cols="12" sm="8" md="4">
+                        <v-card class="elevation-12">
+                            <v-toolbar color="primary" dark flat>
+                                <v-toolbar-title>Hyperion Login</v-toolbar-title>
+                            </v-toolbar>
+                            <v-card-text>
+                                <v-form @submit.prevent="login">
+                                    <v-text-field
+                                        v-model="password"
+                                        :append-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                                        :type="showPassword ? 'text' : 'password'"
+                                        label="Password"
+                                        @click:append="showPassword = !showPassword"
+                                    ></v-text-field>
+                                    <v-alert v-if="error" type="error" dense>
+                                        {{ error }}
+                                    </v-alert>
+                                </v-form>
+                            </v-card-text>
+                            <v-card-actions>
+                                <v-spacer></v-spacer>
+                                <v-btn color="primary" @click="login">Login</v-btn>
+                            </v-card-actions>
+                        </v-card>
+                    </v-col>
+                </v-row>
+            </v-container>
+
+            <!-- Dashboard -->
+            <v-container v-else>
+                <v-row>
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                Hyperion Chains
+                                <v-spacer></v-spacer>
+                                <v-btn color="primary" @click="showAddChainDialog = true">
+                                    Add Chain
+                                </v-btn>
+                            </v-card-title>
+                            <v-card-text>
+                                <v-row>
+                                    <v-col v-for="(chain, id) in chains" :key="id" cols="12" md="6" lg="4">
+                                        <v-card class="chain-card">
+                                            <v-card-text>
+                                                <div class="text-h6 mb-2">Chain ID: {{ chain.chainId }}</div>
+                                                <v-list dense>
+                                                    <v-list-item>
+                                                        <v-list-item-content>
+                                                            <v-list-item-title>Address</v-list-item-title>
+                                                            <v-list-item-subtitle>{{ chain.address }}</v-list-item-subtitle>
+                                                        </v-list-item-content>
+                                                    </v-list-item>
+                                                    <v-list-item>
+                                                        <v-list-item-content>
+                                                            <v-list-item-title>Status</v-list-item-title>
+                                                            <v-list-item-subtitle>
+                                                                <v-chip
+                                                                    :color="chain.running ? 'success' : 'error'"
+                                                                    small
+                                                                >
+                                                                    {{ chain.running ? 'Running' : 'Stopped' }}
+                                                                </v-chip>
+                                                                <v-chip
+                                                                    :color="chain.registered ? 'success' : 'warning'"
+                                                                    small
+                                                                    class="ml-2"
+                                                                >
+                                                                    {{ chain.registered ? 'Registered' : 'Unregistered' }}
+                                                                </v-chip>
+                                                                <v-chip
+                                                                    v-if="chain.paused"
+                                                                    color="warning"
+                                                                    small
+                                                                    class="ml-2"
+                                                                >
+                                                                    Paused
+                                                                </v-chip>
+                                                            </v-list-item-subtitle>
+                                                        </v-list-item-content>
+                                                    </v-list-item>
+                                                </v-list>
+                                                <v-card-actions>
+                                                    <v-spacer></v-spacer>
+                                                    <v-btn
+                                                        v-if="!chain.running && chain.proposed && chain.registered"
+                                                        color="success"
+                                                        @click="runHyperion(chain.chainId)"
+                                                        :loading="chain.isLoading"
+                                                    >
+                                                        Run
+                                                    </v-btn>
+                                                    <v-btn
+                                                        v-if="chain.running"
+                                                        color="error"
+                                                        @click="stopHyperion(chain.chainId)"
+                                                        :loading="chain.isLoading"
+                                                    >
+                                                        Stop
+                                                    </v-btn>
+                                                    <v-btn
+                                                        v-if="!chain.proposed"
+                                                        color="primary"
+                                                        @click="openProposeDialog(chain.chainId)"
+                                                        :loading="chain.isLoading"
+                                                        class="ml-2"
+                                                    >
+                                                        Propose
+                                                    </v-btn>
+                                                </v-card-actions>
+                                            </v-card-text>
+                                        </v-card>
+                                    </v-col>
+                                </v-row>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+
+                <!-- Add Chain Dialog -->
+                <v-dialog v-model="showAddChainDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Add New Chain</v-card-title>
+                        <v-card-text>
+                            <v-text-field
+                                v-model="newChainId"
+                                label="Chain ID"
+                                type="number"
+                            ></v-text-field>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showAddChainDialog = false">Cancel</v-btn>
+                            <v-btn color="primary" @click="deployHyperion">Deploy</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Propose Hyperion Dialog -->
+                <v-dialog v-model="showProposeDialog" max-width="600px">
+                    <v-card>
+                        <v-card-title>Propose Hyperion</v-card-title>
+                        <v-card-text>
+                            <v-form ref="proposeForm">
+                                <v-text-field
+                                    v-model="proposeForm.title"
+                                    label="Title"
+                                    required
+                                    :rules="[v => !!v || 'Title is required']"
+                                ></v-text-field>
+                                <v-textarea
+                                    v-model="proposeForm.description"
+                                    label="Description"
+                                    required
+                                    :rules="[v => !!v || 'Description is required']"
+                                ></v-textarea>
+                                <v-text-field
+                                    v-model="proposeForm.bridge_chain_id"
+                                    label="Bridge Chain ID"
+                                    type="number"
+                                    disabled
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeForm.bridge_chain_name"
+                                    label="Bridge Chain Name"
+                                    required
+                                    :rules="[v => !!v || 'Bridge Chain Name is required']"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeForm.average_counterparty_block_time"
+                                    label="Average Block Time (ms)"
+                                    type="number"
+                                    required
+                                    :rules="[
+                                        v => !!v || 'Block time is required',
+                                        v => v > 0 || 'Block time must be positive'
+                                    ]"
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showProposeDialog = false">Cancel</v-btn>
+                            <v-btn color="primary" @click="proposeHyperion" :loading="isProposing">
+                                Propose
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Snackbar for notifications -->
+                <v-snackbar
+                    v-model="snackbar.show"
+                    :color="snackbar.color"
+                    :timeout="3000"
+                >
+                    {{ snackbar.text }}
+                    <template v-slot:action="{ attrs }">
+                        <v-btn
+                            text
+                            v-bind="attrs"
+                            @click="snackbar.show = false"
+                        >
+                            Close
+                        </v-btn>
+                    </template>
+                </v-snackbar>
+            </v-container>
+        </v-app>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            vuetify: new Vuetify(),
+            data: {
+                isAuthenticated: false,
+                password: '',
+                showPassword: false,
+                error: null,
+                chains: {},
+                showAddChainDialog: false,
+                showProposeDialog: false,
+                newChainId: '',
+                isProposing: false,
+                proposeForm: {
+                    title: '',
+                    description: '',
+                    bridge_chain_id: null,
+                    bridge_chain_name: '',
+                    average_counterparty_block_time: 12000
+                },
+                snackbar: {
+                    show: false,
+                    text: '',
+                    color: 'success'
+                }
+            },
+            mounted() {
+                const storedPassword = localStorage.getItem('password');
+                if (storedPassword) {
+                    this.isAuthenticated = true;
+                    this.fetchChains();
+                }
+            },
+            methods: {
+                showNotification(text, color = 'success') {
+                    this.snackbar.text = text;
+                    this.snackbar.color = color;
+                    this.snackbar.show = true;
+                },
+                async login() {
+                    try {
+                        const response = await fetch('/api/query?type=login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ password: this.password }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Invalid password');
+                        }
+
+                        localStorage.setItem('password', this.password);
+                        this.isAuthenticated = true;
+                        this.error = null;
+                        this.fetchChains();
+                    } catch (error) {
+                        this.error = error.message;
+                    }
+                },
+                async fetchChains() {
+                    try {
+                        const response = await fetch('/api/query?type=get-list-hyperions');
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch chains');
+                        }
+                        const resp = await response.json();
+                        // Add isLoading property to each chain
+                        this.chains = [];
+                        Object.keys(resp.data).forEach(key => {
+                            this.chains.push({
+                                ... resp.data[key],
+                                isLoading: false,
+                            });
+                        });
+                    } catch (error) {
+                        console.error('Error fetching chains:', error);
+                        this.showNotification('Failed to fetch chains', 'error');
+                    }
+                },
+                async runHyperion(chainId) {
+                    try {
+                        // Set loading state
+                        this.chains.find(chain => chain.chainId === chainId).isLoading = true;
+
+                        const response = await fetch('/api/query?type=run-hyperion', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ chain_id: chainId }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to run Hyperion');
+                        }
+
+                        // Show success message
+                        this.showNotification(`Hyperion started successfully for chain ${chainId}`);
+                        
+                        // Refresh the chains list
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error running Hyperion:', error);
+                        this.showNotification(`Failed to run Hyperion: ${error.message}`, 'error');
+                    } finally {
+                        // Clear loading state if the chain still exists
+                        if (this.chains.find(chain => chain.chainId === chainId)) {
+                            this.chains.find(chain => chain.chainId === chainId).isLoading = false;
+                        }
+                    }
+                },
+                async stopHyperion(chainId) {
+                    try {
+                        // Set loading state
+                        this.chains.find(chain => chain.chainId === chainId).isLoading = true;
+
+                        const response = await fetch('/api/query?type=stop-hyperion', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ chain_id: chainId }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to stop Hyperion');
+                        }
+
+                        // Show success message
+                        this.showNotification(`Hyperion stopped successfully for chain ${chainId}`);
+                        
+                        // Refresh the chains list
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error stopping Hyperion:', error);
+                        this.showNotification(`Failed to stop Hyperion: ${error.message}`, 'error');
+                    } finally {
+                        // Clear loading state if the chain still exists
+                        if (this.chains.find(chain => chain.chainId === chainId)) {
+                            this.chains.find(chain => chain.chainId === chainId).isLoading = false;
+                        }
+                    }
+                },
+                async deployHyperion() {
+                    try {
+                        const response = await fetch('/api/query?type=deploy-hyperion', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ chain_id: Number(this.newChainId)}),
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error);
+                        }
+
+                        this.showAddChainDialog = false;
+                        this.newChainId = '';
+                        this.showNotification('Hyperion deployed successfully');
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error deploying Hyperion:', error);
+                        this.showNotification(error.message, 'error');
+                    }
+                },
+                openProposeDialog(chainId) {
+                    this.proposeForm = {
+                        title: '',
+                        description: '',
+                        bridge_chain_id: chainId,
+                        bridge_chain_name: '',
+                        average_counterparty_block_time: 12000
+                    };
+                    this.showProposeDialog = true;
+                },
+                async proposeHyperion() {
+                    if (!this.$refs.proposeForm.validate()) {
+                        return;
+                    }
+
+                    this.isProposing = true;
+                    try {
+                        const response = await fetch('/api/query?type=propose-hyperion', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                title: this.proposeForm.title,
+                                description: this.proposeForm.description,
+                                bridge_chain_id: Number(this.proposeForm.bridge_chain_id),
+                                bridge_chain_name: this.proposeForm.bridge_chain_name,
+                                average_counterparty_block_time: Number(this.proposeForm.average_counterparty_block_time)
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to propose Hyperion');
+                        }
+
+                        this.showProposeDialog = false;
+                        this.showNotification('Hyperion proposed successfully');
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error proposing Hyperion:', error);
+                        this.showNotification(`Failed to propose Hyperion: ${error.message}`, 'error');
+                    } finally {
+                        this.isProposing = false;
+                    }
+                },
+            },
+        });
+    </script>
+</body>
+</html> 

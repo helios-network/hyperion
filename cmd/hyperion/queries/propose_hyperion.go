@@ -47,6 +47,10 @@ func ProposeHyperion(ctx context.Context, global *global.Global, title string, d
 		return nil, err
 	}
 
+	storage.UpdateHyperionContractInfo(bridgeChainId, hyperionAddress, map[string]interface{}{
+		"proposed": true,
+	})
+
 	time.Sleep(4 * time.Second)
 
 	global.VoteOnProposal(proposalId)

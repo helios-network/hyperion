@@ -38,6 +38,13 @@ func injectGlobalMiddleware(next http.HandlerFunc, global *globaltypes.Global, c
 	}
 }
 
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Infof("Request: %s %s", r.Method, r.URL.Path)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func startServer(cmd *cli.Cmd) {
 	cmd.Before = func() {
 		initMetrics(cmd)
@@ -50,6 +57,7 @@ func startServer(cmd *cli.Cmd) {
 		defer closer.Close()
 
 		router := mux.NewRouter()
+		router.Use(loggingMiddleware)
 
 		global := globaltypes.NewGlobal(&globaltypes.Config{
 			PrivateKey:            *cfg.heliosPrivKey,
@@ -67,16 +75,25 @@ func startServer(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
-			return queries.RunHyperion(ctx, g, chainId)
-		})
+		// global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
+		// 	return queries.RunHyperion(ctx, g, chainId)
+		// })
 
-		// Query endpoints
-		router.HandleFunc("/api/query", injectGlobalMiddleware(handleQueryGet, global, ctx)).Methods("GET")
-		router.HandleFunc("/api/query", injectGlobalMiddleware(handleQueryPost, global, ctx)).Methods("POST")
+		// API endpoints first
+		apiRouter := router.PathPrefix("/api").Subrouter()
+		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryGet, global, ctx)).Methods("GET")
+		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryPost, global, ctx)).Methods("POST")
+		apiRouter.HandleFunc("/version", handleVersion).Methods("GET")
 
-		// Version endpoint
-		router.HandleFunc("/api/version", handleVersion).Methods("GET")
+		// Create a file server handler that serves index.html for the root path
+		fs := http.FileServer(http.Dir("static"))
+		router.PathPrefix("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.ServeFile(w, r, "static/index.html")
+				return
+			}
+			http.StripPrefix("/", fs).ServeHTTP(w, r)
+		}))
 
 		// Start server
 		port := os.Getenv("PORT")
@@ -135,6 +152,25 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 	queryType := query.Get("type")
 
 	switch queryType {
+	case "login":
+		var params struct {
+			Password string `json:"password"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		// TODO: Implement actual password verification
+		if params.Password != "your-secure-password" {
+			sendError(w, "Invalid password", http.StatusUnauthorized)
+			return
+		}
+
+		sendSuccess(w, "Login successful", nil)
+		return
+
 	case "deploy-hyperion":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`
@@ -258,7 +294,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		sendSuccess(w, response, nil)
 		return
 	}
-	sendSuccess(w, "404", nil)
+	sendError(w, "Unknown query type", http.StatusBadRequest)
 }
 
 func sendError(w http.ResponseWriter, message string, status int) {

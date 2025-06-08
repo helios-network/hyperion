@@ -257,11 +257,24 @@ func RemoveRunner(chainId uint64) error {
 	if err != nil {
 		return err
 	}
+
+	// Find the index of the runner to remove
+	index := -1
 	for i, runner := range runners {
 		if uint64(runner["chainId"].(float64)) == chainId {
-			runners = append(runners[:i], runners[i+1:]...)
+			index = i
+			break
 		}
 	}
+
+	// If found, remove it safely
+	if index >= 0 && index < len(runners) {
+		// Remove the element by copying the last element to the index position
+		// and then truncating the slice
+		runners[index] = runners[len(runners)-1]
+		runners = runners[:len(runners)-1]
+	}
+
 	return UpdateRunners(runners)
 }
 
