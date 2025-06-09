@@ -10,7 +10,39 @@ import (
 	"time"
 )
 
-func UpdateFeesFile(feesTaken *big.Int, tokenContract string, cost *big.Int, txHash string, blockHeight uint64, chainId uint64) {
+func GetFeesFile() ([]map[string]interface{}, error) {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+
+	joinPath := filepath.Join(dirPath, "fees.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("[]"), 0644)
+	}
+
+	baseFile, err := os.ReadFile(joinPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var baseFileArray []map[string]interface{}
+	json.Unmarshal(baseFile, &baseFileArray)
+
+	for i := len(baseFileArray)/2 - 1; i >= 0; i-- {
+		opp := len(baseFileArray) - 1 - i
+		baseFileArray[i], baseFileArray[opp] = baseFileArray[opp], baseFileArray[i]
+	}
+
+	return baseFileArray, nil
+}
+
+func UpdateFeesFile(feesTaken *big.Int, tokenContract string, cost *big.Int, txHash string, blockHeight uint64, chainId uint64, txType string) {
 
 	homePath, err := os.UserHomeDir()
 	if err != nil {
@@ -42,7 +74,9 @@ func UpdateFeesFile(feesTaken *big.Int, tokenContract string, cost *big.Int, txH
 		"cost":           cost.String(),
 		"tx_hash":        txHash,
 		"block_height":   blockHeight,
+		"tx_type":        txType,
 		"chain_id":       chainId,
+		"timestamp":      time.Now().Unix(),
 	}
 	baseFileArray = append(baseFileArray, feesObject)
 	json, err := json.Marshal(baseFileArray)
@@ -265,6 +299,18 @@ func SetRunner(chainId uint64) error {
 	if err != nil {
 		return err
 	}
+
+	alreadyExists := false
+	for _, runner := range runners {
+		if uint64(runner["chainId"].(float64)) == chainId {
+			alreadyExists = true
+			break
+		}
+	}
+	if alreadyExists {
+		RemoveRunner(chainId)
+	}
+
 	runners = append(runners, map[string]interface{}{
 		"chainId": chainId,
 	})

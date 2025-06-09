@@ -13,6 +13,13 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 )
 
+func min(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) error {
 	registeredNetworks, _ := helios.GetListOfNetworksWhereRegistered(*global.GetHeliosNetwork(), global.GetAddress())
 
@@ -57,41 +64,117 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		ChainParams:          counterpartyChainParams,
 	}
 
-	heliosNetwork, err := global.InitHeliosNetwork(counterpartyChainParams.BridgeChainId)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to initialize helios network for chain %d", counterpartyChainParams.BridgeChainId))
-	}
+	fmt.Println("run Hyperion FUNC")
 
-	targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to initialize target network for chain %d", counterpartyChainParams.BridgeChainId))
-	}
-
-	// Create hyperion and run it
-	hyperion, err := orchestrator.NewOrchestrator(
-		*heliosNetwork,
-		*targetNetwork,
-		pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: "https://api.coingecko.com/api/v3"}),
-		orchestratorCfg,
-		global,
-	)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to initialize orchestrator for chain %d", counterpartyChainParams.BridgeChainId))
-	}
-
-	ctxCancellable, cancel := context.WithCancel(ctx)
-	// run orchestrator and retry if it fails
 	go func() {
 		fmt.Println("run orchestrator")
-		err = hyperion.Run(ctxCancellable, network, *targetNetwork)
-		if err != nil {
-			fmt.Println("Error running orchestrator", err)
-			time.Sleep(10 * time.Second)
-			RunHyperion(ctx, global, counterpartyChainParams.BridgeChainId)
+		baseDelay, _ := time.ParseDuration("10s")
+		maxDelay, _ := time.ParseDuration("5m")
+		currentDelay := baseDelay
+		consecutiveErrors := 0
+
+		for {
+			// Create new cancellable context for each iteration
+			ctxCancellable, cancel := context.WithCancel(ctx)
+
+			fmt.Println("Starting orchestrator")
+
+			heliosNetwork, err := global.InitHeliosNetwork(counterpartyChainParams.BridgeChainId)
+			if err != nil {
+				fmt.Println("Error initializing helios network:", err)
+				cancel()
+				time.Sleep(currentDelay)
+				currentDelay = min(currentDelay*2, maxDelay)
+				consecutiveErrors++
+				if consecutiveErrors > 5 {
+					fmt.Println("Too many consecutive errors, waiting for max delay")
+					time.Sleep(maxDelay)
+				}
+				continue
+			}
+
+			// Initialize new target network
+			targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)
+			if err != nil {
+				fmt.Println("Error initializing target network:", err)
+				cancel()
+				time.Sleep(currentDelay)
+				currentDelay = min(currentDelay*2, maxDelay)
+				consecutiveErrors++
+				if consecutiveErrors > 5 {
+					fmt.Println("Too many consecutive errors, waiting for max delay")
+					time.Sleep(maxDelay)
+				}
+				continue
+			}
+
+			// Create new hyperion instance
+			hyperion, err := orchestrator.NewOrchestrator(
+				*heliosNetwork,
+				*targetNetwork,
+				pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: "https://api.coingecko.com/api/v3"}),
+				orchestratorCfg,
+				global,
+			)
+			if err != nil {
+				fmt.Println("Error creating new orchestrator:", err)
+				cancel()
+				time.Sleep(currentDelay)
+				currentDelay = min(currentDelay*2, maxDelay)
+				consecutiveErrors++
+				if consecutiveErrors > 5 {
+					fmt.Println("Too many consecutive errors, waiting for max delay")
+					time.Sleep(maxDelay)
+				}
+				continue
+			}
+
+			// Reset delay and error count on successful initialization
+			currentDelay = baseDelay
+			consecutiveErrors = 0
+
+			// Update runner in global state
+			global.SetRunner(chainId, cancel, hyperion)
+
+			// Run the orchestrator with panic recovery
+			errChan := make(chan error, 1)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Printf("Recovered from panic in hyperion.Run: %v\n", r)
+						errChan <- fmt.Errorf("panic: %v", r)
+					}
+				}()
+
+				err := hyperion.Run(ctxCancellable, network, *targetNetwork)
+				errChan <- err
+			}()
+
+			// Wait for either error or context cancellation
+			select {
+			case err := <-errChan:
+				if err != nil {
+					fmt.Printf("Orchestrator error: %v, restarting after delay...\n", err)
+					cancel()
+					time.Sleep(currentDelay)
+					currentDelay = min(currentDelay*2, maxDelay)
+					consecutiveErrors++
+					if consecutiveErrors > 5 {
+						fmt.Println("Too many consecutive errors, waiting for max delay")
+						time.Sleep(maxDelay)
+					}
+				} else {
+					fmt.Println("Orchestrator stopped normally, exiting...")
+					cancel()
+					return
+				}
+			case <-ctx.Done():
+				fmt.Println("Context cancelled, stopping orchestrator")
+				cancel()
+				return
+			}
 		}
 	}()
-
-	global.SetRunner(chainId, cancel, hyperion)
 
 	return nil
 }

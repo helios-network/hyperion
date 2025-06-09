@@ -184,6 +184,24 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, rpcs, nil)
 		return
+	case "get-list-transactions":
+		page, err := strconv.ParseInt(query.Get("page"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid page", http.StatusBadRequest)
+			return
+		}
+		size, err := strconv.ParseInt(query.Get("size"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid size", http.StatusBadRequest)
+			return
+		}
+		transactions, err := queries.GetListTransactions(r.Context(), global, int(page), int(size))
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, transactions, nil)
+		return
 	}
 	sendSuccess(w, "404", nil)
 }

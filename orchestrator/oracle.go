@@ -326,7 +326,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			}
 			cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
 			if err == nil {
-				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000))
+				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
 			}
 
 			// Considering block time ~1s on Helios chain, adding Sleep to make sure new event is sent

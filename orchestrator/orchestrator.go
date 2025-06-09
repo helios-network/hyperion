@@ -92,6 +92,10 @@ func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ether
 	return s.startValidatorMode(ctx, eth)
 }
 
+func (s *Orchestrator) SetEthereum(eth ethereum.Network) {
+	s.ethereum = eth
+}
+
 func (s *Orchestrator) GetEthereum() ethereum.Network {
 	return s.ethereum
 }

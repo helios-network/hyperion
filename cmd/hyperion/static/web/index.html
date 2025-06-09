@@ -50,7 +50,7 @@
             </v-container>
 
             <!-- Dashboard -->
-            <v-container v-else-if="!showTokensPage">
+            <v-container v-else-if="!showTokensPage && !showRpcsPage">
                 <v-row>
                     <v-col cols="12">
                         <v-card>
@@ -68,6 +68,12 @@
                                             <v-card-text>
                                                 <div class="text-h6 mb-2">Chain ID: {{ chain.chainId }}</div>
                                                 <v-list dense>
+                                                    <v-list-item v-if="chain.name !== undefined">
+                                                        <v-list-item-content>
+                                                            <v-list-item-title>Name</v-list-item-title>
+                                                            <v-list-item-subtitle>{{ chain.name }}</v-list-item-subtitle>
+                                                        </v-list-item-content>
+                                                    </v-list-item>
                                                     <v-list-item>
                                                         <v-list-item-content>
                                                             <v-list-item-title>Address</v-list-item-title>
@@ -111,6 +117,14 @@
                                                         class="mr-2"
                                                     >
                                                         Tokens
+                                                    </v-btn>
+                                                    <v-btn
+                                                        v-if="chain.running"
+                                                        color="info"
+                                                        @click="viewRpcs(chain.chainId)"
+                                                        class="mr-2"
+                                                    >
+                                                        RPCs
                                                     </v-btn>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
@@ -161,6 +175,68 @@
                                         </v-card>
                                     </v-col>
                                 </v-row>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+
+                <!-- Transactions Table -->
+                <v-row class="mt-4">
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                Recent Transactions
+                            </v-card-title>
+                            <v-card-text>
+                                <v-data-table
+                                    :headers="[
+                                        { text: 'Chain ID', value: 'chain_id' },
+                                        { text: 'Type', value: 'tx_type' },
+                                        { text: 'Transaction Hash', value: 'tx_hash' },
+                                        { text: 'Block Height', value: 'block_height' },
+                                        { text: 'Token Contract', value: 'token_contract' },
+                                        { text: 'Fees Taken', value: 'fees_taken' },
+                                        { text: 'Cost', value: 'cost' },
+                                        { text: 'Timestamp', value: 'timestamp' }
+                                    ]"
+                                    :items="transactions"
+                                    :loading="isLoadingTransactions"
+                                    :options.sync="transactionTableOptions"
+                                    :server-items-length="totalTransactions"
+                                    :footer-props="{
+                                        'items-per-page-options': [5, 10, 20, 50],
+                                        showFirstLastPage: true
+                                    }"
+                                >
+                                    <template v-slot:item.tx_hash="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.tx_hash }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.tx_hash)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                    <template v-slot:item.token_contract="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.token_contract }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.token_contract)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                </v-data-table>
                             </v-card-text>
                         </v-card>
                     </v-col>
@@ -243,6 +319,48 @@
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
+            </v-container>
+
+            <!-- RPCs Page -->
+            <v-container v-else-if="showRpcsPage">
+                <v-row>
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                RPCs for Chain {{ selectedChainId }}
+                                <v-spacer></v-spacer>
+                                <v-btn color="secondary" @click="showRpcsPage = false">
+                                    Back to Chains
+                                </v-btn>
+                            </v-card-title>
+                            <v-card-text>
+                                <v-data-table
+                                    :headers="[
+                                        { text: 'RPC URL', value: 'url' },
+                                        { text: 'Reputation', value: 'reputation' }
+                                    ]"
+                                    :items="rpcs"
+                                    :loading="isLoadingRpcs"
+                                >
+                                    <template v-slot:item.url="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.url }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.url)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                </v-data-table>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
             </v-container>
 
             <!-- Tokens Page -->
@@ -371,6 +489,7 @@
                 showAddChainDialog: false,
                 showProposeDialog: false,
                 showTokensPage: false,
+                showRpcsPage: false,
                 showAddTokenDialog: false,
                 selectedChainId: null,
                 newChainId: '',
@@ -378,10 +497,15 @@
                 isDeploying: false,
                 isDeployingToken: false,
                 isLoadingTokens: false,
+                isLoadingRpcs: false,
+                isLoadingTransactions: false,
                 tokens: [],
-                totalTokens: 0,
-                page: 1,
-                size: 10,
+                rpcs: [],
+                transactions: [],
+                tableOptions: {},
+                transactionTableOptions: {},
+                totalItems: 0,
+                totalTransactions: 0,
                 newToken: {
                     name: '',
                     symbol: '',
@@ -399,15 +523,14 @@
                     show: false,
                     text: '',
                     color: 'success'
-                },
-                tableOptions: {},
-                totalItems: 0
+                }
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
                 if (storedPassword) {
                     this.isAuthenticated = true;
                     this.fetchChains();
+                    this.fetchTransactions();
                 }
             },
             watch: {
@@ -416,6 +539,12 @@
                         if (this.selectedChainId) {
                             this.viewTokens(this.selectedChainId);
                         }
+                    },
+                    deep: true
+                },
+                transactionTableOptions: {
+                    handler() {
+                        this.fetchTransactions();
                     },
                     deep: true
                 }
@@ -760,6 +889,59 @@
                         if (chain) {
                             chain.isLoading = false;
                         }
+                    }
+                },
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showNotification('RPC URL copied to clipboard');
+                    });
+                },
+                async viewRpcs(chainId) {
+                    this.selectedChainId = chainId;
+                    this.showRpcsPage = true;
+                    this.rpcs = [];
+                    this.isLoadingRpcs = true;
+
+                    try {
+                        const response = await fetch(`/api/query?type=get-list-rpcs&chain_id=${chainId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch RPCs');
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.rpcs = data.data.rpcs.sort((a, b) => b.reputation - a.reputation);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching RPCs:', error);
+                        this.showNotification('Failed to fetch RPCs', 'error');
+                    } finally {
+                        this.isLoadingRpcs = false;
+                    }
+                },
+                async fetchTransactions() {
+                    if (!this.isAuthenticated) return;
+                    
+                    this.isLoadingTransactions = true;
+                    try {
+                        const page = this.transactionTableOptions.page || 1;
+                        const itemsPerPage = this.transactionTableOptions.itemsPerPage || 10;
+                        
+                        const response = await fetch(`/api/query?type=get-list-transactions&page=${page}&size=${itemsPerPage}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch transactions');
+                        }
+
+                        const data = await response.json();
+                        if (data.success && data.data.transactions) {
+                            this.transactions = data.data.transactions;
+                            this.totalTransactions = data.data.total || this.transactions.length;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching transactions:', error);
+                        this.showNotification('Failed to fetch transactions', 'error');
+                    } finally {
+                        this.isLoadingTransactions = false;
                     }
                 },
             },

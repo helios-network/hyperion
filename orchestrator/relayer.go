@@ -351,7 +351,7 @@ func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontype
 		return err
 	}
 
-	storage.UpdateFeesFile(latestEthValset.RewardAmount.BigInt(), latestEthValset.RewardToken, cost, txHash.Hex(), latestEthValset.Height, l.cfg.ChainId)
+	storage.UpdateFeesFile(latestEthValset.RewardAmount.BigInt(), latestEthValset.RewardToken, cost, txHash.Hex(), latestEthValset.Height, l.cfg.ChainId, "VALSET")
 
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent validator set update to Ethereum")
 
@@ -476,7 +476,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 
 	feesTaken := oldestConfirmedBatch.GetFees().BigInt()
 	// TODO: save fees taken and expenses
-	storage.UpdateFeesFile(feesTaken, oldestConfirmedBatch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId)
+	storage.UpdateFeesFile(feesTaken, oldestConfirmedBatch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
 	///////
 
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)

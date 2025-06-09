@@ -180,6 +180,68 @@
                     </v-col>
                 </v-row>
 
+                <!-- Transactions Table -->
+                <v-row class="mt-4">
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                Recent Transactions
+                            </v-card-title>
+                            <v-card-text>
+                                <v-data-table
+                                    :headers="[
+                                        { text: 'Chain ID', value: 'chain_id' },
+                                        { text: 'Type', value: 'tx_type' },
+                                        { text: 'Transaction Hash', value: 'tx_hash' },
+                                        { text: 'Block Height', value: 'block_height' },
+                                        { text: 'Token Contract', value: 'token_contract' },
+                                        { text: 'Fees Taken', value: 'fees_taken' },
+                                        { text: 'Cost', value: 'cost' },
+                                        { text: 'Timestamp', value: 'timestamp' }
+                                    ]"
+                                    :items="transactions"
+                                    :loading="isLoadingTransactions"
+                                    :options.sync="transactionTableOptions"
+                                    :server-items-length="totalTransactions"
+                                    :footer-props="{
+                                        'items-per-page-options': [5, 10, 20, 50],
+                                        showFirstLastPage: true
+                                    }"
+                                >
+                                    <template v-slot:item.tx_hash="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.tx_hash }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.tx_hash)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                    <template v-slot:item.token_contract="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.token_contract }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.token_contract)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                </v-data-table>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+
                 <!-- Add Chain Dialog -->
                 <v-dialog v-model="showAddChainDialog" max-width="500px">
                     <v-card>
@@ -436,10 +498,14 @@
                 isDeployingToken: false,
                 isLoadingTokens: false,
                 isLoadingRpcs: false,
+                isLoadingTransactions: false,
                 tokens: [],
                 rpcs: [],
+                transactions: [],
                 tableOptions: {},
+                transactionTableOptions: {},
                 totalItems: 0,
+                totalTransactions: 0,
                 newToken: {
                     name: '',
                     symbol: '',
@@ -464,6 +530,7 @@
                 if (storedPassword) {
                     this.isAuthenticated = true;
                     this.fetchChains();
+                    this.fetchTransactions();
                 }
             },
             watch: {
@@ -472,6 +539,12 @@
                         if (this.selectedChainId) {
                             this.viewTokens(this.selectedChainId);
                         }
+                    },
+                    deep: true
+                },
+                transactionTableOptions: {
+                    handler() {
+                        this.fetchTransactions();
                     },
                     deep: true
                 }
@@ -844,6 +917,31 @@
                         this.showNotification('Failed to fetch RPCs', 'error');
                     } finally {
                         this.isLoadingRpcs = false;
+                    }
+                },
+                async fetchTransactions() {
+                    if (!this.isAuthenticated) return;
+                    
+                    this.isLoadingTransactions = true;
+                    try {
+                        const page = this.transactionTableOptions.page || 1;
+                        const itemsPerPage = this.transactionTableOptions.itemsPerPage || 10;
+                        
+                        const response = await fetch(`/api/query?type=get-list-transactions&page=${page}&size=${itemsPerPage}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch transactions');
+                        }
+
+                        const data = await response.json();
+                        if (data.success && data.data.transactions) {
+                            this.transactions = data.data.transactions;
+                            this.totalTransactions = data.data.total || this.transactions.length;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching transactions:', error);
+                        this.showNotification('Failed to fetch transactions', 'error');
+                    } finally {
+                        this.isLoadingTransactions = false;
                     }
                 },
             },
