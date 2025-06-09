@@ -77,10 +77,6 @@ func startServer(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		// global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
-		// 	return queries.RunHyperion(ctx, g, chainId)
-		// })
-
 		// API endpoints first
 		apiRouter := router.PathPrefix("/api").Subrouter()
 		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryGet, global, ctx)).Methods("GET")
@@ -106,6 +102,13 @@ func startServer(cmd *cli.Cmd) {
 				return
 			}
 		}))
+
+		// Start runners at start up
+		go func() {
+			global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
+				return queries.RunHyperion(ctx, g, chainId)
+			})
+		}()
 
 		// Start server
 		port := os.Getenv("PORT")
@@ -167,6 +170,19 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sendSuccess(w, tokens, nil)
+		return
+	case "get-list-rpcs":
+		chainId, err := strconv.ParseUint(query.Get("chain_id"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid chain_id", http.StatusBadRequest)
+			return
+		}
+		rpcs, err := queries.GetListRpcs(r.Context(), global, chainId)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, rpcs, nil)
 		return
 	}
 	sendSuccess(w, "404", nil)

@@ -50,7 +50,7 @@
             </v-container>
 
             <!-- Dashboard -->
-            <v-container v-else-if="!showTokensPage">
+            <v-container v-else-if="!showTokensPage && !showRpcsPage">
                 <v-row>
                     <v-col cols="12">
                         <v-card>
@@ -68,6 +68,12 @@
                                             <v-card-text>
                                                 <div class="text-h6 mb-2">Chain ID: {{ chain.chainId }}</div>
                                                 <v-list dense>
+                                                    <v-list-item v-if="chain.name !== undefined">
+                                                        <v-list-item-content>
+                                                            <v-list-item-title>Name</v-list-item-title>
+                                                            <v-list-item-subtitle>{{ chain.name }}</v-list-item-subtitle>
+                                                        </v-list-item-content>
+                                                    </v-list-item>
                                                     <v-list-item>
                                                         <v-list-item-content>
                                                             <v-list-item-title>Address</v-list-item-title>
@@ -111,6 +117,14 @@
                                                         class="mr-2"
                                                     >
                                                         Tokens
+                                                    </v-btn>
+                                                    <v-btn
+                                                        v-if="chain.running"
+                                                        color="info"
+                                                        @click="viewRpcs(chain.chainId)"
+                                                        class="mr-2"
+                                                    >
+                                                        RPCs
                                                     </v-btn>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
@@ -245,6 +259,48 @@
                 </v-dialog>
             </v-container>
 
+            <!-- RPCs Page -->
+            <v-container v-else-if="showRpcsPage">
+                <v-row>
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                RPCs for Chain {{ selectedChainId }}
+                                <v-spacer></v-spacer>
+                                <v-btn color="secondary" @click="showRpcsPage = false">
+                                    Back to Chains
+                                </v-btn>
+                            </v-card-title>
+                            <v-card-text>
+                                <v-data-table
+                                    :headers="[
+                                        { text: 'RPC URL', value: 'url' },
+                                        { text: 'Reputation', value: 'reputation' }
+                                    ]"
+                                    :items="rpcs"
+                                    :loading="isLoadingRpcs"
+                                >
+                                    <template v-slot:item.url="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.url }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.url)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                </v-data-table>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+            </v-container>
+
             <!-- Tokens Page -->
             <v-container v-else>
                 <v-row>
@@ -371,6 +427,7 @@
                 showAddChainDialog: false,
                 showProposeDialog: false,
                 showTokensPage: false,
+                showRpcsPage: false,
                 showAddTokenDialog: false,
                 selectedChainId: null,
                 newChainId: '',
@@ -378,10 +435,11 @@
                 isDeploying: false,
                 isDeployingToken: false,
                 isLoadingTokens: false,
+                isLoadingRpcs: false,
                 tokens: [],
-                totalTokens: 0,
-                page: 1,
-                size: 10,
+                rpcs: [],
+                tableOptions: {},
+                totalItems: 0,
                 newToken: {
                     name: '',
                     symbol: '',
@@ -399,9 +457,7 @@
                     show: false,
                     text: '',
                     color: 'success'
-                },
-                tableOptions: {},
-                totalItems: 0
+                }
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -760,6 +816,34 @@
                         if (chain) {
                             chain.isLoading = false;
                         }
+                    }
+                },
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showNotification('RPC URL copied to clipboard');
+                    });
+                },
+                async viewRpcs(chainId) {
+                    this.selectedChainId = chainId;
+                    this.showRpcsPage = true;
+                    this.rpcs = [];
+                    this.isLoadingRpcs = true;
+
+                    try {
+                        const response = await fetch(`/api/query?type=get-list-rpcs&chain_id=${chainId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch RPCs');
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.rpcs = data.data.rpcs.sort((a, b) => b.reputation - a.reputation);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching RPCs:', error);
+                        this.showNotification('Failed to fetch RPCs', 'error');
+                    } finally {
+                        this.isLoadingRpcs = false;
                     }
                 },
             },

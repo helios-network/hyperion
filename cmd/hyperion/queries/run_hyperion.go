@@ -73,6 +73,7 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		*targetNetwork,
 		pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: "https://api.coingecko.com/api/v3"}),
 		orchestratorCfg,
+		global,
 	)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to initialize orchestrator for chain %d", counterpartyChainParams.BridgeChainId))
@@ -90,7 +91,7 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		}
 	}()
 
-	global.SetRunner(chainId, cancel)
+	global.SetRunner(chainId, cancel, hyperion)
 
 	return nil
 }

@@ -38,6 +38,7 @@ type Network interface {
 	RemoveLastUsedRpc()
 	RemoveRpc(targetUrl string) bool
 	TestRpcs(ctx context.Context) bool
+	SetRpcs(rpcs []*hyperiontypes.Rpc)
 	GetRpcs() []*hyperiontypes.Rpc
 
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
@@ -224,6 +225,10 @@ func (n *network) TestRpcs(ctx context.Context) bool {
 
 func (n *network) GetRpcs() []*hyperiontypes.Rpc {
 	return n.Provider().GetRpcs()
+}
+
+func (n *network) SetRpcs(rpcs []*hyperiontypes.Rpc) {
+	n.Provider().SetRpcs(rpcs)
 }
 
 func (n *network) RemoveRpc(targetUrl string) bool {

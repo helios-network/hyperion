@@ -27,6 +27,7 @@ type EVMProvider interface {
 	TestRpcs(ctx context.Context, operation func(*ethclient.Client, string) error) bool
 	RemoveRpc(targetUrl string) bool
 	GetRpcs() []*hyperiontypes.Rpc
+	SetRpcs(rpcs []*hyperiontypes.Rpc)
 
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
@@ -79,6 +80,10 @@ func (p *evmProviderWithRet) TestRpcs(ctx context.Context, operation func(*ethcl
 
 func (p *evmProviderWithRet) GetRpcs() []*hyperiontypes.Rpc {
 	return p.pool.GetRpcs()
+}
+
+func (p *evmProviderWithRet) SetRpcs(rpcs []*hyperiontypes.Rpc) {
+	p.pool.SetRpcs(rpcs)
 }
 
 func (p *evmProviderWithRet) RemoveRpc(targetUrl string) bool {

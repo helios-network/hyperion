@@ -28,6 +28,10 @@ type PriceFeed interface {
 	QueryUSDPrice(address gethcommon.Address) (float64, error)
 }
 
+type Global interface {
+	GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
+}
+
 type Config struct {
 	EnabledLogs          string
 	CosmosAddr           cosmostypes.AccAddress
@@ -55,6 +59,7 @@ type Orchestrator struct {
 	ethereum      ethereum.Network
 	priceFeed     PriceFeed
 	firstTimeSync bool
+	global        Global
 }
 
 func NewOrchestrator(
@@ -62,6 +67,7 @@ func NewOrchestrator(
 	eth ethereum.Network,
 	priceFeed PriceFeed,
 	cfg Config,
+	global Global,
 ) (*Orchestrator, error) {
 	o := &Orchestrator{
 		logger: log.WithFields(log.Fields{
@@ -74,6 +80,7 @@ func NewOrchestrator(
 		cfg:           cfg,
 		maxAttempts:   10,
 		firstTimeSync: false,
+		global:        global,
 	}
 
 	return o, nil
@@ -83,6 +90,10 @@ func NewOrchestrator(
 // up the Orchestrator, all of these are async loops.
 func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
 	return s.startValidatorMode(ctx, eth)
+}
+
+func (s *Orchestrator) GetEthereum() ethereum.Network {
+	return s.ethereum
 }
 
 // startValidatorMode runs all orchestrator processes. This is called
@@ -174,6 +185,19 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		retry.OnRetry(func(n uint, err error) {
 			if strings.Contains(err.Error(), "unavailable on our public API") { // remove rpc if it's unavailable
 				s.ethereum.RemoveLastUsedRpc()
+			}
+			if strings.Contains(err.Error(), "no contract code at given address") {
+				s.ethereum.RemoveLastUsedRpc()
+			}
+			if strings.Contains(err.Error(), "no RPC clients available") {
+				s.logger.Warningf("no RPC clients available, refreshing rpcs... (#%d)", n+1)
+				rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
+				if err != nil {
+					s.logger.WithError(err).Warningf("failed to get rpcs")
+					return
+				}
+				s.ethereum.SetRpcs(rpcs)
+				return
 			}
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)
 		}))

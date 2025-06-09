@@ -202,6 +202,39 @@ func (p *EVMProviders) GetRpcs() []*hyperiontypes.Rpc {
 	return rpcs
 }
 
+func (p *EVMProviders) SetRpcs(rpcs []*hyperiontypes.Rpc) {
+	var rcs []*rpc.Client
+	var ethClients []*ethclient.Client
+	var validUrls []string
+	reputations := make(map[string]*RPCReputation)
+	for _, rpcReputation := range rpcs {
+		client, err := rpc.Dial(rpcReputation.Url)
+		if err != nil {
+			// Skip failed connections but don't panic
+			continue
+		}
+		ethClient := ethclient.NewClient(client)
+		rcs = append(rcs, client)
+		ethClients = append(ethClients, ethClient)
+		validUrls = append(validUrls, rpcReputation.Url)
+		log.Println("Pool RPC: ", rpcReputation.Url)
+		reputations[rpcReputation.Url] = &RPCReputation{
+			rpcUrl:     rpcReputation.Url,
+			reputation: rpcReputation.Reputation,
+		}
+	}
+
+	if len(rcs) == 0 {
+		// If no connections could be established, panic
+		panic("failed to connect to any RPC endpoints")
+	}
+
+	p.rcs = rcs
+	p.ethClients = ethClients
+	p.urls = validUrls
+	p.reputations = reputations
+}
+
 // getNextClient returns the next client using round-robin selection
 func (p *EVMProviders) getNextClient() (*ethclient.Client, *rpc.Client) {
 	p.mu.RLock()

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"cosmossdk.io/math"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
@@ -53,11 +54,12 @@ type Global struct {
 	signerFn          bind.SignerFn
 	personalSignFn    keystore.PersonalSignFn
 
-	runners map[uint64]context.CancelFunc
+	runners       map[uint64]context.CancelFunc
+	orchestrators map[uint64]*orchestrator.Orchestrator
 }
 
 func NewGlobal(cfg *Config) *Global {
-	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelFunc, 0)}
+	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0)}
 }
 
 func (g *Global) GetConfig() *Config {
@@ -96,19 +98,25 @@ func (g *Global) StartRunnersAtStartUp(runHyperion func(ctx context.Context, g *
 	}
 }
 
-func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc) {
+func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc, orchestrator *orchestrator.Orchestrator) {
 	storage.SetRunner(chainId)
 	g.runners[chainId] = cancel
+	g.orchestrators[chainId] = orchestrator
 }
 
 func (g *Global) GetRunner(chainId uint64) context.CancelFunc {
 	return g.runners[chainId]
 }
 
+func (g *Global) GetOrchestrator(chainId uint64) *orchestrator.Orchestrator {
+	return g.orchestrators[chainId]
+}
+
 func (g *Global) CancelRunner(chainId uint64) {
 	g.runners[chainId]()
 	delete(g.runners, chainId)
 	storage.RemoveRunner(chainId)
+	delete(g.orchestrators, chainId)
 }
 
 func (g *Global) InitHeliosNetwork(linkChainId uint64) (*helios.Network, error) {
