@@ -50,7 +50,7 @@
             </v-container>
 
             <!-- Dashboard -->
-            <v-container v-else>
+            <v-container v-else-if="!showTokensPage">
                 <v-row>
                     <v-col cols="12">
                         <v-card>
@@ -104,6 +104,14 @@
                                                     </v-list-item>
                                                 </v-list>
                                                 <v-card-actions>
+                                                    <v-btn
+                                                        v-if="chain.proposed"
+                                                        color="info"
+                                                        @click="viewTokens(chain.chainId)"
+                                                        class="mr-2"
+                                                    >
+                                                        Tokens
+                                                    </v-btn>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
                                                         v-if="!chain.running && chain.proposed && chain.registered"
@@ -235,25 +243,116 @@
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
-
-                <!-- Snackbar for notifications -->
-                <v-snackbar
-                    v-model="snackbar.show"
-                    :color="snackbar.color"
-                    :timeout="3000"
-                >
-                    {{ snackbar.text }}
-                    <template v-slot:action="{ attrs }">
-                        <v-btn
-                            text
-                            v-bind="attrs"
-                            @click="snackbar.show = false"
-                        >
-                            Close
-                        </v-btn>
-                    </template>
-                </v-snackbar>
             </v-container>
+
+            <!-- Tokens Page -->
+            <v-container v-else>
+                <v-row>
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                Tokens for Chain {{ selectedChainId }}
+                                <v-spacer></v-spacer>
+                                <v-btn color="primary" @click="showAddTokenDialog = true">
+                                    Add Token
+                                </v-btn>
+                                <v-btn color="secondary" class="ml-2" @click="showTokensPage = false">
+                                    Back to Chains
+                                </v-btn>
+                            </v-card-title>
+                            <v-card-text>
+                                <v-data-table
+                                    :headers="[
+                                        { text: 'Name', value: 'name' },
+                                        { text: 'Symbol', value: 'symbol' },
+                                        { text: 'Decimals', value: 'decimals' },
+                                        { text: 'Contract Address', value: 'contract_address' },
+                                        { text: 'Chain Contract Address', value: 'chain_contract_address' },
+                                        { text: 'Origin ChainId', value: 'origin_chain_id' }
+                                    ]"
+                                    :items="tokens"
+                                    :loading="isLoadingTokens"
+                                    :options.sync="tableOptions"
+                                    :server-items-length="totalItems"
+                                    :footer-props="{
+                                        'items-per-page-options': [5, 10, 20, 50],
+                                        showFirstLastPage: true
+                                    }"
+                                >
+                                </v-data-table>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+
+                <!-- Add Token Dialog -->
+                <v-dialog v-model="showAddTokenDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Add New Token</v-card-title>
+                        <v-card-text>
+                            <v-form ref="tokenForm">
+                                <v-text-field
+                                    v-model="newToken.name"
+                                    label="Name"
+                                    required
+                                    :rules="[v => !!v || 'Name is required']"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="newToken.symbol"
+                                    label="Symbol"
+                                    required
+                                    :rules="[v => !!v || 'Symbol is required']"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="newToken.denom"
+                                    label="Denom"
+                                    required
+                                    :rules="[v => !!v || 'Denom is required']"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model.number="newToken.decimals"
+                                    label="Decimals"
+                                    type="number"
+                                    required
+                                    :rules="[
+                                        v => !!v || 'Decimals is required',
+                                        v => v >= 0 || 'Decimals must be non-negative'
+                                    ]"
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showAddTokenDialog = false">Cancel</v-btn>
+                            <v-btn 
+                                color="primary" 
+                                @click="deployToken"
+                                :loading="isDeployingToken"
+                            >
+                                Deploy
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+            </v-container>
+
+            <!-- Snackbar for notifications -->
+            <v-snackbar
+                v-model="snackbar.show"
+                :color="snackbar.color"
+                :timeout="3000"
+            >
+                {{ snackbar.text }}
+                <template v-slot:action="{ attrs }">
+                    <v-btn
+                        text
+                        v-bind="attrs"
+                        @click="snackbar.show = false"
+                    >
+                        Close
+                    </v-btn>
+                </template>
+            </v-snackbar>
         </v-app>
     </div>
 
@@ -271,9 +370,24 @@
                 chains: {},
                 showAddChainDialog: false,
                 showProposeDialog: false,
+                showTokensPage: false,
+                showAddTokenDialog: false,
+                selectedChainId: null,
                 newChainId: '',
                 isProposing: false,
                 isDeploying: false,
+                isDeployingToken: false,
+                isLoadingTokens: false,
+                tokens: [],
+                totalTokens: 0,
+                page: 1,
+                size: 10,
+                newToken: {
+                    name: '',
+                    symbol: '',
+                    denom: '',
+                    decimals: 18
+                },
                 proposeForm: {
                     title: '',
                     description: '',
@@ -285,7 +399,9 @@
                     show: false,
                     text: '',
                     color: 'success'
-                }
+                },
+                tableOptions: {},
+                totalItems: 0
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -294,11 +410,108 @@
                     this.fetchChains();
                 }
             },
+            watch: {
+                tableOptions: {
+                    handler() {
+                        if (this.selectedChainId) {
+                            this.viewTokens(this.selectedChainId);
+                        }
+                    },
+                    deep: true
+                }
+            },
             methods: {
                 showNotification(text, color = 'success') {
                     this.snackbar.text = text;
                     this.snackbar.color = color;
                     this.snackbar.show = true;
+                },
+                async viewTokens(chainId) {
+                    this.selectedChainId = chainId;
+                    this.showTokensPage = true;
+                    this.tokens = [];
+                    this.isLoadingTokens = true;
+
+                    try {
+                        const page = this.tableOptions.page || 1;
+                        const itemsPerPage = this.tableOptions.itemsPerPage || 10;
+                        
+                        const response = await fetch(`/api/query?type=get-list-tokens&chain_id=${chainId}&page=${page}&size=${itemsPerPage}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch tokens');
+                        }
+
+                        const data = await response.json();
+                        if (data.success && data.data.tokens) {
+                            this.tokens = data.data.tokens.map(token => {
+                                const chainMetadata = token.metadata.chainsMetadatas.find(x => x.chainId == chainId);
+
+                                let originChainId = 42000;
+                                const originMetadata = token.metadata.chainsMetadatas.find(x => x.isOriginated === true);
+
+                                if (originMetadata) {
+                                    originChainId = originMetadata.chainId;
+                                }
+
+                                return {
+                                    name: token.metadata.name,
+                                    symbol: token.metadata.symbol,
+                                    decimals: token.metadata.decimals,
+                                    contract_address: token.metadata.contract_address,
+                                    chain_contract_address: chainMetadata?.contractAddress || 'N/A',
+                                    origin_chain_id: originChainId,
+                                }
+                        });
+                            this.totalItems = data.data.total;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching tokens:', error);
+                        this.showNotification('Failed to fetch tokens', 'error');
+                    } finally {
+                        this.isLoadingTokens = false;
+                    }
+                },
+                async deployToken() {
+                    if (!this.$refs.tokenForm.validate()) {
+                        return;
+                    }
+
+                    this.isDeployingToken = true;
+                    try {
+                        const response = await fetch('/api/query?type=deploy-erc20', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                name: this.newToken.name,
+                                symbol: this.newToken.symbol,
+                                denom: this.newToken.denom,
+                                decimals: this.newToken.decimals
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to deploy token');
+                        }
+
+                        this.showAddTokenDialog = false;
+                        this.newToken = {
+                            name: '',
+                            symbol: '',
+                            denom: '',
+                            decimals: 18
+                        };
+                        this.showNotification('Token deployed successfully');
+                        // TODO: Refresh tokens list when API endpoint is available
+                    } catch (error) {
+                        console.error('Error deploying token:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isDeployingToken = false;
+                    }
                 },
                 async login() {
                     try {

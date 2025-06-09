@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"cosmossdk.io/errors"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
 )
 
@@ -83,22 +81,13 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 	ctxCancellable, cancel := context.WithCancel(ctx)
 	// run orchestrator and retry if it fails
 	go func() {
-		delay, _ := time.ParseDuration("10s")
-		loops.RetryFunction(ctxCancellable, func() (error, error) {
-
-			fmt.Println("run orchestrator")
-			err = hyperion.Run(ctxCancellable, network, *targetNetwork)
-			if err != nil {
-
-				if strings.Contains(err.Error(), "connection refused") {
-					return nil, err
-				}
-				fmt.Println("Error Removing RPC", (*targetNetwork).GetLastUsedRpc())
-				(*targetNetwork).RemoveLastUsedRpc() // remove the last used rpc who is in cause of the error then retry
-				return nil, err
-			}
-			return nil, nil
-		}, delay)
+		fmt.Println("run orchestrator")
+		err = hyperion.Run(ctxCancellable, network, *targetNetwork)
+		if err != nil {
+			fmt.Println("Error running orchestrator", err)
+			time.Sleep(10 * time.Second)
+			RunHyperion(ctx, global, counterpartyChainParams.BridgeChainId)
+		}
 	}()
 
 	global.SetRunner(chainId, cancel)

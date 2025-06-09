@@ -12,7 +12,6 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries"
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/static"
 	globaltypes "github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	"github.com/gorilla/mux"
 	cli "github.com/jawher/mow.cli"
@@ -145,13 +144,29 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, hyperions, nil)
 		return
-	case "get-hyperion-info":
-		infos, err := storage.GetHyperionContractInfo(11155111)
+	case "get-list-tokens":
+		chainId, err := strconv.ParseUint(query.Get("chain_id"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid chain_id", http.StatusBadRequest)
+			return
+		}
+		page, err := strconv.ParseUint(query.Get("page"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid page", http.StatusBadRequest)
+			return
+		}
+		size, err := strconv.ParseUint(query.Get("size"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid size", http.StatusBadRequest)
+			return
+		}
+
+		tokens, err := queries.GetListTokens(r.Context(), global, chainId, page, size)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sendSuccess(w, infos, nil)
+		sendSuccess(w, tokens, nil)
 		return
 	}
 	sendSuccess(w, "404", nil)

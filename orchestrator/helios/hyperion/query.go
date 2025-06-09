@@ -21,6 +21,7 @@ type QueryClient interface {
 	GetValidatorAddress(ctx context.Context, hyperionId uint64, addr gethcommon.Address) (cosmostypes.AccAddress, error)
 	GetListOfNetworksWhereRegistered(ctx context.Context, addr gethcommon.Address) ([]uint64, error)
 
+	QueryGetListTokens(ctx context.Context, chainId uint64, page uint64, size uint64) ([]*hyperiontypes.FullMetadataToken, uint64, error)
 	ValsetAt(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error)
 	CurrentValset(ctx context.Context, hyperionId uint64) (*hyperiontypes.Valset, error)
 	OldestUnsignedValsets(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) ([]*hyperiontypes.Valset, error)
@@ -493,4 +494,29 @@ func (c queryClient) QueryTokenAddressToDenom(ctx context.Context, hyperionId ui
 	}
 
 	return resp.Denom, resp.CosmosOriginated, nil
+}
+
+func (c queryClient) QueryGetListTokens(ctx context.Context, chainId uint64, page uint64, size uint64) ([]*hyperiontypes.FullMetadataToken, uint64, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryGetTokensOfChainRequest{
+		ChainId: chainId,
+		Page:    page,
+		Size_:   size,
+	}
+
+	resp, err := c.QueryClient.QueryGetTokensOfChain(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, 0, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, 0, ErrNotFound
+	}
+
+	return resp.Tokens, resp.Pagination.Total, nil
 }
