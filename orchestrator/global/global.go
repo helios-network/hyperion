@@ -437,8 +437,22 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 	powers[0] = big.NewInt(2147483647)
 
 	_, blockNumber, err := (*targetNetwork).SendInitializeBlockchainTx(context.Background(), g.ethKeyFromAddress, hyperionIdHash, powerThreshold, validators, powers)
+
 	if err != nil {
-		return 0, err
+		lastEventNonce, err2 := (*targetNetwork).GetLastEventNonce(context.Background())
+		if err2 != nil {
+			return 0, err2
+		}
+
+		if lastEventNonce.Uint64() == 1 {
+			lastEventHeight, err2 := (*targetNetwork).GetLastEventHeight(context.Background())
+			if err2 != nil {
+				return 0, err2
+			}
+			blockNumber = lastEventHeight.Uint64()
+		} else {
+			return 0, err
+		}
 	}
 
 	storage.UpdateHyperionContractInfo(chainId, hyperionContractInfo["hyperionAddress"].(string), map[string]interface{}{
@@ -446,7 +460,6 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 	})
 
 	return blockNumber, nil
-
 }
 
 func (g *Global) GetProposal(proposalId uint64) (*govtypes.Proposal, error) {

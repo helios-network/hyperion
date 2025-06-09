@@ -177,6 +177,25 @@ func UpdateHyperionContractInfo(chainId uint64, contractAddress string, info map
 	return UpdateMyHyperionsDeployedAddresses(hyperions)
 }
 
+func RemoveHyperionContractInfo(chainId uint64, contractAddress string) error {
+	hyperions, err := GetMyHyperionsDeployedAddresses()
+	if err != nil {
+		return err
+	}
+	index := -1
+	for i, hyperion := range hyperions {
+		if uint64(hyperion["chainId"].(float64)) == chainId && hyperion["hyperionAddress"].(string) == contractAddress {
+			index = i
+			break
+		}
+	}
+	if index >= 0 && index < len(hyperions) {
+		hyperions[index] = hyperions[len(hyperions)-1]
+		hyperions = hyperions[:len(hyperions)-1]
+	}
+	return UpdateMyHyperionsDeployedAddresses(hyperions)
+}
+
 func UpdateMyHyperionsDeployedAddresses(hyperions []map[string]interface{}) error {
 	homePath, err := os.UserHomeDir()
 	if err != nil {

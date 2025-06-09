@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries"
+	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/static"
 	globaltypes "github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
@@ -85,14 +88,24 @@ func startServer(cmd *cli.Cmd) {
 		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryPost, global, ctx)).Methods("POST")
 		apiRouter.HandleFunc("/version", handleVersion).Methods("GET")
 
-		// Create a file server handler that serves index.html for the root path
-		fs := http.FileServer(http.Dir("static"))
+		// Create file servers for both physical and embedded files
+		// physicalFs := http.FileServer(http.Dir("static"))
+		// embeddedFs := http.FileServer(static.GetIndex())
+		indexFile := static.GetIndex()
+
 		router.PathPrefix("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if requesting root path
 			if r.URL.Path == "/" {
-				http.ServeFile(w, r, "static/index.html")
+				// Try to serve physical index.html first
+				if _, err := os.Stat("static/index.html"); err == nil {
+					http.ServeFile(w, r, "static/index.html")
+					return
+				}
+				// Fall back to embedded index.html
+				r.URL.Path = "index.html"
+				http.ServeContent(w, r, "index.html", time.Now(), bytes.NewReader(indexFile))
 				return
 			}
-			http.StripPrefix("/", fs).ServeHTTP(w, r)
 		}))
 
 		// Start server

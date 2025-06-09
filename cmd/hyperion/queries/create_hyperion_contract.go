@@ -30,10 +30,11 @@ func CreateHyperionContract(ctx context.Context, global *global.Global, chainId 
 	}
 
 	hyperionContractInfo := map[string]interface{}{
-		"hyperionAddress": hyperionAddress,
-		"chainId":         chainId,
-		"createdAt":       time.Now().Format(time.RFC3339),
-		"atBlockNumber":   atBlockNumber,
+		"hyperionAddress":          hyperionAddress.Hex(),
+		"chainId":                  chainId,
+		"createdAt":                time.Now().Format(time.RFC3339),
+		"atBlockNumber":            atBlockNumber,
+		"initializedAtBlockNumber": atBlockNumber + 1000,
 	}
 
 	fmt.Println("hyperionContractInfo: ", hyperionContractInfo)
@@ -45,10 +46,9 @@ func CreateHyperionContract(ctx context.Context, global *global.Global, chainId 
 
 	blockNumber, err := global.InitializeHyperionContractWithDefaultValset(chainId)
 	if err != nil {
+		storage.RemoveHyperionContractInfo(chainId, hyperionAddress.Hex())
 		return nil, err
 	}
-
 	hyperionContractInfo["initializedAtBlockNumber"] = blockNumber
-
 	return hyperionContractInfo, nil
 }
