@@ -368,3 +368,37 @@ func UpdateRunners(runners []map[string]interface{}) error {
 
 	return nil
 }
+
+func SetHyperionPassword(password string) error {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+	joinPath := filepath.Join(dirPath, "password.txt")
+	os.WriteFile(joinPath, []byte(password), 0644)
+	return nil
+}
+
+func GetHyperionPassword() (string, error) {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+	joinPath := filepath.Join(dirPath, "password.txt")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte(""), 0644)
+	}
+	baseFile, err := os.ReadFile(joinPath)
+	if err != nil {
+		return "", err
+	}
+	return string(baseFile), nil
+}

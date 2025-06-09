@@ -12,6 +12,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries"
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/static"
 	globaltypes "github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
 	"github.com/gorilla/mux"
 	cli "github.com/jawher/mow.cli"
@@ -202,6 +203,14 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, transactions, nil)
 		return
+	case "get-wallet-address":
+		address, err := queries.GetWalletAddress(r.Context(), global)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, address, nil)
+		return
 	}
 	sendSuccess(w, "404", nil)
 }
@@ -223,13 +232,20 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-
-		// TODO: Implement actual password verification
-		if params.Password != "your-secure-password" {
+		password, err := storage.GetHyperionPassword()
+		if err != nil {
+			sendError(w, "Failed to get password", http.StatusInternalServerError)
+			return
+		}
+		if password == "" { // first time login
+			storage.SetHyperionPassword(params.Password)
+			sendSuccess(w, "Login successful", nil)
+			return
+		}
+		if params.Password != password {
 			sendError(w, "Invalid password", http.StatusUnauthorized)
 			return
 		}
-
 		sendSuccess(w, "Login successful", nil)
 		return
 

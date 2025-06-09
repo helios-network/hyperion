@@ -54,9 +54,23 @@
                 <v-row>
                     <v-col cols="12">
                         <v-card>
-                            <v-card-title>
-                                Hyperion Chains
+                            <v-card-title class="d-flex align-center">
+                                <div>Hyperion Chains</div>
                                 <v-spacer></v-spacer>
+                                <v-tooltip bottom>
+                                    <template v-slot:activator="{ on, attrs }">
+                                        <div 
+                                            class="text-subtitle-2 grey--text mr-4" 
+                                            v-bind="attrs" 
+                                            v-on="on"
+                                            style="cursor: pointer"
+                                            @click="copyToClipboard(walletAddress)"
+                                        >
+                                            {{ walletAddress }}
+                                        </div>
+                                    </template>
+                                    Click to copy address
+                                </v-tooltip>
                                 <v-btn color="primary" @click="showAddChainDialog = true">
                                     Add Chain
                                 </v-btn>
@@ -523,7 +537,8 @@
                     show: false,
                     text: '',
                     color: 'success'
-                }
+                },
+                walletAddress: ''
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -531,6 +546,7 @@
                     this.isAuthenticated = true;
                     this.fetchChains();
                     this.fetchTransactions();
+                    this.fetchWalletAddress();
                 }
             },
             watch: {
@@ -942,6 +958,19 @@
                         this.showNotification('Failed to fetch transactions', 'error');
                     } finally {
                         this.isLoadingTransactions = false;
+                    }
+                },
+                async fetchWalletAddress() {
+                    try {
+                        const response = await fetch('/api/query?type=get-wallet-address');
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch wallet address');
+                        }
+                        const data = await response.json();
+                        this.walletAddress = data.data.address;
+                    } catch (error) {
+                        console.error('Error fetching wallet address:', error);
+                        this.showNotification('Failed to fetch wallet address', 'error');
                     }
                 },
             },
