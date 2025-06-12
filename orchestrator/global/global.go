@@ -204,7 +204,7 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 		for _, rpc := range rpcs {
 			rpcList = append(rpcList, &hyperiontypes.Rpc{
 				Url:            rpc,
-				Reputation:     5,
+				Reputation:     1,
 				LastHeightUsed: 1,
 			})
 		}
@@ -242,7 +242,7 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 	for _, rpc := range rpcs {
 		rpcList = append(rpcList, &hyperiontypes.Rpc{
 			Url:            rpc,
-			Reputation:     5,
+			Reputation:     1,
 			LastHeightUsed: 1,
 		})
 	}
