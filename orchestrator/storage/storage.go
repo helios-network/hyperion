@@ -310,6 +310,10 @@ func SetRunner(chainId uint64) error {
 	if alreadyExists {
 		RemoveRunner(chainId)
 	}
+	runners, err = GetRunners()
+	if err != nil {
+		return err
+	}
 
 	runners = append(runners, map[string]interface{}{
 		"chainId": chainId,
@@ -323,24 +327,15 @@ func RemoveRunner(chainId uint64) error {
 		return err
 	}
 
-	// Find the index of the runner to remove
-	index := -1
-	for i, runner := range runners {
+	newRunners := make([]map[string]interface{}, 0)
+	for _, runner := range runners {
 		if uint64(runner["chainId"].(float64)) == chainId {
-			index = i
-			break
+			continue
 		}
+		newRunners = append(newRunners, runner)
 	}
 
-	// If found, remove it safely
-	if index >= 0 && index < len(runners) {
-		// Remove the element by copying the last element to the index position
-		// and then truncating the slice
-		runners[index] = runners[len(runners)-1]
-		runners = runners[:len(runners)-1]
-	}
-
-	return UpdateRunners(runners)
+	return UpdateRunners(newRunners)
 }
 
 func UpdateRunners(runners []map[string]interface{}) error {
@@ -401,4 +396,58 @@ func GetHyperionPassword() (string, error) {
 		return "", err
 	}
 	return string(baseFile), nil
+}
+
+func StoreStaticRpcs(chainId uint64, rpcs []string) error {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+	joinPath := filepath.Join(dirPath, "static_rpcs.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("{}"), 0644)
+	}
+	baseFile, err := os.ReadFile(joinPath)
+	if err != nil {
+		return err
+	}
+	var baseFileMap map[string][]string
+	json.Unmarshal(baseFile, &baseFileMap)
+
+	baseFileMap[strconv.FormatUint(chainId, 10)] = rpcs
+	jsonData, err := json.Marshal(baseFileMap)
+	if err != nil {
+		return err
+	}
+	os.WriteFile(joinPath, jsonData, 0644)
+	return nil
+}
+
+func GetStaticRpcs(chainId uint64) ([]string, error) {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+	joinPath := filepath.Join(dirPath, "static_rpcs.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("{}"), 0644)
+	}
+	baseFile, err := os.ReadFile(joinPath)
+	if err != nil {
+		return nil, err
+	}
+	var baseFileMap map[string][]string
+	json.Unmarshal(baseFile, &baseFileMap)
+	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
+		return []string{}, nil
+	}
+	return baseFileMap[strconv.FormatUint(chainId, 10)], nil
 }

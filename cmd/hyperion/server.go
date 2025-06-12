@@ -371,6 +371,38 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, response, nil)
 		return
+	case "add-rpcs":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Rpcs    string `json:"rpcs"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		err := queries.AddStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "RPCs added successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "remove-rpcs":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Rpcs    string `json:"rpcs"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		err := queries.RemoveStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "RPCs removed successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
 	}
 	sendError(w, "Unknown query type", http.StatusBadRequest)
 }

@@ -188,12 +188,23 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 		rpcs = make([]string, 0)
 	}
 
+	staticRpcs, err := storage.GetStaticRpcs(chainId)
+	if err != nil {
+		staticRpcs = make([]string, 0)
+	}
+
+	for _, rpc := range staticRpcs {
+		if !slices.Contains(rpcs, rpc) {
+			rpcs = append(rpcs, rpc)
+		}
+	}
+
 	if timeSinceLastUpdate < 60*time.Minute && len(rpcs) > 0 && timeSinceLastUpdate != 0 {
 		rpcList := make([]*hyperiontypes.Rpc, 0)
 		for _, rpc := range rpcs {
 			rpcList = append(rpcList, &hyperiontypes.Rpc{
 				Url:            rpc,
-				Reputation:     1,
+				Reputation:     5,
 				LastHeightUsed: 1,
 			})
 		}
@@ -231,7 +242,7 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 	for _, rpc := range rpcs {
 		rpcList = append(rpcList, &hyperiontypes.Rpc{
 			Url:            rpc,
-			Reputation:     1,
+			Reputation:     5,
 			LastHeightUsed: 1,
 		})
 	}

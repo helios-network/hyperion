@@ -124,22 +124,6 @@
                                                     </v-list-item>
                                                 </v-list>
                                                 <v-card-actions>
-                                                    <v-btn
-                                                        v-if="chain.proposed"
-                                                        color="info"
-                                                        @click="viewTokens(chain.chainId)"
-                                                        class="mr-2"
-                                                    >
-                                                        Tokens
-                                                    </v-btn>
-                                                    <v-btn
-                                                        v-if="chain.running"
-                                                        color="info"
-                                                        @click="viewRpcs(chain.chainId)"
-                                                        class="mr-2"
-                                                    >
-                                                        RPCs
-                                                    </v-btn>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
                                                         v-if="!chain.running && chain.proposed && chain.registered"
@@ -183,6 +167,23 @@
                                                         class="ml-2"
                                                     >
                                                         Register
+                                                    </v-btn>
+                                                </v-card-actions>
+                                                <v-card-actions>
+                                                    <v-btn
+                                                        v-if="chain.proposed"
+                                                        color="info"
+                                                        @click="viewTokens(chain.chainId)"
+                                                        class="mr-2"
+                                                    >
+                                                        Tokens
+                                                    </v-btn>
+                                                    <v-btn
+                                                        color="info"
+                                                        @click="viewRpcs(chain.chainId)"
+                                                        class="mr-2"
+                                                    >
+                                                        RPCs
                                                     </v-btn>
                                                 </v-card-actions>
                                             </v-card-text>
@@ -343,7 +344,10 @@
                             <v-card-title>
                                 RPCs for Chain {{ selectedChainId }}
                                 <v-spacer></v-spacer>
-                                <v-btn color="secondary" @click="showRpcsPage = false">
+                                <v-btn color="primary" @click="showAddRpcsDialog = true">
+                                    Add RPCs
+                                </v-btn>
+                                <v-btn color="secondary" class="ml-2" @click="showRpcsPage = false">
                                     Back to Chains
                                 </v-btn>
                             </v-card-title>
@@ -373,8 +377,61 @@
                                 </v-data-table>
                             </v-card-text>
                         </v-card>
+                        <v-card>
+                            <v-card-title>Static RPCs</v-card-title>
+                            <v-card-text>
+                                <v-list>
+                                    <v-list-item v-for="rpc in staticRpcs" :key="rpc">
+                                        <v-list-item-content>
+                                            <v-list-item-title>{{ rpc }}</v-list-item-title>
+                                        </v-list-item-content>
+                                        <v-list-item-action>
+                                            <v-btn
+                                                icon
+                                                small
+                                                color="error"
+                                                @click="removeRpc(rpc)"
+                                                :loading="isDeletingRpc === rpc"
+                                            >
+                                                <v-icon>mdi-delete</v-icon>
+                                            </v-btn>
+                                        </v-list-item-action>
+                                    </v-list-item>
+                                </v-list>
+                            </v-card-text>
+                        </v-card>
                     </v-col>
                 </v-row>
+
+                <!-- Add RPCs Dialog -->
+                <v-dialog v-model="showAddRpcsDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Add New RPCs</v-card-title>
+                        <v-card-text>
+                            <v-form ref="rpcsForm">
+                                <v-textarea
+                                    v-model="newRpcs"
+                                    label="RPCs (rpc1,rpc2,rpc3)"
+                                    hint="Enter RPCs separated by commas"
+                                    persistent-hint
+                                    required
+                                    :rules="[v => !!v || 'At least one RPC is required']"
+                                ></v-textarea>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showAddRpcsDialog = false">Cancel</v-btn>
+                            <v-btn 
+                                color="primary" 
+                                @click="addRpcs"
+                                :loading="isAddingRpcs"
+                            >
+                                Add
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
             </v-container>
 
             <!-- Tokens Page -->
@@ -505,6 +562,7 @@
                 showTokensPage: false,
                 showRpcsPage: false,
                 showAddTokenDialog: false,
+                showAddRpcsDialog: false,
                 selectedChainId: null,
                 newChainId: '',
                 isProposing: false,
@@ -512,9 +570,12 @@
                 isDeployingToken: false,
                 isLoadingTokens: false,
                 isLoadingRpcs: false,
+                isAddingRpcs: false,
+                isDeletingRpc: null,
                 isLoadingTransactions: false,
                 tokens: [],
                 rpcs: [],
+                staticRpcs: [],
                 transactions: [],
                 tableOptions: {},
                 transactionTableOptions: {},
@@ -538,7 +599,8 @@
                     text: '',
                     color: 'success'
                 },
-                walletAddress: ''
+                walletAddress: '',
+                newRpcs: ''
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -927,6 +989,7 @@
                         const data = await response.json();
                         if (data.success) {
                             this.rpcs = data.data.rpcs.sort((a, b) => b.reputation - a.reputation);
+                            this.staticRpcs = data.data.staticRpcs;
                         }
                     } catch (error) {
                         console.error('Error fetching RPCs:', error);
@@ -971,6 +1034,67 @@
                     } catch (error) {
                         console.error('Error fetching wallet address:', error);
                         this.showNotification('Failed to fetch wallet address', 'error');
+                    }
+                },
+                async addRpcs() {
+                    if (!this.$refs.rpcsForm.validate()) {
+                        return;
+                    }
+
+                    this.isAddingRpcs = true;
+                    try {
+                        const rpcsArray = this.newRpcs.split('\n').map(rpc => rpc.trim()).filter(rpc => rpc);
+                        const response = await fetch('/api/query?type=add-rpcs', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                rpcs: rpcsArray.join(',')
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to add RPCs');
+                        }
+
+                        this.showAddRpcsDialog = false;
+                        this.newRpcs = '';
+                        this.showNotification('RPCs added successfully');
+                        await this.viewRpcs(this.selectedChainId);
+                    } catch (error) {
+                        console.error('Error adding RPCs:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isAddingRpcs = false;
+                    }
+                },
+                async removeRpc(rpc) {
+                    this.isDeletingRpc = rpc;
+                    try {
+                        const response = await fetch('/api/query?type=remove-rpcs', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                rpcs: rpc
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to remove RPC');
+                        }
+
+                        this.showNotification('RPC removed successfully');
+                        await this.viewRpcs(this.selectedChainId);
+                    } catch (error) {
+                        console.error('Error removing RPC:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isDeletingRpc = null;
                     }
                 },
             },
