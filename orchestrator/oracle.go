@@ -22,7 +22,7 @@ import (
 
 const (
 	// Minimum number of confirmations for an Ethereum block to be considered valid
-	ethBlockConfirmationDelay uint64 = 12
+	ethBlockConfirmationDelay uint64 = 4
 
 	// Maximum block range for Ethereum event query. If the orchestrator has been offline for a long time,
 	// the oracle loop can potentially run longer than defaultLoopDur due to a surge of events. This usually happens

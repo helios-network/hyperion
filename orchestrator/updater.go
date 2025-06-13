@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultUpdaterLoopDur = 5 * time.Minute
+	defaultUpdaterLoopDur = 20 * time.Minute
 )
 
 func (s *Orchestrator) runUpdater(ctx context.Context) error {

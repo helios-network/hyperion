@@ -290,7 +290,7 @@ func (c broadcastClient) SendUnSetOrchestratorAddresses(ctx context.Context, hyp
 			"tx_hash": resp.TxResponse.TxHash,
 			"code":    resp.TxResponse.Code,
 			"Error":   "insufficient fee",
-		}).Infoln("EthOracle sent MsgUnSetOrchestratorAddresses")
+		}).Infoln(hyperionId, " - sent MsgUnSetOrchestratorAddresses")
 		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgUnSetOrchestratorAddresses failed")
 	}
 
@@ -315,7 +315,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 		"amount":         deposit.Amount.String(),
 		"data":           deposit.Data,
 		"token_contract": deposit.TokenContract.Hex(),
-	}).Debugln("observed SendToHeliosEvent")
+	}).Debugln(hyperionId, " - observed SendToHeliosEvent")
 
 	// check if data is valid json
 	if !json.Valid([]byte(deposit.Data)) {
@@ -340,7 +340,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
 		"data":         deposit.Data,
-	}).Infoln("EthOracle sending MsgDepositClaim")
+	}).Infoln(hyperionId, " - sending MsgDepositClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
@@ -365,7 +365,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 			"tx_hash":      resp.TxResponse.TxHash,
 			"code":         resp.TxResponse.Code,
 			"Error":        "insufficient fee",
-		}).Infoln("EthOracle sent MsgDepositClaim")
+		}).Infoln(hyperionId, " - sent MsgDepositClaim")
 		return nil, errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgDepositClaim failed")
 	}
 
@@ -375,7 +375,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 		"tx_hash":      resp.TxResponse.TxHash,
 		"code":         resp.TxResponse.Code,
 		"GasUsed":      resp.TxResponse.GasUsed,
-	}).Infoln("EthOracle sent MsgDepositClaim")
+	}).Infoln(hyperionId, " - sent MsgDepositClaim")
 
 	return resp.TxResponse, nil
 }
@@ -388,7 +388,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 	log.WithFields(log.Fields{
 		"batch_nonce":    withdrawal.BatchNonce.String(),
 		"token_contract": withdrawal.Token.Hex(),
-	}).Debugln("observed TransactionBatchExecutedEvent")
+	}).Debugln(hyperionId, " - observed TransactionBatchExecutedEvent")
 
 	// WithdrawClaim claims that a batch of withdrawal
 	// operations on the bridge contract was executed.
@@ -407,7 +407,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 	log.WithFields(log.Fields{
 		"event_height": msg.BlockHeight,
 		"event_nonce":  msg.EventNonce,
-	}).Infoln("EthOracle sending MsgWithdrawClaim")
+	}).Infoln(hyperionId, " - sending MsgWithdrawClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
@@ -419,7 +419,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 		"event_height": msg.BlockHeight,
 		"event_nonce":  msg.EventNonce,
 		"tx_hash":      resp.TxResponse.TxHash,
-	}).Infoln("EthOracle sent MsgWithdrawClaim")
+	}).Infoln(hyperionId, " - sent MsgWithdrawClaim")
 
 	return resp.TxResponse, nil
 }
@@ -433,7 +433,7 @@ func (c broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId u
 		"tx_nonce":          nonce,
 		"tx_height":         blockHeight,
 		"external_contract": externalContractAddress,
-	}).Debugln("observed ExternalDataClaim")
+	}).Debugln(hyperionId, " - observed ExternalDataClaim")
 
 	// MsgExternalDataClaim claims that a batch of external data
 	// was executed.
@@ -453,7 +453,7 @@ func (c broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId u
 		"tx_height": msg.BlockHeight,
 		"tx_nonce":  msg.TxNonce,
 		"call_data": msg.CallDataResult,
-	}).Infoln("Oracle sending MsgExternalDataClaim")
+	}).Infoln(hyperionId, " - sending MsgExternalDataClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
@@ -465,7 +465,7 @@ func (c broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId u
 		"tx_height": msg.BlockHeight,
 		"tx_nonce":  msg.TxNonce,
 		"tx_hash":   resp.TxResponse.TxHash,
-	}).Infoln("EthOracle sent MsgExternalDataClaim")
+	}).Infoln(hyperionId, " - sent MsgExternalDataClaim")
 
 	return resp.TxResponse, nil
 }
@@ -511,7 +511,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
 		"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
-	}).Infoln("Oracle sending MsgValsetUpdatedClaim")
+	}).Infoln(hyperionId, " - sending MsgValsetUpdatedClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
@@ -524,7 +524,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 		"event_height": msg.BlockHeight,
 		"tx_hash":      resp.TxResponse.TxHash,
 		"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
-	}).Infoln("Oracle sent MsgValsetUpdatedClaim")
+	}).Infoln(hyperionId, " - sent MsgValsetUpdatedClaim")
 
 	// // Attendre que l'attestation soit observée avec un timeout de 5 minutes
 	// if err := c.WaitForAttestation(ctx, msg.EventNonce, msg.ClaimHash(), 5*time.Minute); err != nil {
@@ -574,7 +574,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 	log.WithFields(log.Fields{
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
-	}).Infoln("Oracle sending MsgERC20DeployedClaim")
+	}).Infoln(hyperionId, " - sending MsgERC20DeployedClaim")
 
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
@@ -586,7 +586,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 		"event_nonce":  msg.EventNonce,
 		"event_height": msg.BlockHeight,
 		"tx_hash":      resp.TxResponse.TxHash,
-	}).Infoln("Oracle sent MsgERC20DeployedClaim")
+	}).Infoln(hyperionId, " - sent MsgERC20DeployedClaim")
 
 	return resp.TxResponse, nil
 }

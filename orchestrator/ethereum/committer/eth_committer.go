@@ -109,19 +109,24 @@ func (e *ethCommitter) SendTx(
 		Context:  ctx, // with RPC timeout
 	}
 
-	// Figure out the gas price values
-	suggestedGasPrice, err := e.evmProvider.SuggestGasPrice(opts.Context)
-	if err != nil {
-		metrics.ReportFuncError(e.svcTags)
-		return common.Hash{}, big.NewInt(0), errors.Errorf("failed to suggest gas price: %v", err)
-	}
-
-	// Suggested gas price is not accurate. Increment by multiplying with gasprice adjustment factor
-	incrementedPrice := big.NewFloat(0).Mul(new(big.Float).SetInt(suggestedGasPrice), big.NewFloat(e.ethGasPriceAdjustment))
-
-	// set gasprice to incremented gas price.
 	gasPrice := new(big.Int)
-	incrementedPrice.Int(gasPrice)
+
+	if e.committerOpts.EstimateGas {
+		// Figure out the gas price values
+		suggestedGasPrice, err := e.evmProvider.SuggestGasPrice(opts.Context)
+		if err != nil {
+			metrics.ReportFuncError(e.svcTags)
+			return common.Hash{}, big.NewInt(0), errors.Errorf("failed to suggest gas price: %v", err)
+		}
+
+		// Suggested gas price is not accurate. Increment by multiplying with gasprice adjustment factor
+		incrementedPrice := big.NewFloat(0).Mul(new(big.Float).SetInt(suggestedGasPrice), big.NewFloat(e.ethGasPriceAdjustment))
+
+		// set gasprice to incremented gas price.
+		incrementedPrice.Int(gasPrice)
+	} else {
+		gasPrice = e.committerOpts.GasPrice.BigInt()
+	}
 
 	opts.GasPrice = gasPrice
 
@@ -140,12 +145,16 @@ func (e *ethCommitter) SendTx(
 		Data:     txData,
 	}
 
-	gasLimit, err := e.evmProvider.EstimateGas(opts.Context, msg)
-	if err != nil {
-		return common.Hash{}, big.NewInt(0), errors.Wrap(err, "failed to estimate gas")
-	}
+	if e.committerOpts.EstimateGas {
+		gasLimit, err := e.evmProvider.EstimateGas(opts.Context, msg)
+		if err != nil {
+			return common.Hash{}, big.NewInt(0), errors.Wrap(err, "failed to estimate gas")
+		}
 
-	opts.GasLimit = gasLimit
+		opts.GasLimit = gasLimit
+	} else {
+		opts.GasLimit = e.committerOpts.GasLimit
+	}
 
 	resyncNonces := func(from common.Address) error {
 		var nonce uint64

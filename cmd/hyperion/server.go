@@ -230,7 +230,7 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid chain_id", http.StatusBadRequest)
 			return
 		}
-		settings, err := queries.GetChainSettings(r.Context(), global, chainId)
+		settings, err := queries.GetChainSettings(chainId)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return

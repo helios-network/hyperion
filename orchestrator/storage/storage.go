@@ -481,7 +481,7 @@ func SetChainSettings(chainId uint64, settings map[string]interface{}) error {
 	return nil
 }
 
-func GetChainSettings(chainId uint64) (map[string]interface{}, error) {
+func GetChainSettings(chainId uint64, defaultSettings map[string]interface{}) (map[string]interface{}, error) {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -501,7 +501,7 @@ func GetChainSettings(chainId uint64) (map[string]interface{}, error) {
 	var baseFileMap map[string]interface{}
 	json.Unmarshal(baseFile, &baseFileMap)
 	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
-		return map[string]interface{}{}, nil
+		return defaultSettings, nil
 	}
 	return baseFileMap[strconv.FormatUint(chainId, 10)].(map[string]interface{}), nil
 }

@@ -50,7 +50,7 @@
             </v-container>
 
             <!-- Dashboard -->
-            <v-container v-else-if="!showTokensPage && !showRpcsPage">
+            <v-container v-else-if="!showTokensPage && !showRpcsPage && !showSettingsPage">
                 <v-row>
                     <v-col cols="12">
                         <v-card>
@@ -185,6 +185,14 @@
                                                     >
                                                         RPCs
                                                     </v-btn>
+                                                    <v-btn
+                                                        color="info"
+                                                        @click="viewSettings(chain.chainId)"
+                                                        class="mr-2"
+                                                    >
+                                                        Settings
+                                                    </v-btn>
+                                                    <v-spacer></v-spacer>
                                                 </v-card-actions>
                                             </v-card-text>
                                         </v-card>
@@ -435,7 +443,7 @@
             </v-container>
 
             <!-- Tokens Page -->
-            <v-container v-else>
+            <v-container v-else-if="showTokensPage">
                 <v-row>
                     <v-col cols="12">
                         <v-card>
@@ -525,6 +533,36 @@
                 </v-dialog>
             </v-container>
 
+            <!-- Settings Page -->
+            <v-container v-else-if="showSettingsPage">
+                <v-row>
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                Chain {{ selectedChainId }} Settings
+                                <v-spacer></v-spacer>
+                                <v-btn color="primary" @click="updateSettings" :loading="isUpdatingSettings">
+                                    Update
+                                </v-btn>
+                                <v-btn color="secondary" class="ml-2" @click="showSettingsPage = false">
+                                    Back to Chains
+                                </v-btn>
+                            </v-card-title>
+                            <v-card-text>
+                                <v-textarea
+                                    v-model="chainSettings"
+                                    label="Settings"
+                                    auto-grow
+                                    rows="20"
+                                    :error-messages="settingsError"
+                                    @input="validateJson"
+                                ></v-textarea>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+            </v-container>
+
             <!-- Snackbar for notifications -->
             <v-snackbar
                 v-model="snackbar.show"
@@ -561,6 +599,7 @@
                 showProposeDialog: false,
                 showTokensPage: false,
                 showRpcsPage: false,
+                showSettingsPage: false,
                 showAddTokenDialog: false,
                 showAddRpcsDialog: false,
                 selectedChainId: null,
@@ -573,6 +612,7 @@
                 isAddingRpcs: false,
                 isDeletingRpc: null,
                 isLoadingTransactions: false,
+                isUpdatingSettings: false,
                 tokens: [],
                 rpcs: [],
                 staticRpcs: [],
@@ -600,7 +640,9 @@
                     color: 'success'
                 },
                 walletAddress: '',
-                newRpcs: ''
+                newRpcs: '',
+                chainSettings: '',
+                settingsError: ''
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -1095,6 +1137,69 @@
                         this.showNotification(error.message, 'error');
                     } finally {
                         this.isDeletingRpc = null;
+                    }
+                },
+                async viewSettings(chainId) {
+                    this.selectedChainId = chainId;
+                    this.showSettingsPage = true;
+                    this.chainSettings = '';
+                    this.settingsError = '';
+
+                    try {
+                        const response = await fetch(`/api/query?type=get-chain-settings&chain_id=${chainId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch chain settings');
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            // Format the JSON with proper indentation
+                            this.chainSettings = JSON.stringify(data.data, null, 2);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching chain settings:', error);
+                        this.showNotification('Failed to fetch chain settings', 'error');
+                    }
+                },
+                validateJson() {
+                    try {
+                        JSON.parse(this.chainSettings);
+                        this.settingsError = '';
+                        return true;
+                    } catch (error) {
+                        this.settingsError = 'Invalid JSON format';
+                        return false;
+                    }
+                },
+                async updateSettings() {
+                    if (!this.validateJson()) {
+                        this.showNotification('Invalid JSON format', 'error');
+                        return;
+                    }
+
+                    this.isUpdatingSettings = true;
+                    try {
+                        const response = await fetch('/api/query?type=update-chain-settings', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                settings: JSON.parse(this.chainSettings)
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to update chain settings');
+                        }
+
+                        this.showNotification('Settings updated successfully');
+                    } catch (error) {
+                        console.error('Error updating chain settings:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isUpdatingSettings = false;
                     }
                 },
             },

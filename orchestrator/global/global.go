@@ -319,13 +319,31 @@ func (g *Global) InitTargetNetwork(counterpartyChainParams *hyperiontypes.Counte
 		return nil, err
 	}
 
-	gasPrice := g.GetGasPrice(counterpartyChainParams.BridgeChainId)
-	options := []committer.EVMCommitterOption{
-		committer.OptionGasPriceFromString(gasPrice),
-		committer.OptionGasLimit(5000000),
+	settings, err := storage.GetChainSettings(counterpartyChainParams.BridgeChainId, map[string]interface{}{})
+	if err != nil {
+		return nil, err
 	}
 
-	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, g.ethKeyFromAddress, g.signerFn, ethereum.NetworkConfig{
+	ethKeyFromAddress, signerFn, _, err := keys.InitEthereumAccountsManagerWithPrivateKey(&g.cfg.PrivateKey, counterpartyChainParams.BridgeChainId)
+	if err != nil {
+		fmt.Println("Error initializing ethereum accounts manager:", err)
+		return nil, err
+	}
+
+	options := make([]committer.EVMCommitterOption, 0)
+
+	if settings["estimate_gas"] != nil && !settings["estimate_gas"].(bool) {
+		gasPrice := strconv.FormatInt(committer.ParseGasPrice(settings["eth_gas_price"].(string)), 10)
+		options = append(options, committer.OptionGasPriceFromString(gasPrice))
+		options = append(options, committer.OptionGasLimit(5000000))
+		options = append(options, committer.OptionEstimateGas(false))
+	} else {
+		gasPrice := g.GetGasPrice(counterpartyChainParams.BridgeChainId)
+		options = append(options, committer.OptionGasPriceFromString(gasPrice))
+		options = append(options, committer.OptionGasLimit(5000000))
+	}
+
+	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, ethereum.NetworkConfig{
 		EthNodeRPCs:           rpcs,
 		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
 		MaxGasPrice:           g.cfg.EthMaxGasPrice,

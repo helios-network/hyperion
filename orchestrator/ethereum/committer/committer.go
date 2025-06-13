@@ -30,17 +30,19 @@ type EVMCommitter interface {
 type EVMCommitterOption func(o *options) error
 
 type options struct {
-	GasPrice   decimal.Decimal
-	GasLimit   uint64
-	RPCTimeout time.Duration
+	GasPrice    decimal.Decimal
+	GasLimit    uint64
+	EstimateGas bool
+	RPCTimeout  time.Duration
 }
 
 func defaultOptions() *options {
 	v, _ := decimal.NewFromString("20")
 	return &options{
-		GasPrice:   v.Shift(9), // 20 gwei
-		GasLimit:   1000000,
-		RPCTimeout: 10 * time.Second,
+		GasPrice:    v.Shift(9), // 20 gwei
+		GasLimit:    1000000,
+		EstimateGas: true,
+		RPCTimeout:  10 * time.Second,
 	}
 }
 
@@ -64,6 +66,13 @@ func OptionGasPriceFromString(str string) EVMCommitterOption {
 		}
 
 		o.GasPrice = gasPrice
+		return nil
+	}
+}
+
+func OptionEstimateGas(estimateGas bool) EVMCommitterOption {
+	return func(o *options) error {
+		o.EstimateGas = estimateGas
 		return nil
 	}
 }
@@ -93,6 +102,10 @@ func ParseMaxGasPrice(maxGasPriceStr string) int64 {
 	}
 
 	return maxGasPrice.IntPart()
+}
+
+func ParseGasPrice(gasPriceStr string) int64 {
+	return ParseMaxGasPrice(gasPriceStr)
 }
 
 func OptionGasPriceFromDecimal(gasPrice decimal.Decimal) EVMCommitterOption {
