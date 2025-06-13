@@ -30,6 +30,7 @@ type PriceFeed interface {
 
 type Global interface {
 	GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
+	InitTargetNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (*ethereum.Network, error)
 }
 
 type Config struct {
@@ -152,6 +153,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Netw
 	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
+	pg.Go(func() error { return s.runUpdater(ctx) })
 
 	return pg.Wait()
 }
@@ -166,6 +168,7 @@ func (s *Orchestrator) startRelayerMode(ctx context.Context) error {
 
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
+	pg.Go(func() error { return s.runUpdater(ctx) })
 
 	return pg.Wait()
 }
@@ -210,4 +213,14 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 func (s *Orchestrator) isRegistered() bool {
 	_, isValidator := helios.HasRegisteredOrchestrator(s.helios, uint64(s.cfg.HyperionId), s.ethereum.FromAddress())
 	return isValidator
+}
+
+func (s *Orchestrator) UpdateRpcs() {
+
+	targetNetwork, err := s.global.InitTargetNetwork(s.cfg.ChainParams)
+	if err != nil {
+		s.logger.WithError(err).Warningf("failed to update rpcs")
+		return
+	}
+	s.ethereum = *targetNetwork
 }

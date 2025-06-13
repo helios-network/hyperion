@@ -40,6 +40,8 @@ type QueryClient interface {
 	QueryDenomToTokenAddress(ctx context.Context, hyperionId uint64, denom string) (gethcommon.Address, bool, error)
 
 	LatestTransactionExternalCallDataTxs(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingExternalDataTx, error)
+
+	QueryGetListOutgoingTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
 }
 
 type queryClient struct {
@@ -519,4 +521,27 @@ func (c queryClient) QueryGetListTokens(ctx context.Context, chainId uint64, pag
 	}
 
 	return resp.Tokens, resp.Pagination.Total, nil
+}
+
+func (c queryClient) QueryGetListOutgoingTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTxBatch, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryOutgoingTxBatchesRequest{
+		HyperionId: chainId,
+	}
+
+	resp, err := c.QueryClient.OutgoingTxBatches(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.Batches, nil
 }

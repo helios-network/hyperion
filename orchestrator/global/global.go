@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"slices"
 	"strconv"
 	"time"
 
@@ -183,9 +182,16 @@ func (g *Global) GetGasPrice(chainId uint64) string {
 }
 
 func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*hyperiontypes.Rpc, error) {
-	rpcs, timeSinceLastUpdate, err := storage.GetRpcsFromStorge(chainId)
-	if err != nil {
-		rpcs = make([]string, 0)
+	rpcsFromStorage, timeSinceLastUpdate, err := storage.GetRpcsFromStorge(chainId)
+	rpcs := make([]*hyperiontypes.Rpc, 0)
+	if err == nil && len(rpcsFromStorage) > 0 {
+		for _, rpc := range rpcsFromStorage {
+			rpcs = append(rpcs, &hyperiontypes.Rpc{
+				Url:            rpc,
+				Reputation:     3,
+				LastHeightUsed: 1,
+			})
+		}
 	}
 
 	staticRpcs, err := storage.GetStaticRpcs(chainId)
@@ -194,32 +200,49 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 	}
 
 	for _, rpc := range staticRpcs {
-		if !slices.Contains(rpcs, rpc) {
-			rpcs = append(rpcs, rpc)
+		exists := false
+		for _, r := range rpcs {
+			if r.Url == rpc {
+				exists = true
+				r.Reputation = 10
+				break
+			}
+		}
+		if !exists {
+			rpcs = append(rpcs, &hyperiontypes.Rpc{
+				Url:            rpc,
+				Reputation:     10,
+				LastHeightUsed: 1,
+			})
 		}
 	}
 
 	if timeSinceLastUpdate < 60*time.Minute && len(rpcs) > 0 && timeSinceLastUpdate != 0 {
-		rpcList := make([]*hyperiontypes.Rpc, 0)
-		for _, rpc := range rpcs {
-			rpcList = append(rpcList, &hyperiontypes.Rpc{
-				Url:            rpc,
-				Reputation:     1,
-				LastHeightUsed: 1,
-			})
-		}
-		return rpcList, nil
+		return rpcs, nil
 	}
 
 	if len(rpcsOptional) > 0 {
 		notInRpcs := make([]string, 0)
 		for _, rpc := range rpcsOptional {
-			if !slices.Contains(rpcs, rpc) {
+			exists := false
+			for _, r := range rpcs {
+				if r.Url == rpc {
+					exists = true
+					break
+				}
+			}
+			if !exists {
 				notInRpcs = append(notInRpcs, rpc)
 			}
 		}
 		if len(notInRpcs) > 0 {
-			rpcs = append(rpcs, notInRpcs...)
+			for _, rpc := range notInRpcs {
+				rpcs = append(rpcs, &hyperiontypes.Rpc{
+					Url:            rpc,
+					Reputation:     1,
+					LastHeightUsed: 1,
+				})
+			}
 		}
 	}
 
@@ -228,29 +251,32 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 	if err == nil {
 		notInRpcs := make([]string, 0)
 		for _, rpc := range rpcsFromChainList {
-			if !slices.Contains(rpcs, rpc) {
+			exists := false
+			for _, r := range rpcs {
+				if r.Url == rpc {
+					exists = true
+					break
+				}
+			}
+			if !exists {
 				notInRpcs = append(notInRpcs, rpc)
 			}
 		}
 		if len(notInRpcs) > 0 {
-			rpcs = append(rpcs, notInRpcs...)
+			for _, rpc := range notInRpcs {
+				rpcs = append(rpcs, &hyperiontypes.Rpc{
+					Url:            rpc,
+					Reputation:     1,
+					LastHeightUsed: 1,
+				})
+			}
 		}
-	}
-
-	rpcList := make([]*hyperiontypes.Rpc, 0)
-
-	for _, rpc := range rpcs {
-		rpcList = append(rpcList, &hyperiontypes.Rpc{
-			Url:            rpc,
-			Reputation:     1,
-			LastHeightUsed: 1,
-		})
 	}
 
 	ethKeyFromAddress, signerFn, _, _ := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
 
 	ethNetwork, _ := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, ethereum.NetworkConfig{
-		EthNodeRPCs:           rpcList,
+		EthNodeRPCs:           rpcs,
 		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
 		MaxGasPrice:           g.cfg.EthMaxGasPrice,
 		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,

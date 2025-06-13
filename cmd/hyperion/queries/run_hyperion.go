@@ -41,7 +41,7 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		return errors.Wrap(err, fmt.Sprintf("failed to parse relay valset offset duration for chain %d", counterpartyChainParams.BridgeChainId))
 	}
 
-	defaultBatchOffsetDur := "5m"
+	defaultBatchOffsetDur := "2m"
 	batchDur, err := time.ParseDuration(defaultBatchOffsetDur)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to parse relay batch offset duration for chain %d", counterpartyChainParams.BridgeChainId))
@@ -65,6 +65,9 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 	}
 
 	fmt.Println("run Hyperion FUNC")
+
+	// Create a channel to signal when the runner is set
+	runnerSet := make(chan struct{})
 
 	go func() {
 		fmt.Println("run orchestrator")
@@ -136,6 +139,12 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			// Update runner in global state
 			global.SetRunner(chainId, cancel, hyperion)
 
+			// Signal that the runner is set
+			select {
+			case runnerSet <- struct{}{}:
+			default:
+			}
+
 			// Run the orchestrator with panic recovery
 			errChan := make(chan error, 1)
 			go func() {
@@ -176,5 +185,11 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		}
 	}()
 
-	return nil
+	// Wait for the runner to be set or context cancellation
+	select {
+	case <-runnerSet:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

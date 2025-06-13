@@ -32,6 +32,7 @@ func main() {
 
 	app.Command("version", "Print the version information and exit.", versionCmd)
 	app.Command("server", "Starts the server.", startServer)
+	app.Command("cancel-all-pending-out-tx", "Cancels all pending outgoing txs.", cancelAllPendingOutTxCmd)
 
 	_ = app.Run(os.Args)
 }

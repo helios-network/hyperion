@@ -38,6 +38,8 @@ type BroadcastClient interface {
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
+	SendCancelAllPendingOutTx(ctx context.Context, chainId uint64) error
+	SendCancelPendingOutTxs(ctx context.Context, chainId uint64, count uint64) error
 }
 
 type broadcastClient struct {
@@ -122,16 +124,16 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 	defer doneFn()
 
 	confirmHash := hyperion.EncodeTxBatchConfirm(hyperionID, batch)
-	log.Info("confirmHash: ", confirmHash, "batch: ", batch, "hyperionID: ", hyperionID, "ethFrom: ", ethFrom.Hex())
-	log.Info("confirmHashLength: ", len(confirmHash.Bytes()))
+	// log.Info("confirmHash: ", confirmHash, "batch: ", batch, "hyperionID: ", hyperionID, "ethFrom: ", ethFrom.Hex())
+	// log.Info("confirmHashLength: ", len(confirmHash.Bytes()))
 	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return errors.New("failed to sign validator address")
 	}
 
-	sigV, sigR, sigS := sigToVRS(gethcommon.Bytes2Hex(signature))
-	log.Info("sigV: ", sigV, "sigR: ", sigR, "sigS: ", sigS)
+	// sigV, sigR, sigS := sigToVRS(gethcommon.Bytes2Hex(signature))
+	// log.Info("sigV: ", sigV, "sigR: ", sigR, "sigS: ", sigS)
 
 	// MsgConfirmBatch
 	// When validators observe a MsgRequestBatch they form a batch by ordering
@@ -613,6 +615,53 @@ func (c broadcastClient) SendForceSetValsetAndLastObservedEventNonce(ctx context
 	}).Infoln("Oracle sent MsgForceSetValset")
 
 	time.Sleep(10 * time.Second)
+
+	return nil
+}
+
+func (c broadcastClient) SendCancelAllPendingOutTx(ctx context.Context, chainId uint64) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &hyperiontypes.MsgCancelAllPendingOutgoingTxs{
+		ChainId: chainId,
+		Signer:  c.FromAddress().String(),
+	}
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgCancelAllPendingOutTx failed")
+	}
+
+	log.WithFields(log.Fields{
+		"tx_hash": resp.TxResponse.TxHash,
+	}).Infoln("Oracle sent MsgCancelAllPendingOutTx")
+
+	return nil
+}
+
+func (c broadcastClient) SendCancelPendingOutTxs(ctx context.Context, chainId uint64, count uint64) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &hyperiontypes.MsgCancelPendingOutgoingTxs{
+		ChainId: chainId,
+		Signer:  c.FromAddress().String(),
+		Count:   count,
+	}
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgCancelAllPendingOutTx failed")
+	}
+
+	log.WithFields(log.Fields{
+		"tx_hash": resp.TxResponse.TxHash,
+	}).Infoln("Oracle sent MsgCancelAllPendingOutTx")
 
 	return nil
 }

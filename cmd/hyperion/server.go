@@ -211,6 +211,32 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, address, nil)
 		return
+	case "get-list-outgoing-txs":
+		chainId, err := strconv.ParseUint(query.Get("chain_id"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid chain_id", http.StatusBadRequest)
+			return
+		}
+		outgoingTxs, err := queries.GetListOutgoingTxs(r.Context(), global, chainId)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, outgoingTxs, nil)
+		return
+	case "get-chain-settings":
+		chainId, err := strconv.ParseUint(query.Get("chain_id"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid chain_id", http.StatusBadRequest)
+			return
+		}
+		settings, err := queries.GetChainSettings(r.Context(), global, chainId)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, settings, nil)
+		return
 	}
 	sendSuccess(w, "404", nil)
 }
@@ -402,6 +428,22 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sendSuccess(w, "RPCs removed successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "update-chain-settings":
+		var params struct {
+			ChainID  uint64                 `json:"chain_id"`
+			Settings map[string]interface{} `json:"settings"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		err := queries.UpdateChainSettings(r.Context(), global, params.ChainID, params.Settings)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "Chain settings updated successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
 		return
 	}
 	sendError(w, "Unknown query type", http.StatusBadRequest)

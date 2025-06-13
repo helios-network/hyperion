@@ -150,7 +150,17 @@ func (l *relayer) relay(ctx context.Context) error {
 	if l.cfg.RelayBatches {
 		pg.Go(func() error {
 			return l.retry(ctx, func() error {
-				return l.relayTokenBatch(ctx, ethValset)
+				for i := 0; i < 3; i++ { // do 3 batch in same time if possible
+					relayed, err := l.relayTokenBatch(ctx, ethValset)
+					if err != nil {
+						return err
+					}
+					if relayed {
+						time.Sleep(15 * time.Second)
+						continue
+					}
+				}
+				return nil
 			})
 		})
 	}
@@ -392,24 +402,24 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valse
 	return true
 }
 
-func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
+func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) (bool, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
 	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
 	if l.logEnabled {
-		l.Log().Info("batches: ", batches)
+		l.Log().Info("batches: ", len(batches))
 	}
 	if err != nil {
 		l.Log().Info("failed to get latest transaction batches", err)
-		return err
+		return false, err
 	}
 
 	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-		return err
+		return false, err
 	}
 
 	var (
@@ -417,8 +427,10 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		confirmations        []*hyperiontypes.MsgConfirmBatch
 	)
 
+	mapBatchNonce := make(map[string]uint64, 0)
+
 	for _, batch := range batches {
-		l.Log().Info("batch details: ", batch)
+		// l.Log().Info("batch details: ", batch)
 
 		if batch.HyperionId != l.cfg.HyperionId {
 			continue
@@ -430,13 +442,28 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		}
 
 		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
-		l.Log().Info("sigs", sigs)
+		// l.Log().Info("sigs", sigs)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		if len(sigs) == 0 {
 			continue
+		}
+
+		if _, ok := mapBatchNonce[batch.TokenContract]; ok {
+			if batch.BatchNonce <= mapBatchNonce[batch.TokenContract] {
+				continue
+			}
+		} else {
+			latestBatchNonce, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(batch.TokenContract))
+			if err != nil {
+				return false, err
+			}
+			mapBatchNonce[batch.TokenContract] = latestBatchNonce.Uint64()
+			if batch.BatchNonce <= mapBatchNonce[batch.TokenContract] {
+				continue
+			}
 		}
 
 		oldestConfirmedBatch = batch
@@ -450,7 +477,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		if l.logEnabled {
 			l.Log().Infoln("no token batch to relay")
 		}
-		return nil
+		return false, nil
 	}
 	// l.Log().Info("oldestConfirmedBatch", oldestConfirmedBatch)
 
@@ -460,18 +487,17 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 	// }
 
 	// if l.logEnabled {
-	l.Log().Infoln("latestEthValset", latestEthValset)
-	l.Log().Infoln("oldestConfirmedBatch", oldestConfirmedBatch)
-	l.Log().Infoln("confirmations", confirmations)
+	// l.Log().Infoln("latestEthValset", latestEthValset)
+	l.Log().Infoln("Nonce", oldestConfirmedBatch.BatchNonce, "ContractNonce", mapBatchNonce[oldestConfirmedBatch.TokenContract])
+	// l.Log().Infoln("confirmations", confirmations)
 	// }
 
 	txHash, cost, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
 	if err != nil {
 		// Returning an error here triggers retries which don't help much except risk a binary crash
 		// Better to warn the user and try again in the next loop interval
-
 		l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
-		return nil
+		return false, nil
 	}
 
 	feesTaken := oldestConfirmedBatch.GetFees().BigInt()
@@ -481,7 +507,7 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)
 
-	return nil
+	return true, nil
 }
 
 // func (l *relayer) testRelayExternalData(ctx context.Context) {

@@ -451,3 +451,57 @@ func GetStaticRpcs(chainId uint64) ([]string, error) {
 	}
 	return baseFileMap[strconv.FormatUint(chainId, 10)], nil
 }
+
+func SetChainSettings(chainId uint64, settings map[string]interface{}) error {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+	joinPath := filepath.Join(dirPath, "chain_settings.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("{}"), 0644)
+	}
+	baseFile, err := os.ReadFile(joinPath)
+	if err != nil {
+		return err
+	}
+	var baseFileMap map[string]interface{}
+	json.Unmarshal(baseFile, &baseFileMap)
+
+	baseFileMap[strconv.FormatUint(chainId, 10)] = settings
+	jsonData, err := json.Marshal(baseFileMap)
+	if err != nil {
+		return err
+	}
+	os.WriteFile(joinPath, jsonData, 0644)
+	return nil
+}
+
+func GetChainSettings(chainId uint64) (map[string]interface{}, error) {
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		os.MkdirAll(dirPath, 0755)
+	}
+	joinPath := filepath.Join(dirPath, "chain_settings.json")
+	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
+		os.WriteFile(joinPath, []byte("{}"), 0644)
+	}
+	baseFile, err := os.ReadFile(joinPath)
+	if err != nil {
+		return nil, err
+	}
+	var baseFileMap map[string]interface{}
+	json.Unmarshal(baseFile, &baseFileMap)
+	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
+		return map[string]interface{}{}, nil
+	}
+	return baseFileMap[strconv.FormatUint(chainId, 10)].(map[string]interface{}), nil
+}
