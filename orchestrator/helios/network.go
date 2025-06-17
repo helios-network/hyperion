@@ -8,6 +8,8 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/gov"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/slashing"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/staking"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/tendermint"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
@@ -16,6 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 	"google.golang.org/grpc"
@@ -35,6 +38,7 @@ type NetworkWithoutBroadcast interface {
 	hyperion.QueryClient
 	gov.QClient
 	tendermint.Client
+	staking.StakingQueryClient
 }
 
 type Network interface {
@@ -43,6 +47,8 @@ type Network interface {
 	gov.QClient
 	gov.BClient
 	tendermint.Client
+	staking.StakingQueryClient
+	slashing.SlashingBroadcastClient
 }
 
 func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWithoutBroadcast, error) {
@@ -95,10 +101,12 @@ func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWi
 		hyperion.QueryClient
 		gov.QClient
 		tendermint.Client
+		staking.StakingQueryClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
 		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
+		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
 	}
 
 	logger.Infoln("NET LOADED")
@@ -158,12 +166,16 @@ func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignF
 		tendermint.Client
 		gov.QClient
 		gov.BClient
+		staking.StakingQueryClient
+		slashing.SlashingBroadcastClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
 		hyperion.NewBroadcastClient(chainClient, ethSignFn),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
 		gov.NewBroadcastClient(chainClient, ethSignFn),
+		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
+		slashing.NewBroadcastClient(chainClient, ethSignFn),
 	}
 
 	logger.Infoln("NET LOADED")

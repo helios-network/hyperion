@@ -573,6 +573,7 @@ func (l *relayer) processBatch(ctx context.Context, batches []*hyperiontypes.Out
 		if len(batchsNotConfirmed) > 0 {
 			for _, batch := range batchsNotConfirmed {
 				if !batch.Signed {
+					l.Log().Infoln("signing batch - batch: ", batch.Batch.BatchNonce, " - tokenContract: ", batch.Batch.TokenContract)
 					l.SignBatch(ctx, batch.Batch)
 				}
 			}

@@ -69,7 +69,7 @@ type oracle struct {
 }
 
 func (l *oracle) Log() log.Logger {
-	return l.logger.WithField("loop", "Oracle")
+	return l.logger.WithField("loop", "Oracle").WithField("chain", l.cfg.ChainName)
 }
 
 func (l *oracle) observeEthEvents(ctx context.Context) error {
@@ -107,7 +107,27 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	if !bonded {
 		l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height}).Warningln("validator not in active set, cannot make claims...")
-		err := l.helios.SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
+		_, err := l.helios.GetLatestBlockHeight(ctx)
+		if err != nil {
+			l.Log().WithError(err).Errorln("Connected node is down, cannot make claims...")
+			return err
+		}
+		validator, err := l.helios.GetValidator(ctx, l.cfg.CosmosAddr.String())
+		if err != nil {
+			l.Log().WithError(err).Errorln("failed to get validator on " + l.cfg.ChainName)
+			return err
+		}
+		if validator.Jailed {
+			// todo try to unjail
+			l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height, "validator": validator.Description.Moniker}).Warningln("validator jailed, cannot make claims...")
+			err = l.helios.SendUnjail(ctx, l.cfg.CosmosAddr.String())
+			if err != nil {
+				l.Log().WithError(err).Errorln("failed to unjail validator on " + l.cfg.ChainName)
+				return err
+			}
+			return nil
+		}
+		err = l.helios.SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
 		if err != nil {
 			return err
 		}
@@ -116,7 +136,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	latestHeight, err := l.getLatestEthHeight(ctx)
 	if err != nil {
-		l.Log().WithError(err).Errorln("failed to get latest ethereum height")
+		l.Log().WithError(err).Errorln("failed to get latest " + l.cfg.ChainName + " height")
 		return err
 	}
 
@@ -144,16 +164,19 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
 	if err != nil {
+		l.Log().WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
 		return err
 	}
 
 	lastObservedEventNonce, err := l.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
+		l.Log().WithError(err).Errorln("failed to get last observed event nonce on " + l.cfg.ChainName)
 		return err
 	}
 
 	lastEventNonce, err := l.ethereum.GetLastEventNonce(ctx)
 	if err != nil {
+		l.Log().WithError(err).Errorln("failed to get last event nonce on " + l.cfg.ChainName)
 		return err
 	}
 
