@@ -36,6 +36,7 @@ type Global interface {
 type Config struct {
 	EnabledLogs          string
 	CosmosAddr           cosmostypes.AccAddress
+	ValidatorAddress     cosmostypes.ValAddress
 	HyperionId           uint64
 	ChainName            string
 	ChainId              uint64

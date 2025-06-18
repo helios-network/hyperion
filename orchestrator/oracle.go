@@ -112,7 +112,8 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			l.Log().WithError(err).Errorln("Connected node is down, cannot make claims...")
 			return err
 		}
-		validator, err := l.helios.GetValidator(ctx, l.cfg.CosmosAddr.String())
+		//l.cfg.CosmosAddr.String()
+		validator, err := l.helios.GetValidator(ctx, l.cfg.ValidatorAddress.String())
 		if err != nil {
 			l.Log().WithError(err).Errorln("failed to get validator on " + l.cfg.ChainName)
 			return err
@@ -120,7 +121,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		if validator.Jailed {
 			// todo try to unjail
 			l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height, "validator": validator.Description.Moniker}).Warningln("validator jailed, cannot make claims...")
-			err = l.helios.SendUnjail(ctx, l.cfg.CosmosAddr.String())
+			err = l.helios.SendUnjail(ctx, l.cfg.ValidatorAddress.String())
 			if err != nil {
 				l.Log().WithError(err).Errorln("failed to unjail validator on " + l.cfg.ChainName)
 				return err

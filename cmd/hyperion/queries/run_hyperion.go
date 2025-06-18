@@ -11,6 +11,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/pricefeed"
+	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 )
 
 func min(a, b time.Duration) time.Duration {
@@ -47,12 +48,18 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		return errors.Wrap(err, fmt.Sprintf("failed to parse relay batch offset duration for chain %d", counterpartyChainParams.BridgeChainId))
 	}
 
+	validatorAddress, err := cosmostypes.ValAddressFromBech32(global.GetCosmosAddress().String())
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to parse validator address for chain %d", counterpartyChainParams.BridgeChainId))
+	}
+
 	orchestratorCfg := orchestrator.Config{
 		EnabledLogs:          "signer,relayer,oracle,batch-creator",
 		ChainId:              counterpartyChainParams.BridgeChainId,
 		ChainName:            counterpartyChainParams.BridgeChainName,
 		HyperionId:           uint64(counterpartyChainParams.HyperionId),
 		CosmosAddr:           global.GetCosmosAddress(),
+		ValidatorAddress:     validatorAddress,
 		EthereumAddr:         global.GetAddress(),
 		MinBatchFeeUSD:       global.GetMinBatchFeeUSD(),
 		RelayValsetOffsetDur: valsetDur,
