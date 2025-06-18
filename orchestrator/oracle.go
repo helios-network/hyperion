@@ -126,6 +126,9 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 				l.Log().WithError(err).Errorln("failed to unjail validator on " + l.cfg.ChainName)
 				return err
 			}
+			//failed to get validator on BSC Testnet
+			// chain="BSC Testnet" error="rpc error: code = Unknown desc = codespace sdk code 35:
+			/// internal logic error: hrp does not match bech32 prefix: expected 'heliosvaloper' got 'helios'" loop=Oracle
 			return nil
 		}
 		err = l.helios.SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())

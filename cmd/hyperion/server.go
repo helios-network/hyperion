@@ -237,6 +237,14 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, settings, nil)
 		return
+	case "get-validator":
+		validator, err := queries.GetValidator(r.Context(), global)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, validator, nil)
+		return
 	}
 	sendSuccess(w, "404", nil)
 }

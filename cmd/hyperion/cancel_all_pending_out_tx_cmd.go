@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries"
 	globaltypes "github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/gorilla/mux"
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
+	log "github.com/xlab/suplog"
 )
 
 func cancelAllPendingOutTxCmd(cmd *cli.Cmd) {
@@ -40,7 +42,12 @@ func cancelAllPendingOutTxCmd(cmd *cli.Cmd) {
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)
 
-		queries.CancelAllPendingOutTx(ctx, global, 80002)
+		validator, err := queries.GetValidator(ctx, global)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(validator)
+		// queries.CancelAllPendingOutTx(ctx, global, 80002)
 
 		closer.Hold()
 	}
