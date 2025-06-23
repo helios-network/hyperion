@@ -107,8 +107,16 @@ func (g *Global) GetRunner(chainId uint64) context.CancelFunc {
 	return g.runners[chainId]
 }
 
+func (g *Global) GetRunners() map[uint64]context.CancelFunc {
+	return g.runners
+}
+
 func (g *Global) GetOrchestrator(chainId uint64) *orchestrator.Orchestrator {
 	return g.orchestrators[chainId]
+}
+
+func (g *Global) GetOrchestrators() map[uint64]*orchestrator.Orchestrator {
+	return g.orchestrators
 }
 
 func (g *Global) CancelRunner(chainId uint64) {

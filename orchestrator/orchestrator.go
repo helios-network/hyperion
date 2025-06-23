@@ -62,6 +62,9 @@ type Orchestrator struct {
 	priceFeed     PriceFeed
 	firstTimeSync bool
 	global        Global
+
+	height       uint64
+	targetHeight uint64
 }
 
 func NewOrchestrator(
@@ -83,6 +86,9 @@ func NewOrchestrator(
 		maxAttempts:   10,
 		firstTimeSync: false,
 		global:        global,
+
+		height:       0,
+		targetHeight: 0,
 	}
 
 	return o, nil
@@ -100,6 +106,29 @@ func (s *Orchestrator) SetEthereum(eth ethereum.Network) {
 
 func (s *Orchestrator) GetEthereum() ethereum.Network {
 	return s.ethereum
+}
+
+func (s *Orchestrator) SetHeight(height uint64) {
+	s.height = height
+}
+
+func (s *Orchestrator) SetTargetHeight(height uint64) {
+	s.targetHeight = height
+}
+
+func (s *Orchestrator) GetHeight() uint64 {
+	return s.height
+}
+
+func (s *Orchestrator) GetTargetHeight() uint64 {
+	return s.targetHeight
+}
+
+func (s *Orchestrator) GetStats() map[string]interface{} {
+	return map[string]interface{}{
+		"height":       s.height,
+		"targetHeight": s.targetHeight,
+	}
 }
 
 // startValidatorMode runs all orchestrator processes. This is called

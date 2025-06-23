@@ -30,11 +30,21 @@ type BroadcastClient interface {
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
 	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+
 	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
 	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
 	SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
 	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
 	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
+
+	SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
+	SendWithdrawalClaimMsg(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
+	SendExternalDataClaimMsg(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (cosmostypes.Msg, error)
+	SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
+	SendERC20DeployedClaimMsg(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
+
+	SyncBroadcastMsgs(ctx context.Context, msgs []cosmostypes.Msg) (*cosmostypes.TxResponse, error)
+
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
@@ -697,4 +707,185 @@ func (c broadcastClient) WaitForAttestation(ctx context.Context, eventNonce uint
 			}
 		}
 	}
+}
+
+func (c broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+	// EthereumBridgeDepositClaim
+	// When more than 66% of the active validator set has
+	// claimed to have seen the deposit enter the ethereum blockchain coins are
+	// issued to the Cosmos address in question
+	// -------------
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.WithFields(log.Fields{
+		"sender":         deposit.Sender.Hex(),
+		"destination":    cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
+		"amount":         deposit.Amount.String(),
+		"data":           deposit.Data,
+		"token_contract": deposit.TokenContract.Hex(),
+	}).Debugln(hyperionId, " - observed SendToHeliosEvent")
+
+	// check if data is valid json
+	if !json.Valid([]byte(deposit.Data)) {
+		deposit.Data = ""
+	}
+
+	msg := &hyperiontypes.MsgDepositClaim{
+		HyperionId:     hyperionId,
+		EventNonce:     deposit.EventNonce.Uint64(),
+		BlockHeight:    deposit.Raw.BlockNumber,
+		TokenContract:  deposit.TokenContract.Hex(),
+		Amount:         sdkmath.NewIntFromBigInt(deposit.Amount),
+		EthereumSender: deposit.Sender.Hex(),
+		CosmosReceiver: cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
+		Orchestrator:   c.ChainClient.FromAddress().String(),
+		Data:           deposit.Data,
+		TxHash:         deposit.Raw.TxHash.Hex(),
+		RpcUsed:        rpcUsedForObservation,
+	}
+
+	return msg, nil
+}
+
+func (c broadcastClient) SendWithdrawalClaimMsg(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.WithFields(log.Fields{
+		"batch_nonce":    withdrawal.BatchNonce.String(),
+		"token_contract": withdrawal.Token.Hex(),
+	}).Debugln(hyperionId, " - observed TransactionBatchExecutedEvent")
+
+	// WithdrawClaim claims that a batch of withdrawal
+	// operations on the bridge contract was executed.
+	// -------------
+	msg := &hyperiontypes.MsgWithdrawClaim{
+		HyperionId:    hyperionId,
+		EventNonce:    withdrawal.EventNonce.Uint64(),
+		BatchNonce:    withdrawal.BatchNonce.Uint64(),
+		BlockHeight:   withdrawal.Raw.BlockNumber,
+		TokenContract: withdrawal.Token.Hex(),
+		Orchestrator:  c.FromAddress().String(),
+		TxHash:        withdrawal.Raw.TxHash.Hex(),
+		RpcUsed:       rpcUsedForObservation,
+	}
+
+	return msg, nil
+}
+
+func (c broadcastClient) SendExternalDataClaimMsg(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.WithFields(log.Fields{
+		"tx_nonce":          nonce,
+		"tx_height":         blockHeight,
+		"external_contract": externalContractAddress,
+	}).Debugln(hyperionId, " - observed ExternalDataClaim")
+
+	// MsgExternalDataClaim claims that a batch of external data
+	// was executed.
+	// -------------
+	msg := &hyperiontypes.MsgExternalDataClaim{
+		HyperionId:              hyperionId,
+		TxNonce:                 nonce,
+		BlockHeight:             blockHeight,
+		ExternalContractAddress: externalContractAddress,
+		Orchestrator:            c.FromAddress().String(),
+		CallDataResult:          hex.EncodeToString(callData),
+		CallDataResultError:     hex.EncodeToString(callErr),
+		RpcUsed:                 rpcUsedForObservation,
+	}
+
+	return msg, nil
+}
+
+func (c broadcastClient) SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.WithFields(log.Fields{
+		"valset_nonce":  vs.NewValsetNonce.Uint64(),
+		"validators":    vs.Validators,
+		"powers":        vs.Powers,
+		"reward_amount": vs.RewardAmount,
+		"reward_token":  vs.RewardToken.Hex(),
+	}).Debugln("observed ValsetUpdatedEvent")
+
+	members := make([]*hyperiontypes.BridgeValidator, len(vs.Validators))
+	for i, val := range vs.Validators {
+		members[i] = &hyperiontypes.BridgeValidator{
+			EthereumAddress: val.Hex(),
+			Power:           vs.Powers[i].Uint64(),
+		}
+	}
+
+	// MsgValsetUpdatedClaim this message permit to share to
+	// hyperion module the valset was updated on source blockchain
+	// this permit to insure the power is well share on both side
+	// -------------
+	msg := &hyperiontypes.MsgValsetUpdatedClaim{
+		HyperionId:   hyperionId,
+		EventNonce:   vs.EventNonce.Uint64(),
+		ValsetNonce:  vs.NewValsetNonce.Uint64(),
+		BlockHeight:  vs.Raw.BlockNumber,
+		RewardAmount: sdkmath.NewIntFromBigInt(vs.RewardAmount),
+		RewardToken:  vs.RewardToken.Hex(),
+		Members:      members,
+		Orchestrator: c.FromAddress().String(),
+		RpcUsed:      rpcUsedForObservation,
+	}
+	return msg, nil
+}
+
+func (c broadcastClient) SendERC20DeployedClaimMsg(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	log.WithFields(log.Fields{
+		"helios_denom":   erc20.HeliosDenom,
+		"token_contract": erc20.TokenContract.Hex(),
+		"name":           erc20.Name,
+		"symbol":         erc20.Symbol,
+		"decimals":       erc20.Decimals,
+	}).Debugln("observed ERC20DeployedEvent")
+
+	// MsgERC20DeployedClaim claims that new erc20 token
+	// was deployed on the source blockchain and will be linked
+	// as ERC20 to cosmosDenom in hyperion Module on HyperionId
+	// ----------
+	msg := &hyperiontypes.MsgERC20DeployedClaim{
+		HyperionId:    hyperionId,
+		EventNonce:    erc20.EventNonce.Uint64(),
+		BlockHeight:   erc20.Raw.BlockNumber,
+		CosmosDenom:   erc20.HeliosDenom,
+		TokenContract: erc20.TokenContract.Hex(),
+		Name:          erc20.Name,
+		Symbol:        erc20.Symbol,
+		Decimals:      uint64(erc20.Decimals),
+		Orchestrator:  c.FromAddress().String(),
+		RpcUsed:       rpcUsedForObservation,
+	}
+
+	return msg, nil
+}
+
+func (c broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []cosmostypes.Msg) (*cosmostypes.TxResponse, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msgs...)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "broadcasting Msgs failed")
+	}
+
+	return resp.TxResponse, nil
 }

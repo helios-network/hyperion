@@ -245,6 +245,14 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, validator, nil)
 		return
+	case "get-stats":
+		stats, err := queries.GetStats(r.Context(), global)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, stats, nil)
+		return
 	}
 	sendSuccess(w, "404", nil)
 }

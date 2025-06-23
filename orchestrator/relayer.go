@@ -391,10 +391,24 @@ func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valse
 		return false
 	}
 
-	// Check custom time delay offset
+	// Check custom time delay offset for determine if we should relay the valset on chain respecting the offset
 	block, err := l.helios.GetBlock(ctx, int64(vs.Height))
 	if err != nil {
-		l.Log().WithError(err).Warningln("unable to get latest block from Helios")
+		latestBlockHeight, err := l.helios.GetLatestBlockHeight(ctx)
+		if err != nil {
+			l.Log().WithError(err).Warningln("unable to get latest block from Helios")
+			return false
+		}
+		block, err = l.helios.GetBlock(ctx, int64(latestBlockHeight))
+		if err != nil {
+			l.Log().WithError(err).Warningln("unable to get latest block from Helios (tryed block:", int64(vs.Height), ")")
+			return false
+		}
+		if block != nil && latestBlockHeight > int64(vs.Height)+1000 { // should be sufficient to avoid race condition
+			l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
+			return true
+		}
+		l.Log().WithError(err).Warningln("unable to get latest block of valset from Helios")
 		return false
 	}
 

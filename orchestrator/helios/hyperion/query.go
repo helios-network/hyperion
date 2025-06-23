@@ -42,6 +42,7 @@ type QueryClient interface {
 	LatestTransactionExternalCallDataTxs(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingExternalDataTx, error)
 
 	QueryGetListOutgoingTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
+	QueryGetAllPendingSendToChain(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTransferTx, []*hyperiontypes.OutgoingTransferTx, error)
 }
 
 type queryClient struct {
@@ -544,4 +545,27 @@ func (c queryClient) QueryGetListOutgoingTxs(ctx context.Context, chainId uint64
 	}
 
 	return resp.Batches, nil
+}
+
+func (c queryClient) QueryGetAllPendingSendToChain(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTransferTx, []*hyperiontypes.OutgoingTransferTx, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryAllPendingSendToChainRequest{
+		HyperionId: chainId,
+	}
+
+	resp, err := c.QueryClient.GetAllPendingSendToChain(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, nil, ErrNotFound
+	}
+
+	return resp.TransfersInBatches, resp.UnbatchedTransfers, nil
 }

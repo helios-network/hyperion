@@ -164,6 +164,9 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		targetHeight = l.lastObservedEthHeight + defaultBlocksToSearch
 	}
 
+	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
+	l.Orchestrator.SetTargetHeight(latestHeight - ethBlockConfirmationDelay)
+
 	l.Log().Infoln("Sync", strconv.FormatUint(targetHeight-l.lastObservedEthHeight, 10), "Blocks", strconv.FormatUint(l.lastObservedEthHeight, 10)+"("+strconv.FormatUint(((l.lastObservedEthHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%) to", strconv.FormatUint(targetHeight, 10)+"("+strconv.FormatUint(((targetHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%)")
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
@@ -346,8 +349,32 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			return nil
 		}
 
+		var msgs []cosmostypes.Msg
 		for _, event := range newEvents {
-			resp, err := l.sendEthEventClaim(ctx, event)
+			msg, err := l.prepareSendEthEventClaim(ctx, event)
+			if err != nil {
+				return err
+			}
+			msgs = append(msgs, msg)
+
+			if len(msgs) > 10 {
+				log.Infoln("sending bulk of ", len(msgs), "claims messages")
+				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
+				if err != nil {
+					return err
+				}
+				cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
+				if err == nil {
+					storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
+				}
+				msgs = []cosmostypes.Msg{}
+				time.Sleep(1100 * time.Millisecond)
+			}
+		}
+
+		if len(msgs) > 0 {
+			log.Infoln("sending bulk of ", len(msgs), "claims messages")
+			resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
 				return err
 			}
@@ -355,11 +382,22 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			if err == nil {
 				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
 			}
-
-			// Considering block time ~1s on Helios chain, adding Sleep to make sure new event is sent
-			// only after previous event is executed successfully. Otherwise it will through `non contiguous event nonce` failing CheckTx.
 			time.Sleep(1100 * time.Millisecond)
 		}
+		// for _, event := range newEvents {
+		// 	resp, err := l.sendEthEventClaim(ctx, event)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
+		// 	if err == nil {
+		// 		storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
+		// 	}
+
+		// 	// Considering block time ~1s on Helios chain, adding Sleep to make sure new event is sent
+		// 	// only after previous event is executed successfully. Otherwise it will through `non contiguous event nonce` failing CheckTx.
+		// 	time.Sleep(1100 * time.Millisecond)
+		// }
 
 		return nil
 	}
@@ -388,6 +426,25 @@ func (l *oracle) autoResync(ctx context.Context) error {
 	l.lastResyncWithHelios = time.Now()
 
 	return nil
+}
+
+func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmostypes.Msg, error) {
+	switch e := ev.(type) {
+	case *deposit:
+		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
+		return l.helios.SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+	case *valsetUpdate:
+		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
+		return l.helios.SendValsetClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+	case *withdrawal:
+		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
+		return l.helios.SendWithdrawalClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+	case *erc20Deployment:
+		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
+		return l.helios.SendERC20DeployedClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+	default:
+		panic(errors.Errorf("unknown ev type %T", e))
+	}
 }
 
 func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) (*cosmostypes.TxResponse, error) {

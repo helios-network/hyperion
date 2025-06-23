@@ -119,6 +119,25 @@
                                                                 >
                                                                     Paused
                                                                 </v-chip>
+                                                                <v-chip
+                                                                    :color="chain.isSynced ? 'success' : 'error'"
+                                                                    small
+                                                                    class="ml-2"
+                                                                >
+                                                                    {{ chain.isSynced ? 'Synced' : 'Out of Sync' }}
+                                                                </v-chip>
+                                                            </v-list-item-subtitle>
+                                                        </v-list-item-content>
+                                                    </v-list-item>
+                                                    <v-list-item v-if="!chain.isSynced && chain.height > 0">
+                                                        <v-list-item-content>
+                                                            <v-list-item-title>Sync Status</v-list-item-title>
+                                                            <v-list-item-subtitle>
+                                                                Height: {{ chain.height }} | Target: {{ chain.targetHeight }} | Diff: {{ chain.heightDiff }}
+                                                            </v-list-item-subtitle>
+                                                            <v-list-item-title>Stats</v-list-item-title>
+                                                            <v-list-item-subtitle>
+                                                                Total Txs: {{ chain.totalTxs }} | Batches: {{ chain.batches }}
                                                             </v-list-item-subtitle>
                                                         </v-list-item-content>
                                                     </v-list-item>
@@ -791,12 +810,36 @@
                             throw new Error('Failed to fetch chains');
                         }
                         const resp = await response.json();
-                        // Add isLoading property to each chain
+                        
+                        // Fetch stats to get height information
+                        const statsResponse = await fetch('/api/query?type=get-stats');
+                        let stats = {};
+                        if (statsResponse.ok) {
+                            const statsData = await statsResponse.json();
+                            if (statsData.success && statsData.data) {
+                                stats = statsData.data;
+                            }
+                        }
+                        
+                        // Add isLoading property to each chain and sync status
                         this.chains = [];
                         Object.keys(resp.data).forEach(key => {
+                            const chain = resp.data[key];
+                            const chainStats = stats[key] || {};
+                            const height = chainStats.height || 0;
+                            const targetHeight = chainStats.targetHeight || 0;
+                            const heightDiff = Math.abs(targetHeight - height);
+                            const isSynced = heightDiff <= 10;
+                            
                             this.chains.push({
-                                ... resp.data[key],
+                                ...chain,
                                 isLoading: false,
+                                height: height,
+                                targetHeight: targetHeight,
+                                isSynced: isSynced,
+                                heightDiff: heightDiff,
+                                totalTxs: chainStats.totalTxs || 0,
+                                batches: chainStats.batches || 0
                             });
                         });
                     } catch (error) {
