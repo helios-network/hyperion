@@ -84,8 +84,8 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 
 			fmt.Println("Starting orchestrator")
 
-			heliosNetwork, err := global.InitHeliosNetwork(counterpartyChainParams.BridgeChainId)
-			if err != nil {
+			heliosNetwork := global.GetHeliosNetwork()
+			if heliosNetwork == nil { // should not happen
 				fmt.Println("Error initializing helios network:", err)
 				cancel()
 				time.Sleep(currentDelay)

@@ -7,8 +7,6 @@ import (
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
-
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 )
 
@@ -19,14 +17,12 @@ type SlashingBroadcastClient interface {
 type broadcastClient struct {
 	chain.ChainClient
 
-	ethSignFn keystore.PersonalSignFn
-	svcTags   metrics.Tags
+	svcTags metrics.Tags
 }
 
-func NewBroadcastClient(client chain.ChainClient, signFn keystore.PersonalSignFn) SlashingBroadcastClient {
+func NewBroadcastClient(client chain.ChainClient) SlashingBroadcastClient {
 	return broadcastClient{
 		ChainClient: client,
-		ethSignFn:   signFn,
 		svcTags:     metrics.Tags{"svc": "gov_broadcast"},
 	}
 }

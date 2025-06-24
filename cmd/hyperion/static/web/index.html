@@ -829,7 +829,7 @@
                             const height = chainStats.height || 0;
                             const targetHeight = chainStats.targetHeight || 0;
                             const heightDiff = Math.abs(targetHeight - height);
-                            const isSynced = heightDiff <= 10;
+                            const isSynced = heightDiff <= 1000;
                             
                             this.chains.push({
                                 ...chain,

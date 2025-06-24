@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -56,11 +57,13 @@ func (l *signer) sign(ctx context.Context) error {
 	}
 	l.Log().Debugln("signing validator sets done")
 
+	noncesPushed := []uint64{}
 	for i := 0; i < 5; i++ {
-		hasPushedABatch, err := l.signNewBatch(ctx)
+		hasPushedABatch, noncePushed, err := l.signNewBatch(ctx, noncesPushed)
 		if err != nil {
 			return err
 		}
+		noncesPushed = append(noncesPushed, noncePushed)
 		if !hasPushedABatch {
 			break
 		}
@@ -87,7 +90,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
 			l.Log().Infoln("signing valset", vs.Nonce)
-			return l.helios.SendValsetConfirm(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, vs)
+			return l.helios.SendValsetConfirm(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, l.ethereum.GetPersonalSignFn(), vs)
 		}); err != nil {
 			l.Log().Infoln("signing valset failed", err)
 			return err
@@ -101,25 +104,25 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 	return nil
 }
 
-func (l *signer) signNewBatch(ctx context.Context) (bool, error) {
+func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool, uint64, error) {
 	var oldestUnsignedBatch *hyperiontypes.OutgoingTxBatch
 	getBatchFn := func() error {
 		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
-		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == l.cfg.HyperionId {
+		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == l.cfg.HyperionId && !slices.Contains(noncesPushed, tmpOldestUnsignedBatch.BatchNonce) {
 			oldestUnsignedBatch = tmpOldestUnsignedBatch
 		}
 		return nil
 	}
 
 	if err := l.retry(ctx, getBatchFn); err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	if oldestUnsignedBatch == nil {
 		if l.logEnabled {
 			l.Log().Infoln("no token batch to confirm")
 		}
-		return false, nil
+		return false, 0, nil
 	}
 
 	if err := l.retry(ctx, func() error {
@@ -127,13 +130,14 @@ func (l *signer) signNewBatch(ctx context.Context) (bool, error) {
 			l.cfg.HyperionId,
 			l.cfg.EthereumAddr,
 			l.hyperionID,
+			l.ethereum.GetPersonalSignFn(),
 			oldestUnsignedBatch,
 		)
 	}); err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	l.Log().WithFields(log.Fields{"token_contract": oldestUnsignedBatch.TokenContract, "batch_nonce": oldestUnsignedBatch.BatchNonce, "txs": len(oldestUnsignedBatch.Transactions)}).Infoln("confirmed batch on Helios")
 
-	return true, nil
+	return true, oldestUnsignedBatch.BatchNonce, nil
 }

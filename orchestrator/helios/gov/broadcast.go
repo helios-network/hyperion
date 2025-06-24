@@ -9,8 +9,6 @@ import (
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
-
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -27,14 +25,12 @@ type BClient interface {
 type broadcastClient struct {
 	chain.ChainClient
 
-	ethSignFn keystore.PersonalSignFn
-	svcTags   metrics.Tags
+	svcTags metrics.Tags
 }
 
-func NewBroadcastClient(client chain.ChainClient, signFn keystore.PersonalSignFn) BClient {
+func NewBroadcastClient(client chain.ChainClient) BClient {
 	return broadcastClient{
 		ChainClient: client,
-		ethSignFn:   signFn,
 		svcTags:     metrics.Tags{"svc": "gov_broadcast"},
 	}
 }

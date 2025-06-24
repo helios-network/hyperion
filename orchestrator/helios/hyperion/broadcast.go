@@ -26,8 +26,8 @@ import (
 
 type BroadcastClient interface {
 	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
-	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error
-	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error
+	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error
+	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
 	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 
@@ -55,27 +55,25 @@ type BroadcastClient interface {
 type broadcastClient struct {
 	chain.ChainClient
 
-	ethSignFn keystore.PersonalSignFn
-	svcTags   metrics.Tags
+	svcTags metrics.Tags
 }
 
-func NewBroadcastClient(client chain.ChainClient, signFn keystore.PersonalSignFn) BroadcastClient {
+func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
 	return broadcastClient{
 		ChainClient: client,
-		ethSignFn:   signFn,
 		svcTags:     metrics.Tags{"svc": "hyperion_broadcast"},
 	}
 }
 
-func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, valset *hyperiontypes.Valset) error {
+func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	log.Infoln("sending valset confirm", c.ethSignFn)
+	log.Infoln("sending valset confirm")
 
 	confirmHash := hyperion.EncodeValsetConfirm(hyperionID, valset)
-	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
+	signature, err := signerFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return errors.New("failed to sign validator address")
@@ -128,7 +126,7 @@ func sigToVRS(sigHex string) (v uint8, r, s gethcommon.Hash) {
 	return
 }
 
-func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, batch *hyperiontypes.OutgoingTxBatch) error {
+func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -136,7 +134,7 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 	confirmHash := hyperion.EncodeTxBatchConfirm(hyperionID, batch)
 	// log.Info("confirmHash: ", confirmHash, "batch: ", batch, "hyperionID: ", hyperionID, "ethFrom: ", ethFrom.Hex())
 	// log.Info("confirmHashLength: ", len(confirmHash.Bytes()))
-	signature, err := c.ethSignFn(ethFrom, confirmHash.Bytes())
+	signature, err := signerFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return errors.New("failed to sign validator address")

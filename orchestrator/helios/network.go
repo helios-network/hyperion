@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/gov"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/slashing"
@@ -114,7 +113,7 @@ func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWi
 	return net, nil
 }
 
-func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignFn, cfg NetworkConfig) (Network, error) {
+func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (Network, error) {
 	clientCfg := cfg.loadClientConfig()
 	logger := log.WithField("svc", "MAIN PROCESS")
 
@@ -170,12 +169,12 @@ func NewNetworkWithBroadcast(k keyring.Keyring, ethSignFn keystore.PersonalSignF
 		slashing.SlashingBroadcastClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
-		hyperion.NewBroadcastClient(chainClient, ethSignFn),
+		hyperion.NewBroadcastClient(chainClient),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
-		gov.NewBroadcastClient(chainClient, ethSignFn),
+		gov.NewBroadcastClient(chainClient),
 		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
-		slashing.NewBroadcastClient(chainClient, ethSignFn),
+		slashing.NewBroadcastClient(chainClient),
 	}
 
 	logger.Infoln("NET LOADED")

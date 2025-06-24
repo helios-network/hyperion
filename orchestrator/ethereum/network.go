@@ -17,6 +17,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -91,12 +92,16 @@ type Network interface {
 
 	TokenDecimals(ctx context.Context, tokenContract gethcommon.Address) (uint8, error)
 	ExecuteExternalDataTx(ctx context.Context, address gethcommon.Address, txAbi []byte, blockNumber *big.Int) ([]byte, []byte, string, error)
+	GetSignerFn() bind.SignerFn
+	GetPersonalSignFn() keystore.PersonalSignFn
 }
 
 type network struct {
 	hyperion.HyperionContract
 
-	FromAddr gethcommon.Address
+	FromAddr       gethcommon.Address
+	SignerFn       bind.SignerFn
+	PersonalSignFn keystore.PersonalSignFn
 }
 
 func DeployNewHyperionContract(
@@ -124,6 +129,7 @@ func NewNetwork(
 	hyperionContractAddr,
 	fromAddr gethcommon.Address,
 	signerFn bind.SignerFn,
+	personalSignFn keystore.PersonalSignFn,
 	cfg NetworkConfig,
 	options ...committer.EVMCommitterOption,
 ) (Network, error) {
@@ -164,6 +170,8 @@ func NewNetwork(
 	n := &network{
 		HyperionContract: hyperionContract,
 		FromAddr:         fromAddr,
+		SignerFn:         signerFn,
+		PersonalSignFn:   personalSignFn,
 	}
 
 	return n, nil
@@ -185,6 +193,14 @@ func (n *network) TokenDecimals(ctx context.Context, tokenContract gethcommon.Ad
 	}
 
 	return uint8(big.NewInt(0).SetBytes(res).Uint64()), nil
+}
+
+func (n *network) GetSignerFn() bind.SignerFn {
+	return n.SignerFn
+}
+
+func (n *network) GetPersonalSignFn() keystore.PersonalSignFn {
+	return n.PersonalSignFn
 }
 
 func (n *network) FromAddress() gethcommon.Address {

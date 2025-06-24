@@ -16,9 +16,9 @@ func DeployHeliosTokenToChain(ctx context.Context, global *global.Global, chainI
 		return nil, err
 	}
 
-	_, err = global.InitHeliosNetwork(counterpartyChainParams.BridgeChainId)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to initialize helios network for chain %d", counterpartyChainParams.BridgeChainId))
+	heliosNetwork := global.GetHeliosNetwork()
+	if heliosNetwork == nil {
+		return nil, fmt.Errorf("helios network not initialized")
 	}
 
 	targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)

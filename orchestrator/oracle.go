@@ -159,10 +159,27 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	// ensure the block range is within defaultBlocksToSearch
-	if targetHeight > l.lastObservedEthHeight+defaultBlocksToSearch {
-		targetHeight = l.lastObservedEthHeight + defaultBlocksToSearch
+	targetHeightForSync := targetHeight
+	for i := 0; i < 100 && latestHeight > targetHeightForSync; i++ {
+		if targetHeightForSync > l.lastObservedEthHeight+defaultBlocksToSearch {
+			targetHeightForSync = l.lastObservedEthHeight + defaultBlocksToSearch
+		}
+		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync); err != nil {
+			return err
+		}
+		targetHeightForSync = targetHeightForSync + defaultBlocksToSearch
 	}
+
+	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
+		if err := l.autoResync(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64) error {
 
 	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
 	l.Orchestrator.SetTargetHeight(latestHeight - ethBlockConfirmationDelay)
@@ -203,7 +220,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if len(newEvents) == 0 {
 		l.Log().Infoln("NO EVENTS DETECTED 0", l.ethereum.GetLastUsedRpc())
 		if l.logEnabled {
-			l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("oracle no new events on Ethereum")
+			l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": targetHeight}).Infoln("oracle no new events on " + l.cfg.ChainName)
 		}
 		l.lastObservedEthHeight = targetHeight
 		return nil
@@ -225,7 +242,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		}
 		l.lastObservedEthHeight = lastObservedHeight.EthereumBlockHeight
 		// move back to the last observed event height
-		l.Log().WithFields(log.Fields{"current_helios_nonce": lastObservedEventNonce, "wanted_nonce": lastObservedEventNonce + 1, "actual_ethereum_nonce": newEvents[0].Nonce()}).Infoln("orchestrator missed an Ethereum event. Restarting block search from last observed claim...")
+		l.Log().WithFields(log.Fields{"current_helios_nonce": lastObservedEventNonce, "wanted_nonce": lastObservedEventNonce + 1, "actual_ethereum_nonce": newEvents[0].Nonce()}).Infoln("orchestrator missed an " + l.cfg.ChainName + " event. Restarting block search from last observed claim...")
 		return nil
 	}
 
@@ -238,12 +255,6 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().WithFields(log.Fields{"claims": len(newEvents), "eth_block_start": l.lastObservedEthHeight, "eth_block_end": latestHeight}).Infoln("sent new event claims to Helios")
 	}
 	l.lastObservedEthHeight = targetHeight
-
-	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
-		if err := l.autoResync(ctx); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
@@ -429,42 +440,46 @@ func (l *oracle) autoResync(ctx context.Context) error {
 }
 
 func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmostypes.Msg, error) {
+	rpc := ""
+	if !l.IsStaticRpcAnonymous() {
+		rpc = l.ethereum.GetLastUsedRpc()
+	}
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
-		return l.helios.SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+		return l.helios.SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *valsetUpdate:
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+		return l.helios.SendValsetClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *withdrawal:
 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+		return l.helios.SendWithdrawalClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *erc20Deployment:
 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaimMsg(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+		return l.helios.SendERC20DeployedClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}
 }
 
-func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) (*cosmostypes.TxResponse, error) {
-	switch e := ev.(type) {
-	case *deposit:
-		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
-		return l.helios.SendDepositClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-	case *valsetUpdate:
-		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-	case *withdrawal:
-		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-	case *erc20Deployment:
-		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-	default:
-		panic(errors.Errorf("unknown ev type %T", e))
-	}
-}
+// func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) (*cosmostypes.TxResponse, error) {
+// 	switch e := ev.(type) {
+// 	case *deposit:
+// 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
+// 		return l.helios.SendDepositClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+// 	case *valsetUpdate:
+// 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
+// 		return l.helios.SendValsetClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+// 	case *withdrawal:
+// 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
+// 		return l.helios.SendWithdrawalClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+// 	case *erc20Deployment:
+// 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
+// 		return l.helios.SendERC20DeployedClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
+// 	default:
+// 		panic(errors.Errorf("unknown ev type %T", e))
+// 	}
+// }
 
 type (
 	deposit         hyperionevents.HyperionSendToHeliosEvent

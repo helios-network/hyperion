@@ -73,7 +73,10 @@ func startServer(cmd *cli.Cmd) {
 			EthMaxGasPrice:        *cfg.ethMaxGasPrice,
 			PendingTxWaitDuration: *cfg.pendingTxWaitDuration,
 		})
-		global.InitHeliosNetwork(0)
+		heliosNetwork := global.GetHeliosNetwork()
+		if heliosNetwork == nil {
+			log.Fatal("helios network not initialized")
+		}
 
 		ctx, cancelFn := context.WithCancel(context.Background())
 		closer.Bind(cancelFn)

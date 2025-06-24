@@ -16,6 +16,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/metrics"
 )
 
@@ -83,7 +84,7 @@ func NewOrchestrator(
 		ethereum:      eth,
 		priceFeed:     priceFeed,
 		cfg:           cfg,
-		maxAttempts:   10,
+		maxAttempts:   100,
 		firstTimeSync: false,
 		global:        global,
 
@@ -226,6 +227,10 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 			if strings.Contains(err.Error(), "no contract code at given address") {
 				s.ethereum.RemoveLastUsedRpc()
 			}
+			if strings.Contains(err.Error(), "History has been pruned for this block") || strings.Contains(err.Error(), "public API") {
+				s.ethereum.RemoveLastUsedRpc()
+				return
+			}
 			if strings.Contains(err.Error(), "no RPC clients available") {
 				s.logger.Warningf("no RPC clients available, refreshing rpcs... (#%d)", n+1)
 				rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
@@ -240,9 +245,15 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		}))
 }
 
-func (s *Orchestrator) isRegistered() bool {
-	_, isValidator := helios.HasRegisteredOrchestrator(s.helios, uint64(s.cfg.HyperionId), s.ethereum.FromAddress())
-	return isValidator
+func (s *Orchestrator) IsStaticRpcAnonymous() bool {
+	settings, err := storage.GetChainSettings(s.cfg.ChainId, map[string]interface{}{})
+	if err != nil {
+		return false
+	}
+	if _, ok := settings["static_rpc_anonymous"]; !ok {
+		return false
+	}
+	return settings["static_rpc_anonymous"].(bool)
 }
 
 func (s *Orchestrator) UpdateRpcs() {

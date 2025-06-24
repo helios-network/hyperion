@@ -65,7 +65,7 @@ func NewEVMProvidersWithOptions(rpcs []*hyperiontypes.Rpc, maxRetries int, timeo
 		rcs = append(rcs, client)
 		ethClients = append(ethClients, ethClient)
 		validUrls = append(validUrls, rpcReputation.Url)
-		log.Println("Pool RPC: ", rpcReputation.Url)
+		// log.Println("Pool RPC: ", rpcReputation.Url)
 		reputations[rpcReputation.Url] = &RPCReputation{
 			rpcUrl:     rpcReputation.Url,
 			reputation: rpcReputation.Reputation,
@@ -343,7 +343,7 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 		// Create a context with timeout
 		timeoutCtx, cancel := context.WithTimeout(ctx, p.timeout)
 
-		fmt.Println("CALLING rpcUrl: ", rpcUrl)
+		// fmt.Println("CALLING rpcUrl: ", rpcUrl)
 		// Execute the operation
 		errCh := make(chan error, 1)
 		go func() {
@@ -356,17 +356,17 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 			cancel()
 			if err == nil {
 				// fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
-				fmt.Println("SUCCESS rpcUrl: ", rpcUrl)
+				// fmt.Println("SUCCESS rpcUrl: ", rpcUrl)
 				p.classifyRpcUrl(rpcUrl, false)
 				return nil // Success
 			}
 			if strings.Contains(err.Error(), "limit") || strings.Contains(err.Error(), "Too Many Requests") || strings.Contains(err.Error(), "cannot unmarshal") || strings.Contains(err.Error(), "500 Internal Server Error") || strings.Contains(err.Error(), "transactions allowed") {
-				fmt.Println("WARNING rpcUrl: ", rpcUrl)
+				// fmt.Println("WARNING rpcUrl: ", rpcUrl)
 				p.classifyRpcUrl(rpcUrl, true)
 				continue
 			}
 			lastErr = err
-			fmt.Println("ERROR rpcUrl: ", rpcUrl)
+			// fmt.Println("ERROR rpcUrl: ", rpcUrl)
 			p.classifyRpcUrl(rpcUrl, true)
 			// fmt.Println("ERRORrpcUrl: ", rpcUrl)
 			// fmt.Println("ERROR rpcUrl: ", rpcUrl, err)
@@ -375,7 +375,7 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 		case <-timeoutCtx.Done():
 			cancel()
 			lastErr = timeoutCtx.Err()
-			fmt.Println("TIMEOUTrpcUrl: ", rpcUrl)
+			// fmt.Println("TIMEOUTrpcUrl: ", rpcUrl)
 			p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		}

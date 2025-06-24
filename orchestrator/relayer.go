@@ -490,6 +490,7 @@ func (l *relayer) SignBatch(ctx context.Context, batch *hyperiontypes.OutgoingTx
 			l.cfg.HyperionId,
 			l.cfg.EthereumAddr,
 			hyperionIdHash,
+			l.ethereum.GetPersonalSignFn(),
 			batch,
 		)
 	}); err != nil {

@@ -15,6 +15,8 @@ var defaultSettings = map[string]interface{}{
 	"eth_gas_price":            "10gwei",
 	"valset_offset_dur":        "5m",
 	"batch_offset_dur":         "2m",
+	"static_rpc_anonymous":     true,
+	"static_rpc_only":          false,
 }
 
 func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uint64, settings map[string]interface{}) error {
@@ -22,6 +24,7 @@ func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uin
 	if err != nil {
 		return err
 	}
+	storage.UpdateRpcsToStorge(chainId, []string{})
 
 	return nil
 }
