@@ -464,6 +464,10 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		mapBatchPerTokenContract[batch.TokenContract] = append(mapBatchPerTokenContract[batch.TokenContract], batch)
 	}
 
+	if len(mapBatchPerTokenContract) == 0 {
+		return false, nil
+	}
+
 	hasPushedABatch := false
 	errorsBatchs := make([]string, 0)
 	for _, batches := range mapBatchPerTokenContract {
