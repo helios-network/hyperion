@@ -3,7 +3,9 @@ package orchestrator
 import (
 	"context"
 	"strings"
+	"time"
 
+	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	log "github.com/xlab/suplog"
@@ -21,11 +23,17 @@ func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting BatchCreator...")
 
 	return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
-		// if !s.isRegistered() {
-		// 	bc.Log().Infoln("Orchestrator not registered, skipping...")
-		// 	return nil
-		// }
+		if s.HyperionState.BatchCreatorStatus == "running" {
+			return nil
+		}
+
+		start := time.Now()
+		s.HyperionState.BatchCreatorStatus = "running"
 		err := bc.requestTokenBatches(ctx)
+		s.HyperionState.BatchCreatorStatus = "idle"
+		s.HyperionState.BatchCreatorLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
+		// elapsed := time.Since(start)
+		s.HyperionState.BatchCreatorNextExecutionTimestamp = uint64(start.Add(defaultLoopDur).Unix())
 		return err
 	})
 }
@@ -55,8 +63,38 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 		return nil
 	}
 
+	msgs := make([]cosmostypes.Msg, 0, len(fees))
 	for _, fee := range fees {
-		l.requestTokenBatch(ctx, fee)
+		msg, err := l.requestTokenBatch(ctx, fee)
+		if err != nil {
+			l.Log().WithError(err).Warningln("failed to request token batch")
+			return err
+		}
+		msgs = append(msgs, msg)
+	}
+
+	if len(msgs) > 0 { // bulk send messages
+		paquetOfTenMsgs := make([]cosmostypes.Msg, 0)
+		for _, msg := range msgs {
+			paquetOfTenMsgs = append(paquetOfTenMsgs, msg)
+			if len(paquetOfTenMsgs) == 10 {
+				l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
+				_, err := l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+				if err != nil {
+					l.Log().WithError(err).Warningln("failed to broadcast token batches")
+					return err
+				}
+				paquetOfTenMsgs = make([]cosmostypes.Msg, 0)
+			}
+		}
+		if len(paquetOfTenMsgs) > 0 {
+			l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
+			_, err := l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+			if err != nil {
+				l.Log().WithError(err).Warningln("failed to broadcast token batches")
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -76,29 +114,46 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperionty
 	return fees, nil
 }
 
-func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) {
+func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) (cosmostypes.Msg, error) {
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
 	tokenDenom, _, err := l.helios.QueryTokenAddressToDenom(ctx, l.cfg.HyperionId, tokenAddress)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to query token address to denom")
-		return
+		return nil, err
 	}
 
 	tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
 	if err != nil {
 		l.Log().WithError(err).Warningln("is token address valid?")
-		return
+		return nil, err
+	}
+
+	if _, ok := l.CacheSymbol[tokenAddress]; !ok {
+		tokenSymbol, err := l.ethereum.TokenSymbol(ctx, tokenAddress)
+		if err == nil {
+			l.CacheSymbol[tokenAddress] = tokenSymbol
+			l.Orchestrator.HyperionState.BatchCreatorStatus = "batching " + tokenSymbol
+		} else {
+			l.Orchestrator.HyperionState.BatchCreatorStatus = "batching " + tokenAddress.String()
+		}
+	} else {
+		l.Orchestrator.HyperionState.BatchCreatorStatus = "batching " + l.CacheSymbol[tokenAddress]
 	}
 
 	if !l.checkMinBatchFee(fee, tokenAddress, tokenDecimals) {
-		return
+		return nil, err
 	}
 
 	if l.logEnabled {
 		l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
 	}
 
-	_ = l.helios.SendRequestBatch(ctx, l.cfg.HyperionId, tokenDenom)
+	msg, err := l.helios.SendRequestBatchMsg(ctx, l.cfg.HyperionId, tokenDenom)
+	if err != nil {
+		l.Log().WithError(err).Warningln("failed to send request batch msg")
+		return nil, err
+	}
+	return msg, nil
 }
 
 // func (l *batchCreator) getTokenDenom(hyperionId uint64, tokenAddr gethcommon.Address) string {

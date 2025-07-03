@@ -13,12 +13,12 @@ import (
 	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
-func (s *hyperionContract) SendTransactionBatch(
+func (s *hyperionContract) PrepareTransactionBatch(
 	ctx context.Context,
 	currentValset *types.Valset,
 	batch *types.OutgoingTxBatch,
 	confirms []*types.MsgConfirmBatch,
-) (*common.Hash, *big.Int, error) {
+) ([]byte, error) {
 	metrics.ReportFuncCall(s.svcTags)
 	doneFn := metrics.ReportFuncTiming(s.svcTags)
 	defer doneFn()
@@ -35,7 +35,7 @@ func (s *hyperionContract) SendTransactionBatch(
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		err = errors.Wrap(err, "submit_batch.go confirmations check failed")
-		return nil, big.NewInt(0), err
+		return nil, err
 	}
 
 	amounts, destinations, fees := getBatchCheckpointValues(batch)
@@ -95,72 +95,21 @@ func (s *hyperionContract) SendTransactionBatch(
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		log.WithError(err).Errorln("ABI Pack (Hyperion submitBatch) method")
-		return nil, big.NewInt(0), err
+		return nil, err
 	}
 
 	// Checking in pending txs(mempool) if tx with same input is already submitted
 	if s.pendingTxInputList.IsPendingTxInput(txData, s.pendingTxWaitDuration) {
-		return nil, big.NewInt(0), errors.New("Transaction with same batch input data is already present in mempool")
+		return nil, errors.New("Transaction with same batch input data is already present in mempool")
 	}
 
-	txHash, cost, err := s.SendTx(ctx, s.hyperionAddress, txData)
-	if err != nil {
-		metrics.ReportFuncError(s.svcTags)
-		return nil, big.NewInt(0), err
-	}
-
-	//     let before_nonce = get_tx_batch_nonce(
-	//         hyperion_contract_address,
-	//         batch.token_contract,
-	//         eth_address,
-	//         &web3,
-	//     )
-	//     .await?;
-	//     if before_nonce >= new_batch_nonce {
-	//         info!(
-	//             "Someone else updated the batch to {}, exiting early",
-	//             before_nonce
-	//         );
-	//         return Ok(());
-	//     }
-
-	//     let tx = web3
-	//         .send_transaction(
-	//             hyperion_contract_address,
-	//             payload,
-	//             0u32.into(),
-	//             eth_address,
-	//             our_eth_key,
-	//             vec![SendTxOption::GasLimit(1_000_000u32.into())],
-	//         )
-	//         .await?;
-	//     info!("Sent batch update with txid {:#066x}", tx);
-
-	//     // TODO this segment of code works around the race condition for submitting batches mostly
-	//     // by not caring if our own submission reverts and only checking if the valset has been updated
-	//     // period not if our update succeeded in particular. This will require some further consideration
-	//     // in the future as many independent relayers racing to update the same thing will hopefully
-	//     // be the common case.
-	//     web3.wait_for_transaction(tx, timeout, None).await?;
-
-	//     let last_nonce = get_tx_batch_nonce(
-	//         hyperion_contract_address,
-	//         batch.token_contract,
-	//         eth_address,
-	//         &web3,
-	//     )
-	//     .await?;
-	//     if last_nonce != new_batch_nonce {
-	//         error!(
-	//             "Current nonce is {} expected to update to nonce {}",
-	//             last_nonce, new_batch_nonce
-	//         );
-	//     } else {
-	//         info!("Successfully updated Batch with new Nonce {:?}", last_nonce);
-	//     }
-	//     Ok(())
-
-	return &txHash, cost, nil
+	// txHash, cost, err := s.SendTx(ctx, s.hyperionAddress, txData)
+	// if err != nil {
+	// 	metrics.ReportFuncError(s.svcTags)
+	// 	return nil, big.NewInt(0), err
+	// }
+	return txData, nil
+	// return &txHash, cost, nil
 }
 
 func getBatchCheckpointValues(batch *types.OutgoingTxBatch) (amounts []*big.Int, destinations []common.Address, fees []*big.Int) {

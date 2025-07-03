@@ -13,7 +13,6 @@ import (
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
@@ -49,16 +48,40 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
 
-	return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
+	ticker := time.NewTicker(defaultLoopDur)
+	defer ticker.Stop()
 
-		// if !s.isRegistered() {
-		// 	oracle.Log().Infoln("Orchestrator not registered, skipping...")
-		// 	return nil
-		// }
+	// Run first iteration immediately
+	if err := oracle.observeEthEvents(ctx); err != nil {
+		s.logger.WithError(err).Errorln("oracle function returned an error")
+	}
 
-		err := oracle.observeEthEvents(ctx)
-		return err
-	})
+	for {
+		select {
+		case <-ticker.C:
+			if s.HyperionState.OracleStatus == "running" {
+				continue
+			}
+
+			start := time.Now()
+			s.HyperionState.OracleStatus = "running"
+			if err := oracle.observeEthEvents(ctx); err != nil {
+				s.logger.WithError(err).Errorln("oracle function returned an error")
+			}
+			s.HyperionState.OracleStatus = "idle"
+			s.HyperionState.OracleLastExecutionFinishedTimestamp = uint64(start.Unix())
+			s.HyperionState.OracleNextExecutionTimestamp = uint64(start.Add(defaultLoopDur).Unix())
+		case <-ctx.Done():
+			return nil
+		}
+	}
+
+	// return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
+	// 	s.HyperionState.OracleStatus = "running"
+	// 	err := oracle.observeEthEvents(ctx)
+	// 	s.HyperionState.OracleStatus = "idle"
+	// 	return err
+	// })
 }
 
 type oracle struct {
@@ -85,10 +108,12 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	}
 
 	latestObservedHeight, err := l.helios.QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
-
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest valsets on Helios")
 	}
+
+	// state
+	l.HyperionState.LastObservedHeight = latestObservedHeight.EthereumBlockHeight
 
 	if latestObservedHeight.EthereumBlockHeight <= l.cfg.ChainParams.BridgeContractStartHeight && !l.firstTimeSync { // first time total sync needed
 		l.lastObservedEthHeight = l.cfg.ChainParams.BridgeContractStartHeight
@@ -143,6 +168,10 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().WithError(err).Errorln("failed to get latest " + l.cfg.ChainName + " height")
 		return err
 	}
+
+	// state
+	l.HyperionState.Height = latestHeight
+	l.HyperionState.TargetHeight = latestHeight - ethBlockConfirmationDelay
 
 	targetHeight := latestHeight
 
@@ -368,12 +397,15 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			}
 			msgs = append(msgs, msg)
 
-			if len(msgs) > 10 {
+			if len(msgs) >= 10 {
 				log.Infoln("sending bulk of ", len(msgs), "claims messages")
+				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 				if err != nil {
+					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 					return err
 				}
+				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
 				cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
 				if err == nil {
 					storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
@@ -385,14 +417,17 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 
 		if len(msgs) > 0 {
 			log.Infoln("sending bulk of ", len(msgs), "claims messages")
+			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 			resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
 				return err
 			}
 			cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
 			if err == nil {
+				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
 				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
 			}
+			l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
 			time.Sleep(1100 * time.Millisecond)
 		}
 		// for _, event := range newEvents {
@@ -447,6 +482,7 @@ func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmos
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
+		l.HyperionState.InBridgedTxCount++
 		return l.helios.SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *valsetUpdate:
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)

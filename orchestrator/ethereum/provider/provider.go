@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"math/big"
+	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -45,6 +48,7 @@ type EVMProviderWithRet interface {
 	EVMProvider
 
 	SendTransactionWithRet(ctx context.Context, tx *types.Transaction) (txHash common.Hash, err error)
+	SendTransactionWithRetSync(ctx context.Context, tx *types.Transaction) (txHash common.Hash, err error)
 }
 
 type evmProviderWithRet struct {
@@ -174,6 +178,60 @@ func (p *evmProviderWithRet) SendTransactionWithRet(ctx context.Context, tx *typ
 	if err != nil {
 		metrics.ReportFuncError(p.svcTags)
 		return common.Hash{}, err
+	}
+
+	return txHash, nil
+}
+
+func (p *evmProviderWithRet) SendTransactionWithRetSync(ctx context.Context, tx *types.Transaction) (txHash common.Hash, err error) {
+	metrics.ReportFuncCall(p.svcTags)
+	doneFn := metrics.ReportFuncTiming(p.svcTags)
+	defer doneFn()
+
+	data, err := rlp.EncodeToBytes(tx)
+	if err != nil {
+		metrics.ReportFuncError(p.svcTags)
+		return common.Hash{}, err
+	}
+
+	err = p.pool.CallRpcClientWithRetry(ctx, func(client *rpc.Client) error {
+		return client.CallContext(ctx, &txHash, "eth_sendRawTransaction", hexutil.Encode(data))
+	})
+	if err != nil {
+		metrics.ReportFuncError(p.svcTags)
+		return common.Hash{}, err
+	}
+
+	txIsPending := p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+		_, isPending, err := client.TransactionByHash(ctx, txHash)
+		if err != nil {
+			return err
+		}
+		if isPending {
+			return errors.New("transaction is pending")
+		}
+		return nil
+	})
+
+	// wait for tx to be mined
+	maxRetries := 10
+	retryCount := 0
+	for txIsPending != nil {
+		time.Sleep(10 * time.Second)
+		txIsPending = p.pool.CallEthClientWithRetry(ctx, func(client *ethclient.Client) error {
+			_, isPending, err := client.TransactionByHash(ctx, txHash)
+			if err != nil {
+				return err
+			}
+			if isPending {
+				return errors.New("transaction is pending")
+			}
+			return nil
+		})
+		retryCount++
+		if retryCount >= maxRetries {
+			return txHash, errors.New("transaction is not mined after " + strconv.Itoa(maxRetries) + " retries")
+		}
 	}
 
 	return txHash, nil

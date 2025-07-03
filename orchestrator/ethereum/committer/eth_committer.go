@@ -96,6 +96,23 @@ func (e *ethCommitter) SendTx(
 	recipient common.Address,
 	txData []byte,
 ) (txHash common.Hash, cost *big.Int, err error) {
+	return e.SendTxWith(ctx, recipient, txData, false)
+}
+
+func (e *ethCommitter) SendTxSync(
+	ctx context.Context,
+	recipient common.Address,
+	txData []byte,
+) (txHash common.Hash, cost *big.Int, err error) {
+	return e.SendTxWith(ctx, recipient, txData, true)
+}
+
+func (e *ethCommitter) SendTxWith(
+	ctx context.Context,
+	recipient common.Address,
+	txData []byte,
+	sync bool,
+) (txHash common.Hash, cost *big.Int, err error) {
 	metrics.ReportFuncCall(e.svcTags)
 	doneFn := metrics.ReportFuncTiming(e.svcTags)
 	defer doneFn()
@@ -151,6 +168,7 @@ func (e *ethCommitter) SendTx(
 			return common.Hash{}, big.NewInt(0), errors.Wrap(err, "failed to estimate gas")
 		}
 
+		gasLimit, _ = big.NewFloat(0).Mul(big.NewFloat(float64(gasLimit)), big.NewFloat(e.ethGasPriceAdjustment)).Uint64()
 		opts.GasLimit = gasLimit
 	} else {
 		opts.GasLimit = e.committerOpts.GasLimit
@@ -206,7 +224,13 @@ func (e *ethCommitter) SendTx(
 			txHash = signedTx.Hash()
 			cost = signedTx.Cost()
 
-			txHashRet, err := e.evmProvider.SendTransactionWithRet(opts.Context, signedTx)
+			var txHashRet common.Hash
+			if sync {
+				txHashRet, err = e.evmProvider.SendTransactionWithRetSync(opts.Context, signedTx)
+			} else {
+				txHashRet, err = e.evmProvider.SendTransactionWithRet(opts.Context, signedTx)
+			}
+
 			if err == nil {
 				// override with a real hash from node resp
 				txHash = txHashRet

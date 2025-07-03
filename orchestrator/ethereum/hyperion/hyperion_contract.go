@@ -29,6 +29,16 @@ type HyperionContract interface {
 
 	Address() common.Address
 
+	SendPreparedTx(
+		ctx context.Context,
+		txData []byte,
+	) (*common.Hash, *big.Int, error)
+
+	SendPreparedTxSync(
+		ctx context.Context,
+		txData []byte,
+	) (*common.Hash, *big.Int, error)
+
 	SendToHelios(
 		ctx context.Context,
 		erc20 common.Address,
@@ -38,12 +48,12 @@ type HyperionContract interface {
 		data string,
 	) (*common.Hash, error)
 
-	SendTransactionBatch(
+	PrepareTransactionBatch(
 		ctx context.Context,
 		currentValset *types.Valset,
 		batch *types.OutgoingTxBatch,
 		confirms []*types.MsgConfirmBatch,
-	) (*common.Hash, *big.Int, error)
+	) ([]byte, error)
 
 	SendEthValsetUpdate(
 		ctx context.Context,
@@ -114,6 +124,8 @@ type HyperionContract interface {
 		ctx context.Context,
 		callerAddress common.Address,
 	) (*big.Int, error)
+
+	WaitForTransaction(ctx context.Context, txHash common.Hash) (*gethtypes.Transaction, uint64, error)
 }
 
 func DeployHyperionContract(

@@ -21,7 +21,17 @@ func (s *Orchestrator) runUpdater(ctx context.Context) error {
 	s.logger.WithField("loop_duration", defaultUpdaterLoopDur.String()).Debugln("starting Updater...")
 
 	return loops.RunLoop(ctx, s.ethereum, defaultUpdaterLoopDur, func() error {
-		return updater.Update()
+		if s.HyperionState.UpdaterStatus == "running" {
+			return nil
+		}
+
+		start := time.Now()
+		s.HyperionState.UpdaterStatus = "running"
+		err := updater.Update()
+		s.HyperionState.UpdaterStatus = "idle"
+		s.HyperionState.UpdaterLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
+		s.HyperionState.UpdaterNextExecutionTimestamp = uint64(start.Add(defaultUpdaterLoopDur).Unix())
+		return err
 	})
 }
 
@@ -35,7 +45,6 @@ func (l *updater) Log() log.Logger {
 }
 
 func (l *updater) Update() error {
-	l.UpdateRpcs()
 	l.logger.Info("Updater updated")
 	return nil
 }

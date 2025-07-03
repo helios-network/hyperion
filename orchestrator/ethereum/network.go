@@ -84,16 +84,27 @@ type Network interface {
 	GetLastEventHeight(ctx context.Context) (*big.Int, error)
 
 	GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
-	SendTransactionBatch(ctx context.Context,
+	PrepareTransactionBatch(ctx context.Context,
 		currentValset *hyperiontypes.Valset,
 		batch *hyperiontypes.OutgoingTxBatch,
 		confirms []*hyperiontypes.MsgConfirmBatch,
+	) ([]byte, error)
+
+	SendPreparedTx(ctx context.Context,
+		txData []byte,
+	) (*gethcommon.Hash, *big.Int, error)
+
+	SendPreparedTxSync(ctx context.Context,
+		txData []byte,
 	) (*gethcommon.Hash, *big.Int, error)
 
 	TokenDecimals(ctx context.Context, tokenContract gethcommon.Address) (uint8, error)
+	TokenSymbol(ctx context.Context, tokenContract gethcommon.Address) (string, error)
 	ExecuteExternalDataTx(ctx context.Context, address gethcommon.Address, txAbi []byte, blockNumber *big.Int) ([]byte, []byte, string, error)
 	GetSignerFn() bind.SignerFn
 	GetPersonalSignFn() keystore.PersonalSignFn
+
+	WaitForTransaction(ctx context.Context, txHash gethcommon.Hash) (*gethtypes.Transaction, uint64, error)
 }
 
 type network struct {
@@ -193,6 +204,19 @@ func (n *network) TokenDecimals(ctx context.Context, tokenContract gethcommon.Ad
 	}
 
 	return uint8(big.NewInt(0).SetBytes(res).Uint64()), nil
+}
+
+func (n *network) TokenSymbol(ctx context.Context, tokenContract gethcommon.Address) (string, error) {
+	msg := ethereum.CallMsg{
+		To:   &tokenContract,
+		Data: gethcommon.Hex2Bytes("95d89b41"), // symbol() method signature
+	}
+
+	res, err := n.Provider().CallContract(ctx, msg, nil)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(string(res), "\x00"), nil
 }
 
 func (n *network) GetSignerFn() bind.SignerFn {
