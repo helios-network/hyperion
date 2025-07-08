@@ -11,6 +11,7 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 )
 
 // ErrGracefulStop is a special error, if returned from within loop function, will stop that loop without
@@ -32,7 +33,11 @@ func RunLoop(ctx context.Context, ethereum ethereum.Network, interval time.Durat
 				log.WithError(fnErr).Errorln("loop function returned an error")
 
 				if strings.Contains(fnErr.Error(), "unavailable on our public API") || strings.Contains(fnErr.Error(), "connection refused") || strings.Contains(fnErr.Error(), "attempting to unmarshall") || strings.Contains(fnErr.Error(), "Too Many Requests") || strings.Contains(fnErr.Error(), "full node") {
-					//ethereum.RemoveLastUsedRpc()
+					usedRpc := provider.GetCurrentRPCURL(ctx)
+					if usedRpc != "" {
+						ethereum.PenalizeRpc(usedRpc, 1)
+						log.WithField("rpc", usedRpc).Debug("Penalized RPC for unavailable on our public API")
+					}
 				}
 
 			}

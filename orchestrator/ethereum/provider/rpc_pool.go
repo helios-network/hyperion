@@ -16,6 +16,32 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+// Context keys for RPC information
+type contextKey string
+
+const (
+	RPCURLKey contextKey = "rpc_url"
+)
+
+// WithRPCURL adds RPC URL to context
+func WithRPCURL(ctx context.Context, rpcURL string) context.Context {
+	return context.WithValue(ctx, RPCURLKey, rpcURL)
+}
+
+// GetRPCURLFromContext retrieves RPC URL from context
+func GetRPCURLFromContext(ctx context.Context) (string, bool) {
+	rpcURL, ok := ctx.Value(RPCURLKey).(string)
+	return rpcURL, ok
+}
+
+// GetCurrentRPCURL retrieves the RPC URL from context or returns empty string
+func GetCurrentRPCURL(ctx context.Context) string {
+	if rpcURL, ok := GetRPCURLFromContext(ctx); ok {
+		return rpcURL
+	}
+	return ""
+}
+
 var (
 	// ErrNoClientsAvailable is returned when no RPC clients are available in the pool
 	ErrNoClientsAvailable = errors.New("no RPC clients available in the pool")
@@ -262,6 +288,39 @@ func (p *EVMProviders) getRandomClient() (*ethclient.Client, *rpc.Client, string
 	return p.ethClients[idx], p.rcs[idx], p.urls[idx]
 }
 
+// getBestRatedClient returns the client with the highest reputation
+func (p *EVMProviders) getBestRatedClient() (*ethclient.Client, *rpc.Client, string) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if len(p.ethClients) == 0 {
+		return nil, nil, ""
+	}
+
+	var bestClient *ethclient.Client
+	var bestRpcClient *rpc.Client
+	var bestUrl string
+	var bestReputation uint64
+
+	for i, url := range p.urls {
+		reputation := p.reputations[url].reputation
+		if reputation > bestReputation {
+			bestReputation = reputation
+			bestClient = p.ethClients[i]
+			bestRpcClient = p.rcs[i]
+			bestUrl = url
+		}
+	}
+
+	// If no client with reputation > 0, fall back to random selection
+	if bestReputation == 0 {
+		idx := rand.Intn(len(p.ethClients))
+		return p.ethClients[idx], p.rcs[idx], p.urls[idx]
+	}
+
+	return bestClient, bestRpcClient, bestUrl
+}
+
 func (p *EVMProviders) classifyRpcUrl(rpcUrl string, failed bool) {
 
 	if p.reputations[rpcUrl] == nil {
@@ -321,6 +380,97 @@ func (p *EVMProviders) CallEthClientWithSpecificClient(ctx context.Context, clie
 	return ErrAllAttemptsFailed
 }
 
+// CallEthClientWithSpecificRPC executes an operation with a specific RPC URL
+func (p *EVMProviders) CallEthClientWithSpecificRPC(ctx context.Context, rpcURL string, operation func(*ethclient.Client) error) error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Trouver le client correspondant à l'URL RPC
+	var ethClient *ethclient.Client
+	for i, url := range p.urls {
+		if url == rpcURL {
+			ethClient = p.ethClients[i]
+			break
+		}
+	}
+
+	if ethClient == nil {
+		return fmt.Errorf("RPC URL not found in pool: %s", rpcURL)
+	}
+
+	p.lastUsedRpc = rpcURL
+
+	// Create a context with timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+
+	// Execute the operation
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- operation(ethClient)
+	}()
+
+	// Wait for either the result or timeout
+	select {
+	case err := <-errCh:
+		if err == nil {
+			p.classifyRpcUrl(rpcURL, false)
+			return nil // Success
+		}
+		if strings.Contains(err.Error(), "limit") || strings.Contains(err.Error(), "Too Many Requests") || strings.Contains(err.Error(), "cannot unmarshal") || strings.Contains(err.Error(), "500 Internal Server Error") || strings.Contains(err.Error(), "transactions allowed") {
+			p.classifyRpcUrl(rpcURL, true)
+			return err
+		}
+		p.classifyRpcUrl(rpcURL, true)
+		return err
+	case <-timeoutCtx.Done():
+		p.classifyRpcUrl(rpcURL, true)
+		return timeoutCtx.Err()
+	}
+}
+
+// CallRpcClientWithSpecificRPC executes an operation with a specific RPC URL using rpc.Client
+func (p *EVMProviders) CallRpcClientWithSpecificRPC(ctx context.Context, rpcURL string, operation func(*rpc.Client) error) error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Trouver le client RPC correspondant à l'URL RPC
+	var rpcClient *rpc.Client
+	for i, url := range p.urls {
+		if url == rpcURL {
+			rpcClient = p.rcs[i]
+			break
+		}
+	}
+
+	if rpcClient == nil {
+		return fmt.Errorf("RPC URL not found in pool: %s", rpcURL)
+	}
+
+	p.lastUsedRpc = rpcURL
+
+	// Create a context with timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+
+	// Execute the operation
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- operation(rpcClient)
+	}()
+
+	// Wait for either the result or timeout
+	select {
+	case err := <-errCh:
+		if err == nil {
+			return nil // Success
+		}
+		return err
+	case <-timeoutCtx.Done():
+		return timeoutCtx.Err()
+	}
+}
+
 // CallEthClientWithRetry executes an operation with the ethclient with retry logic
 func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation func(*ethclient.Client) error) error {
 	p.mu.RLock()
@@ -329,6 +479,12 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 
 	if clientCount == 0 {
 		return ErrNoClientsAvailable
+	}
+
+	// Vérifier si un RPC spécifique est fourni dans le contexte
+	if rpcURL, ok := GetRPCURLFromContext(ctx); ok {
+		// Utiliser le RPC spécifique du contexte
+		return p.CallEthClientWithSpecificRPC(ctx, rpcURL, operation)
 	}
 
 	var lastErr error
@@ -355,28 +511,17 @@ func (p *EVMProviders) CallEthClientWithRetry(ctx context.Context, operation fun
 		case err := <-errCh:
 			cancel()
 			if err == nil {
-				// fmt.Println("SUCCESSrpcUrl: ", rpcUrl)
-				// fmt.Println("SUCCESS rpcUrl: ", rpcUrl)
-				p.classifyRpcUrl(rpcUrl, false)
 				return nil // Success
 			}
 			if strings.Contains(err.Error(), "limit") || strings.Contains(err.Error(), "Too Many Requests") || strings.Contains(err.Error(), "cannot unmarshal") || strings.Contains(err.Error(), "500 Internal Server Error") || strings.Contains(err.Error(), "transactions allowed") {
-				// fmt.Println("WARNING rpcUrl: ", rpcUrl)
 				p.classifyRpcUrl(rpcUrl, true)
 				continue
 			}
 			lastErr = err
-			// fmt.Println("ERROR rpcUrl: ", rpcUrl)
-			p.classifyRpcUrl(rpcUrl, true)
-			// fmt.Println("ERRORrpcUrl: ", rpcUrl)
-			// fmt.Println("ERROR rpcUrl: ", rpcUrl, err)
-			// p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		case <-timeoutCtx.Done():
 			cancel()
 			lastErr = timeoutCtx.Err()
-			// fmt.Println("TIMEOUTrpcUrl: ", rpcUrl)
-			p.classifyRpcUrl(rpcUrl, true)
 			// Continue to next attempt
 		}
 	}
@@ -395,6 +540,12 @@ func (p *EVMProviders) CallRpcClientWithRetry(ctx context.Context, operation fun
 
 	if clientCount == 0 {
 		return ErrNoClientsAvailable
+	}
+
+	// Vérifier si un RPC spécifique est fourni dans le contexte
+	if rpcURL, ok := GetRPCURLFromContext(ctx); ok {
+		// Utiliser le RPC spécifique du contexte
+		return p.CallRpcClientWithSpecificRPC(ctx, rpcURL, operation)
 	}
 
 	var lastErr error
@@ -472,4 +623,40 @@ func (p *EVMProviders) GetClientCount() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return len(p.ethClients)
+}
+
+// PenalizeRpc pénalise un RPC en réduisant sa réputation
+func (p *EVMProviders) PenalizeRpc(rpcUrl string, penalty uint64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.reputations[rpcUrl] == nil {
+		return
+	}
+
+	if p.reputations[rpcUrl].reputation >= penalty {
+		p.reputations[rpcUrl].reputation -= penalty
+	} else {
+		p.reputations[rpcUrl].reputation = 0
+	}
+
+	fmt.Printf("PENALIZED rpcUrl: %s, penalty: %d, new reputation: %d\n", rpcUrl, penalty, p.reputations[rpcUrl].reputation)
+
+	if p.reputations[rpcUrl].reputation == 0 {
+		p.RemoveRpc(rpcUrl)
+		fmt.Println("REMOVE rpcUrl: ", rpcUrl, "reputation reached 0 after penalty")
+	}
+}
+
+// PraiseRpc félicite un RPC en augmentant sa réputation
+func (p *EVMProviders) PraiseRpc(rpcUrl string, praise uint64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.reputations[rpcUrl] == nil {
+		return
+	}
+
+	p.reputations[rpcUrl].reputation += praise
+	fmt.Printf("PRAISED rpcUrl: %s, praise: %d, new reputation: %d\n", rpcUrl, praise, p.reputations[rpcUrl].reputation)
 }

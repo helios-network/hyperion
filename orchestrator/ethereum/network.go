@@ -41,6 +41,9 @@ type Network interface {
 	TestRpcs(ctx context.Context) bool
 	SetRpcs(rpcs []*hyperiontypes.Rpc)
 	GetRpcs() []*hyperiontypes.Rpc
+	SelectBestRatedRpcInRpcPool() string
+	PenalizeRpc(rpcUrl string, penalty uint64)
+	PraiseRpc(rpcUrl string, praise uint64)
 
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetNativeBalance(ctx context.Context) (*big.Int, error)
@@ -275,6 +278,10 @@ func (n *network) RemoveRpc(targetUrl string) bool {
 	return n.Provider().RemoveRpc(targetUrl)
 }
 
+func (n *network) SelectBestRatedRpcInRpcPool() string {
+	return n.Provider().SelectBestRatedRpcInRpcPool()
+}
+
 func (n *network) GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error) {
 	return n.Provider().HeaderByNumber(ctx, number)
 }
@@ -475,4 +482,12 @@ func (n *network) ExecuteExternalDataTx(ctx context.Context, address gethcommon.
 		return []byte{}, []byte(err.Error()), n.Provider().GetLastUsedRpc(), err
 	}
 	return result, []byte{}, n.Provider().GetLastUsedRpc(), nil
+}
+
+func (n *network) PenalizeRpc(rpcUrl string, penalty uint64) {
+	n.Provider().PenalizeRpc(rpcUrl, penalty)
+}
+
+func (n *network) PraiseRpc(rpcUrl string, praise uint64) {
+	n.Provider().PraiseRpc(rpcUrl, praise)
 }

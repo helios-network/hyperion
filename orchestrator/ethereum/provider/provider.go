@@ -31,6 +31,9 @@ type EVMProvider interface {
 	RemoveRpc(targetUrl string) bool
 	GetRpcs() []*hyperiontypes.Rpc
 	SetRpcs(rpcs []*hyperiontypes.Rpc)
+	SelectBestRatedRpcInRpcPool() string
+	PenalizeRpc(rpcUrl string, penalty uint64)
+	PraiseRpc(rpcUrl string, praise uint64)
 
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
@@ -92,6 +95,12 @@ func (p *evmProviderWithRet) SetRpcs(rpcs []*hyperiontypes.Rpc) {
 
 func (p *evmProviderWithRet) RemoveRpc(targetUrl string) bool {
 	return p.pool.RemoveRpc(targetUrl)
+}
+
+// SelectBestRatedRpcInRpcPool returns the URL of the RPC with the highest reputation
+func (p *evmProviderWithRet) SelectBestRatedRpcInRpcPool() string {
+	_, _, bestUrl := p.pool.getBestRatedClient()
+	return bestUrl
 }
 
 func (p *evmProviderWithRet) FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error) {
@@ -327,4 +336,14 @@ func (p *evmProviderWithRet) Balance(ctx context.Context, account common.Address
 		return err
 	})
 	return balance, err
+}
+
+// PenalizeRpc pénalise un RPC en réduisant sa réputation
+func (p *evmProviderWithRet) PenalizeRpc(rpcUrl string, penalty uint64) {
+	p.pool.PenalizeRpc(rpcUrl, penalty)
+}
+
+// PraiseRpc félicite un RPC en augmentant sa réputation
+func (p *evmProviderWithRet) PraiseRpc(rpcUrl string, praise uint64) {
+	p.pool.PraiseRpc(rpcUrl, praise)
 }

@@ -13,6 +13,7 @@ import (
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
@@ -99,6 +100,14 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
+
+	// Sélectionner le meilleur RPC basé sur la réputation
+	bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
+	if bestRpcURL != "" {
+		l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for oracle")
+		// Ajouter le meilleur RPC au contexte
+		ctx = provider.WithRPCURL(ctx, bestRpcURL)
+	}
 
 	// check if validator is in the active set since claims will fail otherwise
 	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
@@ -348,7 +357,20 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	fn := func() error {
 		h, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 		if err != nil {
+			usedRpc := provider.GetCurrentRPCURL(ctx)
+			// Pénaliser le RPC utilisé pour cet échec
+			if usedRpc != "" {
+				l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+				l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed header request")
+			}
 			return errors.Wrap(err, "failed to get latest ethereum header")
+		}
+
+		// Féliciter le RPC utilisé pour ce succès
+		usedRpc := provider.GetCurrentRPCURL(ctx)
+		if usedRpc != "" {
+			l.ethereum.PraiseRpc(usedRpc, 1) // Récompense de 1 point
+			l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful header request")
 		}
 
 		latestHeight = h.Number.Uint64()
@@ -397,7 +419,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			}
 			msgs = append(msgs, msg)
 
-			if len(msgs) >= 10 {
+			if len(msgs) >= 50 {
 				log.Infoln("sending bulk of ", len(msgs), "claims messages")
 				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
