@@ -82,6 +82,7 @@ func NewEVMProvidersWithOptions(rpcs []*hyperiontypes.Rpc, maxRetries int, timeo
 	var validUrls []string
 	reputations := make(map[string]*RPCReputation)
 	for _, rpcReputation := range rpcs {
+		fmt.Println("Dialing rpcUrl: ", rpcReputation.Url)
 		client, err := rpc.Dial(rpcReputation.Url)
 		if err != nil {
 			// Skip failed connections but don't panic

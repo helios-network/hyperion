@@ -252,6 +252,18 @@ func (s *hyperionContract) WaitForTransaction(ctx context.Context, txHash common
 	return tx, receipt.BlockNumber.Uint64(), nil
 }
 
+func (s *hyperionContract) GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash common.Hash) (*big.Int, uint64, error) {
+	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, txHash)
+	if err != nil {
+		return nil, 0, err
+	}
+	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+		return nil, 0, errors.New("transaction failed")
+	}
+
+	return big.NewInt(0).Mul(big.NewInt(int64(receipt.GasUsed)), receipt.EffectiveGasPrice), receipt.BlockNumber.Uint64(), nil
+}
+
 func (s *hyperionContract) DeployERC20(
 	ctx context.Context,
 	callerAddress common.Address,

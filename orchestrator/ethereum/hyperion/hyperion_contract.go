@@ -126,6 +126,8 @@ type HyperionContract interface {
 	) (*big.Int, error)
 
 	WaitForTransaction(ctx context.Context, txHash common.Hash) (*gethtypes.Transaction, uint64, error)
+
+	GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash common.Hash) (*big.Int, uint64, error)
 }
 
 func DeployHyperionContract(

@@ -108,6 +108,7 @@ type Network interface {
 	GetPersonalSignFn() keystore.PersonalSignFn
 
 	WaitForTransaction(ctx context.Context, txHash gethcommon.Hash) (*gethtypes.Transaction, uint64, error)
+	GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash gethcommon.Hash) (*big.Int, uint64, error)
 }
 
 type network struct {
