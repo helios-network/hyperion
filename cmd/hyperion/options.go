@@ -103,9 +103,6 @@ type Config struct {
 
 	// Relayer config
 	pendingTxWaitDuration *string
-
-	// Batch requester config
-	minBatchFeeUSD *float64
 }
 
 func initConfig(cmd *cli.Cmd) Config {
@@ -171,13 +168,6 @@ func initConfig(cmd *cli.Cmd) Config {
 	})
 
 	/** Batch Requester **/
-
-	cfg.minBatchFeeUSD = cmd.Float64(cli.Float64Opt{
-		Name:   "min-batch-fee-usd",
-		Desc:   "If set, batch request will create batches only if fee threshold exceeds",
-		EnvVar: "HYPERION_MIN_BATCH_FEE_USD",
-		Value:  float64(23.3),
-	})
 
 	cfg.pendingTxWaitDuration = cmd.String(cli.StringOpt{
 		Name:   "relay-pending-tx-wait-duration",

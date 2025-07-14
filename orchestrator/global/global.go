@@ -79,8 +79,26 @@ func (g *Global) GetCosmosAddress() cosmostypes.AccAddress {
 	return g.accAddress
 }
 
-func (g *Global) GetMinBatchFeeUSD() float64 {
-	return 0.0
+func (g *Global) GetMinBatchFeeHLS(chainId uint64) float64 {
+	hyperionContractInfo, err := storage.GetHyperionContractInfo(chainId)
+	if err != nil {
+		return 0.0
+	}
+	if hyperionContractInfo["min_batch_fee_hls"] == nil {
+		return 0.0
+	}
+	return hyperionContractInfo["min_batch_fee_hls"].(float64)
+}
+
+func (g *Global) GetMinTxFeeHLS(chainId uint64) float64 {
+	hyperionContractInfo, err := storage.GetHyperionContractInfo(chainId)
+	if err != nil {
+		return 0.0
+	}
+	if hyperionContractInfo["min_tx_fee_hls"] == nil {
+		return 0.0
+	}
+	return hyperionContractInfo["min_tx_fee_hls"].(float64)
 }
 
 func (g *Global) StartRunnersAtStartUp(runHyperion func(ctx context.Context, g *Global, chainId uint64) error) {

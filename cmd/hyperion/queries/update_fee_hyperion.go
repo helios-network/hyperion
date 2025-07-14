@@ -10,7 +10,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 )
 
-func RegisterHyperion(ctx context.Context, global *global.Global, chainId uint64) error {
+func UpdateFeeHyperion(ctx context.Context, global *global.Global, minTxFeeHLS float64, minBatchFeeHLS float64, chainId uint64) error {
 	network := *global.GetHeliosNetwork()
 
 	registeredNetworks, _ := helios.GetListOfNetworksWhereRegistered(*global.GetHeliosNetwork(), global.GetAddress())
@@ -18,10 +18,9 @@ func RegisterHyperion(ctx context.Context, global *global.Global, chainId uint64
 		return fmt.Errorf("hyperion already registered for chain %d", chainId)
 	}
 
-	minTxFeeHLS := global.GetMinTxFeeHLS(chainId)
-	minBatchFeeHLS := global.GetMinBatchFeeHLS(chainId)
 	minTxFeeHLSMath := sdkmath.NewInt(0)
 	minBatchFeeHLSMath := sdkmath.NewInt(0)
+
 	if minTxFeeHLS != 0.0 {
 		minTxFeeHLSMath = sdkmath.NewInt(int64(minTxFeeHLS * 1000000000000000000))
 	}
@@ -29,7 +28,7 @@ func RegisterHyperion(ctx context.Context, global *global.Global, chainId uint64
 		minBatchFeeHLSMath = sdkmath.NewInt(int64(minBatchFeeHLS * 1000000000000000000))
 	}
 
-	err := network.SendSetOrchestratorAddressesWithFee(ctx, chainId, global.GetAddress().Hex(), minTxFeeHLSMath, minBatchFeeHLSMath)
+	err := network.SendUpdateOrchestratorAddressesFee(ctx, chainId, minTxFeeHLSMath, minBatchFeeHLSMath)
 	if err != nil {
 		return err
 	}

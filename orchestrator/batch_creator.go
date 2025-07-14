@@ -7,9 +7,10 @@ import (
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/shopspring/decimal"
+	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -52,7 +53,16 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	fees, err := l.getUnbatchedTokenFees(ctx)
+	minBatchFeeHLS := sdkmath.NewInt(0)
+	minTxFeeHLS := sdkmath.NewInt(0)
+	if l.cfg.MinBatchFeeHLS != 0.0 {
+		minBatchFeeHLS = sdkmath.NewInt(int64(l.cfg.MinBatchFeeHLS * 1000000000000000000))
+	}
+	if l.cfg.MinTxFeeHLS != 0.0 {
+		minTxFeeHLS = sdkmath.NewInt(int64(l.cfg.MinTxFeeHLS * 1000000000000000000))
+	}
+
+	fees, err := l.getUnbatchedTokenFees(ctx, minBatchFeeHLS, minTxFeeHLS)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to get withdrawal fees")
 		return nil
@@ -65,7 +75,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 
 	msgs := make([]cosmostypes.Msg, 0, len(fees))
 	for _, fee := range fees {
-		msg, err := l.requestTokenBatch(ctx, fee)
+		msg, err := l.requestTokenBatch(ctx, fee, minBatchFeeHLS, minTxFeeHLS)
 		if err != nil {
 			l.Log().WithError(err).Warningln("failed to request token batch")
 			return err
@@ -100,10 +110,10 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 	return nil
 }
 
-func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperiontypes.BatchFees, error) {
-	var fees []*hyperiontypes.BatchFees
+func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) ([]*hyperiontypes.BatchFeesWithIds, error) {
+	var fees []*hyperiontypes.BatchFeesWithIds
 	fn := func() (err error) {
-		fees, err = l.helios.UnbatchedTokensWithFees(ctx, l.cfg.HyperionId)
+		fees, err = l.helios.UnbatchedTokensWithMinimumFees(ctx, l.cfg.HyperionId, minimumBatchFee, minimumTxFee)
 		return
 	}
 
@@ -114,7 +124,7 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context) ([]*hyperionty
 	return fees, nil
 }
 
-func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFees) (cosmostypes.Msg, error) {
+func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFeesWithIds, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) (cosmostypes.Msg, error) {
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
 	tokenDenom, _, err := l.helios.QueryTokenAddressToDenom(ctx, l.cfg.HyperionId, tokenAddress)
 	if err != nil {
@@ -122,11 +132,11 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 		return nil, err
 	}
 
-	tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
-	if err != nil {
-		l.Log().WithError(err).Warningln("is token address valid?")
-		return nil, err
-	}
+	// tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
+	// if err != nil {
+	// 	l.Log().WithError(err).Warningln("is token address valid?")
+	// 	return nil, err
+	// }
 
 	if _, ok := l.CacheSymbol[tokenAddress]; !ok {
 		tokenSymbol, err := l.ethereum.TokenSymbol(ctx, tokenAddress)
@@ -140,15 +150,19 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 		l.Orchestrator.HyperionState.BatchCreatorStatus = "batching " + l.CacheSymbol[tokenAddress]
 	}
 
-	if !l.checkMinBatchFee(fee, tokenAddress, tokenDecimals) {
-		return nil, err
+	// if !l.checkMinBatchFee(fee, tokenAddress, tokenDecimals) {
+	// 	return nil, err
+	// }
+
+	if fee.TotalFees.LT(minimumBatchFee) {
+		return nil, errors.New("total fees less than minimum batch fee")
 	}
 
 	if l.logEnabled {
 		l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
 	}
 
-	msg, err := l.helios.SendRequestBatchMsg(ctx, l.cfg.HyperionId, tokenDenom)
+	msg, err := l.helios.SendRequestBatchWithMinimumFeeMsg(ctx, l.cfg.HyperionId, tokenDenom, minimumBatchFee, minimumTxFee, fee.Ids)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to send request batch msg")
 		return nil, err
@@ -161,30 +175,30 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 // 	return hyperiontypes.HyperionDenomString(hyperionId, tokenAddr)
 // }
 
-func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
-	if l.cfg.MinBatchFeeUSD == 0 {
-		return true
-	}
+// func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
+// 	if l.cfg.MinBatchFeeUSD == 0 {
+// 		return true
+// 	}
 
-	tokenPriceUSDFloat, err := l.priceFeed.QueryUSDPrice(tokenAddress)
-	if err != nil {
-		l.Log().WithError(err).Warningln("failed to query price feed", "token_addr", tokenAddress.String())
-		return true
-	}
+// 	tokenPriceUSDFloat, err := l.priceFeed.QueryUSDPrice(tokenAddress)
+// 	if err != nil {
+// 		l.Log().WithError(err).Warningln("failed to query price feed", "token_addr", tokenAddress.String())
+// 		return true
+// 	}
 
-	var (
-		minFeeUSD     = decimal.NewFromFloat(l.cfg.MinBatchFeeUSD)
-		tokenPriceUSD = decimal.NewFromFloat(tokenPriceUSDFloat)
-		totalFeeUSD   = decimal.NewFromBigInt(fee.TotalFees.BigInt(), -1*int32(tokenDecimals)).Mul(tokenPriceUSD)
-	)
+// 	var (
+// 		minFeeUSD     = decimal.NewFromFloat(l.cfg.MinBatchFeeUSD)
+// 		tokenPriceUSD = decimal.NewFromFloat(tokenPriceUSDFloat)
+// 		totalFeeUSD   = decimal.NewFromBigInt(fee.TotalFees.BigInt(), -1*int32(tokenDecimals)).Mul(tokenPriceUSD)
+// 	)
 
-	if l.logEnabled {
-		l.Log().WithFields(log.Fields{
-			"token_addr": fee.Token,
-			"total_fee":  totalFeeUSD.String() + "USD",
-			"min_fee":    minFeeUSD.String() + "USD",
-		}).Debugln("checking total batch fees")
-	}
+// 	if l.logEnabled {
+// 		l.Log().WithFields(log.Fields{
+// 			"token_addr": fee.Token,
+// 			"total_fee":  totalFeeUSD.String() + "USD",
+// 			"min_fee":    minFeeUSD.String() + "USD",
+// 		}).Debugln("checking total batch fees")
+// 	}
 
-	return !totalFeeUSD.LessThan(minFeeUSD)
-}
+// 	return !totalFeeUSD.LessThan(minFeeUSD)
+// }

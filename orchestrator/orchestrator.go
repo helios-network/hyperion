@@ -43,7 +43,8 @@ type Config struct {
 	ChainName            string
 	ChainId              uint64
 	EthereumAddr         gethcommon.Address
-	MinBatchFeeUSD       float64
+	MinBatchFeeHLS       float64
+	MinTxFeeHLS          float64
 	RelayValsetOffsetDur time.Duration
 	RelayBatchOffsetDur  time.Duration
 	RelayValsets         bool
