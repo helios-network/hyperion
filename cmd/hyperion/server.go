@@ -108,11 +108,11 @@ func startServer(cmd *cli.Cmd) {
 		}))
 
 		// Start runners at start up
-		go func() {
-			global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
-				return queries.RunHyperion(ctx, g, chainId)
-			})
-		}()
+		// go func() {
+		// 	global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
+		// 		return queries.RunHyperion(ctx, g, chainId)
+		// 	})
+		// }()
 
 		// Start server
 		port := os.Getenv("PORT")
