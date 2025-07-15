@@ -371,6 +371,15 @@ func (c broadcastClient) SendSetOrchestratorAddressesWithFee(ctx context.Context
 		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerTx),
 		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerBatch),
 	}
+
+	log.WithFields(log.Fields{
+		"hyperionId":         hyperionId,
+		"ethAddress":         ethAddress,
+		"minimumfeePerTx":    minimumfeePerTx.String(),
+		"minimumfeePerBatch": minimumfeePerBatch.String(),
+		"sender":             c.FromAddress().String(),
+	}).Infoln("Sending MsgSetOrchestratorAddressesWithFee")
+
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
