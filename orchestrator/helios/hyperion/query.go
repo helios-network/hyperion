@@ -35,6 +35,7 @@ type QueryClient interface {
 
 	OldestUnsignedTransactionBatch(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
+	LatestTransactionBatchesWithOptions(ctx context.Context, hyperionId uint64, address string, batchNonce uint64, batchTimeout uint64, tokenContract string, checkIfIHaveSignedBatch bool) ([]*hyperiontypes.OutgoingTxBatch, error)
 	UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error)
 	UnbatchedTokensWithMinimumFees(ctx context.Context, hyperionId uint64, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) ([]*hyperiontypes.BatchFeesWithIds, error)
 	TransactionBatchSignatures(ctx context.Context, hyperionId uint64, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
@@ -208,6 +209,34 @@ func (c queryClient) LatestTransactionBatches(ctx context.Context, hyperionId ui
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query OutgoingTxBatches from daemon")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.Batches, nil
+}
+
+func (c queryClient) LatestTransactionBatchesWithOptions(ctx context.Context, hyperionId uint64, address string, batchNonce uint64, batchTimeout uint64, tokenContract string, checkIfIHaveSignedBatch bool) ([]*hyperiontypes.OutgoingTxBatch, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryOutgoingTxBatchesWithOptionsRequest{
+		HyperionId:              hyperionId,
+		Address:                 address,
+		BatchNonce:              batchNonce,
+		BatchTimeout:            batchTimeout,
+		TokenContract:           tokenContract,
+		CheckIfIHaveSignedBatch: checkIfIHaveSignedBatch,
+	}
+
+	resp, err := c.QueryClient.OutgoingTxBatchesWithOptions(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query OutgoingTxBatchesWithOptions from daemon")
 	}
 
 	if resp == nil {

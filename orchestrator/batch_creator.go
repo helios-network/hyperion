@@ -90,7 +90,9 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 			if len(paquetOfTenMsgs) == 10 {
 				l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
 				_, err := l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
-				if err != nil {
+				if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
+					l.Log().Infoln("no unbatched txs found, skipping")
+				} else if err != nil {
 					l.Log().WithError(err).Warningln("failed to broadcast token batches")
 					return err
 				}
@@ -100,7 +102,9 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 		if len(paquetOfTenMsgs) > 0 {
 			l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
 			_, err := l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
-			if err != nil {
+			if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
+				l.Log().Infoln("no unbatched txs found, skipping")
+			} else if err != nil {
 				l.Log().WithError(err).Warningln("failed to broadcast token batches")
 				return err
 			}
