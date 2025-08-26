@@ -20,6 +20,7 @@ import (
 	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
@@ -128,6 +129,8 @@ type HyperionContract interface {
 	WaitForTransaction(ctx context.Context, txHash common.Hash) (*gethtypes.Transaction, uint64, error)
 
 	GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash common.Hash) (*big.Int, uint64, error)
+
+	SendClaimTokensOfOldContract(ctx context.Context, hyperionId uint64, tokenContract string, amountInSdkMath *big.Int, ethFrom common.Address, signerFn keystore.PersonalSignFn) error
 }
 
 func DeployHyperionContract(
@@ -140,7 +143,7 @@ func DeployHyperionContract(
 		return common.Address{}, 0, err, false
 	}
 	// wait for the transaction to be handled
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	tx, isPending, err := ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 	if err != nil {
@@ -150,7 +153,7 @@ func DeployHyperionContract(
 
 	if isPending {
 		for isPending {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			tx, isPending, err = ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 			if err != nil {
 				fmt.Println("Error getting transaction by hash:", err)

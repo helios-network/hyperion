@@ -203,7 +203,7 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 
 	if isPending {
 		for isPending {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 			if err != nil {
 				fmt.Println("Error getting transaction by hash:", err)
@@ -232,7 +232,7 @@ func (s *hyperionContract) WaitForTransaction(ctx context.Context, txHash common
 
 	if isPending {
 		for isPending {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 			if err != nil {
 				fmt.Println("Error getting transaction by hash:", err)

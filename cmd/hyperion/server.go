@@ -464,6 +464,20 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, "Chain settings updated successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
 		return
+	case "claim-tokens-of-old-contract":
+		var params struct {
+			ChainID       uint64 `json:"chain_id"`
+			Contract      string `json:"contract"`
+			TokenContract string `json:"token_contract"`
+			AmountInt     int64  `json:"amount_int"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response := queries.ClaimTokensOfOldContract(r.Context(), global, params.ChainID, params.Contract, params.TokenContract, params.AmountInt)
+		sendSuccess(w, response, nil)
+		return
 	}
 	sendError(w, "Unknown query type", http.StatusBadRequest)
 }

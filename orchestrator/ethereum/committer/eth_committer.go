@@ -248,6 +248,13 @@ func (e *ethCommitter) SendTxWith(
 				err := errors.New("failed to sign transaction")
 				e.nonceCache.Incr(e.fromAddress)
 				return err
+			case strings.Contains(err.Error(), "replacement transaction underpriced"):
+				log.Info("err when sending tx", err)
+				// increase gas price by 10%
+				opts.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(110)).Div(opts.GasPrice, big.NewInt(100))
+				log.Info("increased gas price to ", opts.GasPrice)
+				time.Sleep(1 * time.Second)
+				continue
 			case strings.Contains(err.Error(), "nonce too low"),
 				strings.Contains(err.Error(), "nonce too high"),
 				strings.Contains(err.Error(), "the tx doesn't have the correct nonce"):

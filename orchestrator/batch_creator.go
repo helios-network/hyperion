@@ -53,14 +53,8 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	minBatchFeeHLS := sdkmath.NewInt(0)
-	minTxFeeHLS := sdkmath.NewInt(0)
-	if l.cfg.MinBatchFeeHLS != 0.0 {
-		minBatchFeeHLS = sdkmath.NewInt(int64(l.cfg.MinBatchFeeHLS * 1000000000000000000))
-	}
-	if l.cfg.MinTxFeeHLS != 0.0 {
-		minTxFeeHLS = sdkmath.NewInt(int64(l.cfg.MinTxFeeHLS * 1000000000000000000))
-	}
+	minBatchFeeHLS := sdkmath.NewInt(int64(l.global.GetMinBatchFeeHLS(l.cfg.HyperionId) * 1000000000000000000))
+	minTxFeeHLS := sdkmath.NewInt(int64(l.global.GetMinTxFeeHLS(l.cfg.HyperionId) * 1000000000000000000))
 
 	fees, err := l.getUnbatchedTokenFees(ctx, minBatchFeeHLS, minTxFeeHLS)
 	if err != nil {

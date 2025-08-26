@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -109,6 +110,7 @@ type Network interface {
 
 	WaitForTransaction(ctx context.Context, txHash gethcommon.Hash) (*gethtypes.Transaction, uint64, error)
 	GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash gethcommon.Hash) (*big.Int, uint64, error)
+	SendClaimTokensOfOldContract(ctx context.Context, hyperionId uint64, tokenContract string, amountInSdkMath *big.Int, ethFrom common.Address, signerFn keystore.PersonalSignFn) error
 }
 
 type network struct {

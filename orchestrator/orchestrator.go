@@ -33,6 +33,8 @@ type PriceFeed interface {
 type Global interface {
 	GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
 	InitTargetNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (*ethereum.Network, error)
+	GetMinBatchFeeHLS(chainId uint64) float64
+	GetMinTxFeeHLS(chainId uint64) float64
 }
 
 type Config struct {
