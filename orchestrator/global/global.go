@@ -22,7 +22,6 @@ import (
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
-	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	keys "github.com/Helios-Chain-Labs/hyperion/orchestrator/keys"
@@ -44,7 +43,6 @@ type Config struct {
 type Global struct {
 	cfg           *Config
 	heliosNetwork *helios.Network
-	targetNetwork *ethereum.Network
 
 	ethKeyFromAddress gethcommon.Address
 	accAddress        cosmostypes.AccAddress
@@ -533,7 +531,7 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 	}
 
 	// default valset only for initial deployment
-	hyperionIdHash := common.HexToHash(strconv.FormatUint(chainId, 16))
+	hyperionIdHash := gethcommon.HexToHash(strconv.FormatUint(chainId, 16))
 	powerThreshold := big.NewInt(1431655765) // ≈ 33.3% of 4294967295 who is int32 normalized power
 	validators := make([]gethcommon.Address, 1)
 	powers := make([]*big.Int, 1)
