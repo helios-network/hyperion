@@ -410,7 +410,8 @@
                                 <v-data-table
                                     :headers="[
                                         { text: 'RPC URL', value: 'url' },
-                                        { text: 'Reputation', value: 'reputation' }
+                                        { text: 'Is Tested', value: 'isTested' },
+                                        { text: 'Is Primary', value: 'isPrimary' }
                                     ]"
                                     :items="rpcs"
                                     :loading="isLoadingRpcs"
@@ -427,32 +428,16 @@
                                             >
                                                 Click to copy
                                             </v-btn>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="removeRpc(item.url)"
+                                            >
+                                                Remove
+                                            </v-btn>
                                         </v-tooltip>
                                     </template>
                                 </v-data-table>
-                            </v-card-text>
-                        </v-card>
-                        <v-card>
-                            <v-card-title>Static RPCs</v-card-title>
-                            <v-card-text>
-                                <v-list>
-                                    <v-list-item v-for="rpc in staticRpcs" :key="rpc">
-                                        <v-list-item-content>
-                                            <v-list-item-title>{{ rpc }}</v-list-item-title>
-                                        </v-list-item-content>
-                                        <v-list-item-action>
-                                            <v-btn
-                                                icon
-                                                small
-                                                color="error"
-                                                @click="removeRpc(rpc)"
-                                                :loading="isDeletingRpc === rpc"
-                                            >
-                                                <v-icon>mdi-delete</v-icon>
-                                            </v-btn>
-                                        </v-list-item-action>
-                                    </v-list-item>
-                                </v-list>
                             </v-card-text>
                         </v-card>
                     </v-col>
@@ -1209,8 +1194,7 @@
 
                         const data = await response.json();
                         if (data.success) {
-                            this.rpcs = data.data.rpcs.sort((a, b) => b.reputation - a.reputation);
-                            this.staticRpcs = data.data.staticRpcs;
+                            this.rpcs = data.data;
                         }
                     } catch (error) {
                         console.error('Error fetching RPCs:', error);

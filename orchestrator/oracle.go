@@ -13,7 +13,6 @@ import (
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
@@ -102,12 +101,12 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	defer doneFn()
 
 	// Sélectionner le meilleur RPC basé sur la réputation
-	bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	if bestRpcURL != "" {
-		l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for oracle")
-		// Ajouter le meilleur RPC au contexte
-		ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	}
+	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
+	// if bestRpcURL != "" {
+	// 	l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for oracle")
+	// 	// Ajouter le meilleur RPC au contexte
+	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
+	// }
 
 	// check if validator is in the active set since claims will fail otherwise
 	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
@@ -256,7 +255,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 	})
 
 	if len(newEvents) == 0 {
-		l.Log().Infoln("NO EVENTS DETECTED 0", l.ethereum.GetLastUsedRpc())
+		// l.Log().Infoln("NO EVENTS DETECTED 0", l.ethereum.GetLastUsedRpc())
 		if l.logEnabled {
 			l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": targetHeight}).Infoln("oracle no new events on " + l.cfg.ChainName)
 		}
@@ -357,21 +356,21 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	fn := func() error {
 		h, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 		if err != nil {
-			usedRpc := provider.GetCurrentRPCURL(ctx)
+			// usedRpc := provider.GetCurrentRPCURL(ctx)
 			// Pénaliser le RPC utilisé pour cet échec
-			if usedRpc != "" {
-				l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
-				l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed header request")
-			}
+			// if usedRpc != "" {
+			// 	l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+			// 	l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed header request")
+			// }
 			return errors.Wrap(err, "failed to get latest ethereum header")
 		}
 
 		// Féliciter le RPC utilisé pour ce succès
-		usedRpc := provider.GetCurrentRPCURL(ctx)
-		if usedRpc != "" {
-			l.ethereum.PraiseRpc(usedRpc, 1) // Récompense de 1 point
-			l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful header request")
-		}
+		// usedRpc := provider.GetCurrentRPCURL(ctx)
+		// if usedRpc != "" {
+		// 	l.ethereum.PraiseRpc(usedRpc, 1) // Récompense de 1 point
+		// 	l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful header request")
+		// }
 
 		latestHeight = h.Number.Uint64()
 		return nil
@@ -499,7 +498,7 @@ func (l *oracle) autoResync(ctx context.Context) error {
 func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmostypes.Msg, error) {
 	rpc := ""
 	if !l.IsStaticRpcAnonymous() {
-		rpc = l.ethereum.GetLastUsedRpc()
+		rpc = l.ethereum.GetRpc().Url
 	}
 	switch e := ev.(type) {
 	case *deposit:

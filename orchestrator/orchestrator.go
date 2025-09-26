@@ -14,7 +14,6 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
@@ -336,21 +335,21 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		retry.Attempts(s.maxAttempts),
 		retry.OnRetry(func(n uint, err error) {
 			if strings.Contains(err.Error(), "unavailable on our public API") || strings.Contains(err.Error(), "no contract code at given address") || strings.Contains(err.Error(), "History has been pruned for this block") || strings.Contains(err.Error(), "public API") {
-				usedRpc := provider.GetCurrentRPCURL(ctx)
+				usedRpc := s.ethereum.GetRpc().Url
 				if usedRpc != "" {
-					s.ethereum.PenalizeRpc(usedRpc, 1)
+					// s.ethereum.PenalizeRpc(usedRpc, 1)
 					s.logger.WithField("rpc", usedRpc).Debug("Penalized RPC for unavailable on our public API")
 				}
 				return
 			}
 			if strings.Contains(err.Error(), "no RPC clients available") {
 				s.logger.Warningf("no RPC clients available, refreshing rpcs... (#%d)", n+1)
-				rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
-				if err != nil {
-					s.logger.WithError(err).Warningf("failed to get rpcs")
-					return
-				}
-				s.ethereum.SetRpcs(rpcs)
+				// rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
+				// if err != nil {
+				// 	s.logger.WithError(err).Warningf("failed to get rpcs")
+				// 	return
+				// }
+				// s.ethereum.SetRpcs(rpcs)
 				return
 			}
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)

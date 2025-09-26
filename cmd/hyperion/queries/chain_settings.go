@@ -37,7 +37,6 @@ func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uin
 	if err != nil {
 		return err
 	}
-	storage.UpdateRpcsToStorge(chainId, []string{})
 
 	return nil
 }

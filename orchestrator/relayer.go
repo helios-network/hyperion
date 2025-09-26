@@ -10,7 +10,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
@@ -78,12 +77,12 @@ func (l *relayer) relay(ctx context.Context) error {
 	defer doneFn()
 
 	// Sélectionner le meilleur RPC basé sur la réputation
-	bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	if bestRpcURL != "" {
-		l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for relay")
-		// Ajouter le meilleur RPC au contexte
-		ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	}
+	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
+	// if bestRpcURL != "" {
+	// 	l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for relay")
+	// 	// Ajouter le meilleur RPC au contexte
+	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
+	// }
 
 	var pg loops.ParanoidGroup
 
@@ -142,9 +141,9 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-		usedRpc := provider.GetCurrentRPCURL(ctx)
+		usedRpc := l.ethereum.GetRpc().Url
 		if usedRpc != "" {
-			l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+			// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
 			l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed to get latest " + l.cfg.ChainName + " height")
 		}
 		return false, err
@@ -311,9 +310,9 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
 				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
-				usedRpc := provider.GetCurrentRPCURL(ctx)
+				usedRpc := l.ethereum.GetRpc().Url
 				if usedRpc != "" {
-					l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
+					// l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
 					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed transaction")
 				}
 				time.Sleep(2 * time.Second)
@@ -325,10 +324,10 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error waiting for transaction " + symbol
 				l.Log().WithError(err).Warningln("failed to wait for transaction")
-				usedRpc := provider.GetCurrentRPCURL(ctx)
+				usedRpc := l.ethereum.GetRpc().Url
 				// Pénaliser le RPC utilisé pour cet échec
 				if usedRpc != "" {
-					l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+					// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
 					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for transaction not found")
 				}
 				time.Sleep(2 * time.Second)
@@ -340,10 +339,10 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 			storage.UpdateFeesFile(feesTaken, batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
 			///////
 
-			usedRpc := provider.GetCurrentRPCURL(ctx)
+			usedRpc := l.ethereum.GetRpc().Url
 			// Féliciter le RPC utilisé pour ce succès
 			if usedRpc != "" {
-				l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
+				// l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
 				l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful transaction")
 			}
 
@@ -378,9 +377,9 @@ func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontype
 	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-		usedRpc := provider.GetCurrentRPCURL(ctx)
+		usedRpc := l.ethereum.GetRpc().Url
 		if usedRpc != "" {
-			l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+			// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
 			l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed to get latest " + l.cfg.ChainName + " height")
 		}
 		return false, err
@@ -560,9 +559,9 @@ func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontype
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
 				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
-				usedRpc := provider.GetCurrentRPCURL(ctx)
+				usedRpc := l.ethereum.GetRpc().Url
 				if usedRpc != "" {
-					l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
+					// l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
 					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed transaction")
 				}
 				time.Sleep(2 * time.Second)
@@ -574,10 +573,10 @@ func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontype
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error waiting for transaction " + symbol
 				l.Log().WithError(err).Warningln("failed to wait for transaction")
-				usedRpc := provider.GetCurrentRPCURL(ctx)
+				usedRpc := l.ethereum.GetRpc().Url
 				// Pénaliser le RPC utilisé pour cet échec
 				if usedRpc != "" {
-					l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+					// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
 					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for transaction not found")
 				}
 				time.Sleep(2 * time.Second)
@@ -589,10 +588,10 @@ func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontype
 			storage.UpdateFeesFile(feesTaken, batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
 			///////
 
-			usedRpc := provider.GetCurrentRPCURL(ctx)
+			usedRpc := l.ethereum.GetRpc().Url
 			// Féliciter le RPC utilisé pour ce succès
 			if usedRpc != "" {
-				l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
+				// l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
 				l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful transaction")
 			}
 

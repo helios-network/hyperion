@@ -14,9 +14,8 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcchainlist"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcs"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
@@ -179,177 +178,39 @@ func (g *Global) InitHeliosNetwork() (*helios.Network, error) {
 	return &heliosNetwork, nil
 }
 
-func (g *Global) GetGasPrice(chainId uint64) string {
-
-	rpcs, err := g.TestRpcsAndGetRpcs(chainId, []string{})
-	if err != nil {
-		return "0"
-	}
-
-	ethKeyFromAddress, signerFn, personalSignFn, _ := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
-
-	ethNetwork, _ := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
-		EthNodeRPCs:           rpcs,
-		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
-		MaxGasPrice:           g.cfg.EthMaxGasPrice,
-		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
-	})
-
-	gasPrice, err := ethNetwork.GetGasPrice(context.Background())
-	if err != nil {
-		return "0"
-	}
-	return gasPrice.String()
-}
-
-func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*hyperiontypes.Rpc, error) {
-	rpcsFromStorage, timeSinceLastUpdate, err := storage.GetRpcsFromStorge(chainId)
-	rpcs := make([]*hyperiontypes.Rpc, 0)
-	if err == nil && len(rpcsFromStorage) > 0 {
-		for _, rpc := range rpcsFromStorage {
-			rpcs = append(rpcs, &hyperiontypes.Rpc{
-				Url:            rpc,
-				Reputation:     3,
-				LastHeightUsed: 1,
-			})
-		}
-	}
-
-	staticRpcs, err := storage.GetStaticRpcs(chainId)
-	if err != nil {
-		staticRpcs = make([]storage.Rpc, 0)
-	}
-
-	for _, rpc := range staticRpcs {
-		exists := false
-		for _, r := range rpcs {
-			if r.Url == rpc.Url {
-				exists = true
-				r.Reputation = 10
-				break
-			}
-		}
-		if !exists {
-			rpcs = append(rpcs, &hyperiontypes.Rpc{
-				Url:            rpc.Url,
-				Reputation:     10,
-				LastHeightUsed: 1,
-			})
-		}
-	}
-
-	if timeSinceLastUpdate < 60*time.Minute && len(rpcs) > 0 && timeSinceLastUpdate != 0 {
-		return rpcs, nil
-	}
-
-	if len(rpcsOptional) > 0 {
-		notInRpcs := make([]string, 0)
-		for _, rpc := range rpcsOptional {
-			exists := false
-			for _, r := range rpcs {
-				if r.Url == rpc {
-					exists = true
-					break
-				}
-			}
-			if !exists {
-				notInRpcs = append(notInRpcs, rpc)
-			}
-		}
-		if len(notInRpcs) > 0 {
-			for _, rpc := range notInRpcs {
-				rpcs = append(rpcs, &hyperiontypes.Rpc{
-					Url:            rpc,
-					Reputation:     1,
-					LastHeightUsed: 1,
-				})
-			}
-		}
-	}
-
-	isStaticRpcOnly := false
-	settings, err := storage.GetChainSettings(chainId, map[string]interface{}{})
-	if err == nil {
-		if settings["static_rpc_only"] != nil && settings["static_rpc_only"].(bool) {
-			isStaticRpcOnly = true
-		}
-	}
-
-	if !isStaticRpcOnly {
-		// search rpc from chainlist
-		rpcChainListFeed := rpcchainlist.NewRpcChainListFeed()
-		rpcsFromChainList, err := rpcChainListFeed.QueryRpcs(chainId)
-		if err == nil {
-			notInRpcs := make([]string, 0)
-			for _, rpc := range rpcsFromChainList {
-				exists := false
-				for _, r := range rpcs {
-					if r.Url == rpc {
-						exists = true
-						break
-					}
-				}
-				if !exists {
-					notInRpcs = append(notInRpcs, rpc)
-				}
-			}
-			if len(notInRpcs) > 0 {
-				for _, rpc := range notInRpcs {
-					rpcs = append(rpcs, &hyperiontypes.Rpc{
-						Url:            rpc,
-						Reputation:     1,
-						LastHeightUsed: 1,
-					})
-				}
-			}
-		}
-	}
-
-	ethKeyFromAddress, signerFn, personalSignFn, _ := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
-
-	ethNetwork, _ := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
-		EthNodeRPCs:           rpcs,
-		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
-		MaxGasPrice:           g.cfg.EthMaxGasPrice,
-		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
-	})
-
-	ethNetwork.TestRpcs(context.Background())
-
-	testedRpcs := ethNetwork.GetRpcs()
-
-	rpcsToSave := make([]string, 0)
-	for _, rpc := range testedRpcs {
-		rpcsToSave = append(rpcsToSave, rpc.Url)
-	}
-
-	storage.UpdateRpcsToStorge(chainId, rpcsToSave)
-
-	rpcFinalList := make([]*hyperiontypes.Rpc, 0)
-	for _, rpc := range rpcsToSave {
-		rpcFinalList = append(rpcFinalList, &hyperiontypes.Rpc{
-			Url: rpc,
-		})
-	}
-
-	return rpcFinalList, nil
-}
-
-func (g *Global) GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error) {
-	rpcList, err := g.TestRpcsAndGetRpcs(chainId, []string{})
+func (g *Global) GetAnonymousEVMNetwork(chainId uint64, rpc *rpcs.Rpc, options ...committer.EVMCommitterOption) (*ethereum.Network, error) {
+	ethKeyFromAddress, signerFn, personalSignFn, err := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
 	if err != nil {
 		return nil, err
 	}
-	return rpcList, nil
+
+	ethNetwork, err := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
+		EthNodeRPC:            rpc,
+		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
+		MaxGasPrice:           g.cfg.EthMaxGasPrice,
+		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
+	}, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &ethNetwork, nil
 }
 
-func (g *Global) InitTargetNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (*ethereum.Network, error) {
+func (g *Global) GetAnonymousEVMNetworks(chainId uint64, rpcs []*rpcs.Rpc) ([]*ethereum.Network, error) {
+	ethNetworks := make([]*ethereum.Network, 0)
+	for _, rpc := range rpcs {
+		ethNetwork, err := g.GetAnonymousEVMNetwork(chainId, rpc)
+		if err != nil {
+			fmt.Println("Error getting EVM network:", err, "for rpc:", rpc.Url)
+			continue
+		}
+		ethNetworks = append(ethNetworks, ethNetwork)
+	}
+	return ethNetworks, nil
+}
 
+func (g *Global) GetEVMNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams, rpc *rpcs.Rpc) (*ethereum.Network, error) {
 	hyperionContractAddr := gethcommon.HexToAddress(counterpartyChainParams.BridgeCounterpartyAddress)
-	rpcs, err := g.TestRpcsAndGetRpcs(counterpartyChainParams.BridgeChainId, []string{})
-	if err != nil {
-		return nil, err
-	}
 
 	settings, err := storage.GetChainSettings(counterpartyChainParams.BridgeChainId, map[string]interface{}{})
 	if err != nil {
@@ -376,7 +237,7 @@ func (g *Global) InitTargetNetwork(counterpartyChainParams *hyperiontypes.Counte
 	}
 
 	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
-		EthNodeRPCs:           rpcs,
+		EthNodeRPC:            rpc,
 		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
 		MaxGasPrice:           g.cfg.EthMaxGasPrice,
 		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
@@ -388,13 +249,226 @@ func (g *Global) InitTargetNetwork(counterpartyChainParams *hyperiontypes.Counte
 	return &ethNetwork, nil
 }
 
-func (g *Global) GetEVMProvider(chainId uint64) (provider.EVMProvider, error) {
+func (g *Global) GetEVMNetworks(counterpartyChainParams *hyperiontypes.CounterpartyChainParams, rpcs []*rpcs.Rpc) ([]*ethereum.Network, error) {
+	ethNetworks := make([]*ethereum.Network, 0)
+	for _, rpc := range rpcs {
+		ethNetwork, err := g.GetEVMNetwork(counterpartyChainParams, rpc)
+		if err != nil {
+			fmt.Println("Error getting EVM network:", err, "for rpc:", rpc.Url)
+			continue
+		}
+		ethNetworks = append(ethNetworks, ethNetwork)
+	}
+	return ethNetworks, nil
+}
+
+func (g *Global) GetGasPrice(chainId uint64) string {
+
 	rpcs, err := g.TestRpcsAndGetRpcs(chainId, []string{})
+	if err != nil {
+		return "0"
+	}
+
+	ethNetwork, err := g.GetAnonymousEVMNetwork(chainId, rpcs[0])
+	if err != nil {
+		return "0"
+	}
+
+	gasPrice, err := (*ethNetwork).GetGasPrice(context.Background())
+	if err != nil {
+		return "0"
+	}
+	return gasPrice.String()
+}
+
+func (g *Global) TestChainListRpcsAndSaveForChain(chainId uint64) ([]*rpcs.Rpc, error) {
+	rpcChainListFeed := rpcs.NewRpcChainListFeed()
+	rpcsFromChainListStrings, err := rpcChainListFeed.QueryRpcs(chainId)
 	if err != nil {
 		return nil, err
 	}
-	return provider.NewEVMProvider(rpcs), nil
+	rpcsFromChainList := make([]*rpcs.Rpc, 0)
+	for _, rpc := range rpcsFromChainListStrings {
+		rpcsFromChainList = append(rpcsFromChainList, &rpcs.Rpc{
+			Url: rpc,
+		})
+	}
+	ethNetworks, err := g.GetEVMNetworks(&hyperiontypes.CounterpartyChainParams{
+		BridgeChainId:             chainId,
+		BridgeCounterpartyAddress: "0x0000000000000000000000000000000000000000",
+		BridgeChainName:           "Simulation",
+	}, rpcsFromChainList)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ethNetwork := range ethNetworks {
+		ok := (*ethNetwork).TestRpc(context.Background())
+		if !ok {
+			fmt.Println("Error testing rpc:", (*ethNetwork).GetRpc().Url)
+			continue
+		}
+		rpc := (*ethNetwork).GetRpc()
+		rpc.IsTested = true
+		rpc.Usages = append(rpc.Usages, rpcs.RpcUsage{
+			Success: true,
+			Error:   "",
+			Time:    time.Now(),
+		})
+		storage.AddRpcToStorge(chainId, rpc)
+		rpcsFromChainList = append(rpcsFromChainList, rpc)
+	}
+	return rpcsFromChainList, nil
 }
+
+// func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*hyperiontypes.Rpc, error) {
+// 	rpcsFromStorage, timeSinceLastUpdate, err := storage.GetRpcsFromStorge(chainId)
+// 	listOfRpcs := make([]*hyperiontypes.Rpc, 0)
+// 	if err == nil && len(rpcsFromStorage) > 0 {
+// 		for _, rpc := range rpcsFromStorage {
+// 			listOfRpcs = append(listOfRpcs, &hyperiontypes.Rpc{
+// 				Url:            rpc,
+// 				Reputation:     3,
+// 				LastHeightUsed: 1,
+// 			})
+// 		}
+// 	}
+
+// 	staticRpcs, err := storage.GetStaticRpcs(chainId)
+// 	if err != nil {
+// 		staticRpcs = make([]storage.Rpc, 0)
+// 	}
+
+// 	for _, rpc := range staticRpcs {
+// 		exists := false
+// 		for _, r := range listOfRpcs {
+// 			if r.Url == rpc.Url {
+// 				exists = true
+// 				r.Reputation = 10
+// 				break
+// 			}
+// 		}
+// 		if !exists {
+// 			listOfRpcs = append(listOfRpcs, &hyperiontypes.Rpc{
+// 				Url:            rpc.Url,
+// 				Reputation:     10,
+// 				LastHeightUsed: 1,
+// 			})
+// 		}
+// 	}
+
+// 	if timeSinceLastUpdate < 60*time.Minute && len(listOfRpcs) > 0 && timeSinceLastUpdate != 0 {
+// 		return listOfRpcs, nil
+// 	}
+
+// 	if len(rpcsOptional) > 0 {
+// 		notInRpcs := make([]string, 0)
+// 		for _, rpc := range rpcsOptional {
+// 			exists := false
+// 			for _, r := range listOfRpcs {
+// 				if r.Url == rpc {
+// 					exists = true
+// 					break
+// 				}
+// 			}
+// 			if !exists {
+// 				notInRpcs = append(notInRpcs, rpc)
+// 			}
+// 		}
+// 		if len(notInRpcs) > 0 {
+// 			for _, rpc := range notInRpcs {
+// 				listOfRpcs = append(listOfRpcs, &hyperiontypes.Rpc{
+// 					Url:            rpc,
+// 					Reputation:     1,
+// 					LastHeightUsed: 1,
+// 				})
+// 			}
+// 		}
+// 	}
+
+// 	isStaticRpcOnly := false
+// 	settings, err := storage.GetChainSettings(chainId, map[string]interface{}{})
+// 	if err == nil {
+// 		if settings["static_rpc_only"] != nil && settings["static_rpc_only"].(bool) {
+// 			isStaticRpcOnly = true
+// 		}
+// 	}
+
+// 	if !isStaticRpcOnly {
+// 		// search rpc from chainlist
+// 		rpcChainListFeed := rpcs.NewRpcChainListFeed()
+// 		rpcsFromChainList, err := rpcChainListFeed.QueryRpcs(chainId)
+// 		if err == nil {
+// 			notInRpcs := make([]string, 0)
+// 			for _, rpc := range rpcsFromChainList {
+// 				exists := false
+// 				for _, r := range listOfRpcs {
+// 					if r.Url == rpc {
+// 						exists = true
+// 						break
+// 					}
+// 				}
+// 				if !exists {
+// 					notInRpcs = append(notInRpcs, rpc)
+// 				}
+// 			}
+// 			if len(notInRpcs) > 0 {
+// 				for _, rpc := range notInRpcs {
+// 					listOfRpcs = append(listOfRpcs, &hyperiontypes.Rpc{
+// 						Url:            rpc,
+// 						Reputation:     1,
+// 						LastHeightUsed: 1,
+// 					})
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	ethKeyFromAddress, signerFn, personalSignFn, _ := keys.InitEthereumAccountsManagerWithRandomKey(chainId)
+
+// 	ethNetwork, _ := ethereum.NewNetwork(gethcommon.HexToAddress("0x0000000000000000000000000000000000000000"), ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
+// 		EthNodeRPCs:           listOfRpcs,
+// 		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
+// 		MaxGasPrice:           g.cfg.EthMaxGasPrice,
+// 		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,
+// 	})
+
+// 	ethNetwork.TestRpcs(context.Background())
+
+// 	testedRpcs := ethNetwork.GetRpcs()
+
+// 	rpcsToSave := make([]string, 0)
+// 	for _, rpc := range testedRpcs {
+// 		rpcsToSave = append(rpcsToSave, rpc.Url)
+// 	}
+
+// 	storage.UpdateRpcsToStorge(chainId, rpcsToSave)
+
+// 	rpcFinalList := make([]*hyperiontypes.Rpc, 0)
+// 	for _, rpc := range rpcsToSave {
+// 		rpcFinalList = append(rpcFinalList, &hyperiontypes.Rpc{
+// 			Url: rpc,
+// 		})
+// 	}
+
+// 	return rpcFinalList, nil
+// }
+
+// func (g *Global) GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error) {
+// 	rpcList, err := g.TestRpcsAndGetRpcs(chainId, []string{})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return rpcList, nil
+// }
+
+// func (g *Global) GetEVMProvider(chainId uint64) (provider.EVMProvider, error) {
+// 	rpcs, err := g.TestRpcsAndGetRpcs(chainId, []string{})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return provider.NewEVMProvider(rpcs), nil
+// }
 
 func (g *Global) CreateNewBlockchainProposal(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
 	heliosNetwork := g.GetHeliosNetwork()
@@ -474,8 +548,13 @@ func (g *Global) CreateNewBlockchainProposal(title string, description string, c
 }
 
 func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, uint64, bool) {
-	rpcs, err := g.TestRpcsAndGetRpcs(chainId, []string{})
+	rpcs, _, err := storage.GetRpcsFromStorge(chainId)
 	if err != nil {
+		return gethcommon.Address{}, 0, false
+	}
+	if len(rpcs) == 0 {
+		// setup rpcs
+		fmt.Println("No rpcs found for chainId:", chainId, "in global.DeployNewHyperionContract")
 		return gethcommon.Address{}, 0, false
 	}
 	heliosNetwork := g.GetHeliosNetwork()
@@ -497,7 +576,7 @@ func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, 
 
 	fmt.Println("Deploying Hyperion contract...", ethKeyFromAddress.Hex())
 	address, blockNumber, err, success := ethereum.DeployNewHyperionContract(g.ethKeyFromAddress, signerFn, ethereum.NetworkConfig{
-		EthNodeRPCs:           rpcs,
+		EthNodeRPC:            rpcs[0],
 		GasPriceAdjustment:    g.cfg.EthGasPriceAdjustment,
 		MaxGasPrice:           g.cfg.EthMaxGasPrice,
 		PendingTxWaitDuration: g.cfg.PendingTxWaitDuration,

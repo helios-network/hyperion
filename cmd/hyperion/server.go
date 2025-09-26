@@ -426,7 +426,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := queries.AddStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs, params.IsPrimary)
+		err := queries.AddRpcs(r.Context(), global, params.ChainID, params.Rpcs, params.IsPrimary)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -442,7 +442,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := queries.RemoveStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs)
+		err := queries.RemoveRpcs(r.Context(), global, params.ChainID, params.Rpcs)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -8,12 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-)
 
-type Rpc struct {
-	Url       string `json:"url"`
-	IsPrimary bool   `json:"is_primary"`
-}
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcs"
+)
 
 func GetFeesFile() ([]map[string]interface{}, error) {
 	homePath, err := os.UserHomeDir()
@@ -91,7 +88,7 @@ func UpdateFeesFile(feesTaken *big.Int, tokenContract string, cost *big.Int, txH
 	os.WriteFile(joinPath, json, 0644)
 }
 
-func GetRpcsFromStorge(chainId uint64) ([]string, time.Duration, error) {
+func GetRpcsFromStorge(chainId uint64) ([]*rpcs.Rpc, time.Duration, error) {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, 0, err
@@ -118,7 +115,7 @@ func GetRpcsFromStorge(chainId uint64) ([]string, time.Duration, error) {
 		baseFile = []byte("[]")
 	}
 
-	var baseFileArray []string
+	var baseFileArray []*rpcs.Rpc
 	json.Unmarshal(baseFile, &baseFileArray)
 
 	stat, _ := os.Stat(joinPath)
@@ -128,7 +125,40 @@ func GetRpcsFromStorge(chainId uint64) ([]string, time.Duration, error) {
 	return baseFileArray, time.Since(stat.ModTime()), nil
 }
 
-func UpdateRpcsToStorge(chainId uint64, rpcs []string) error {
+func AddRpcToStorge(chainId uint64, rpc *rpcs.Rpc) error {
+	rpcsList, _, err := GetRpcsFromStorge(chainId)
+	if err != nil {
+		return err
+	}
+	alreadyExists := false
+	for _, r := range rpcsList {
+		if r.Url == rpc.Url {
+			alreadyExists = true
+			break
+		}
+	}
+	if alreadyExists {
+		return nil
+	}
+	rpcsList = append(rpcsList, rpc)
+	return UpdateRpcsToStorge(chainId, rpcsList)
+}
+
+func RemoveRpcFromStorge(chainId uint64, rpc *rpcs.Rpc) error {
+	rpcsList, _, err := GetRpcsFromStorge(chainId)
+	if err != nil {
+		return err
+	}
+	newRpcs := make([]*rpcs.Rpc, 0)
+	for _, r := range rpcsList {
+		if r.Url != rpc.Url {
+			newRpcs = append(newRpcs, r)
+		}
+	}
+	return UpdateRpcsToStorge(chainId, newRpcs)
+}
+
+func UpdateRpcsToStorge(chainId uint64, rpcsList []*rpcs.Rpc) error {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -149,7 +179,7 @@ func UpdateRpcsToStorge(chainId uint64, rpcs []string) error {
 		os.WriteFile(joinPath, []byte("[]"), 0644)
 	}
 
-	jsonData, err := json.Marshal(rpcs)
+	jsonData, err := json.Marshal(rpcsList)
 	if err != nil {
 		return err
 	}
@@ -401,60 +431,6 @@ func GetHyperionPassword() (string, error) {
 		return "", err
 	}
 	return string(baseFile), nil
-}
-
-func StoreStaticRpcs(chainId uint64, rpcs []Rpc) error {
-	homePath, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		os.MkdirAll(dirPath, 0755)
-	}
-	joinPath := filepath.Join(dirPath, "static_rpcs.json")
-	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
-		os.WriteFile(joinPath, []byte("{}"), 0644)
-	}
-	baseFile, err := os.ReadFile(joinPath)
-	if err != nil {
-		return err
-	}
-	var baseFileMap map[string][]Rpc
-	json.Unmarshal(baseFile, &baseFileMap)
-
-	baseFileMap[strconv.FormatUint(chainId, 10)] = rpcs
-	jsonData, err := json.Marshal(baseFileMap)
-	if err != nil {
-		return err
-	}
-	os.WriteFile(joinPath, jsonData, 0644)
-	return nil
-}
-
-func GetStaticRpcs(chainId uint64) ([]Rpc, error) {
-	homePath, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		os.MkdirAll(dirPath, 0755)
-	}
-	joinPath := filepath.Join(dirPath, "static_rpcs.json")
-	if _, err := os.Stat(joinPath); os.IsNotExist(err) {
-		os.WriteFile(joinPath, []byte("{}"), 0644)
-	}
-	baseFile, err := os.ReadFile(joinPath)
-	if err != nil {
-		return nil, err
-	}
-	var baseFileMap map[string][]Rpc
-	json.Unmarshal(baseFile, &baseFileMap)
-	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
-		return []Rpc{}, nil
-	}
-	return baseFileMap[strconv.FormatUint(chainId, 10)], nil
 }
 
 func SetChainSettings(chainId uint64, settings map[string]interface{}) error {

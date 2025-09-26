@@ -12,20 +12,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcs"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 type NetworkConfig struct {
-	EthNodeRPCs           []*hyperiontypes.Rpc
+	EthNodeRPC            *rpcs.Rpc
 	GasPriceAdjustment    float64
 	MaxGasPrice           string
 	PendingTxWaitDuration string
@@ -35,16 +34,9 @@ type NetworkConfig struct {
 // Network is the orchestrator's reference endpoint to the Ethereum network
 type Network interface {
 	FromAddress() gethcommon.Address
-	GetLastUsedRpc() string
-	ReduceReputationOfLastRpc()
-	RemoveLastUsedRpc()
-	RemoveRpc(targetUrl string) bool
-	TestRpcs(ctx context.Context) bool
-	SetRpcs(rpcs []*hyperiontypes.Rpc)
-	GetRpcs() []*hyperiontypes.Rpc
-	SelectBestRatedRpcInRpcPool() string
-	PenalizeRpc(rpcUrl string, penalty uint64)
-	PraiseRpc(rpcUrl string, praise uint64)
+
+	GetRpc() *rpcs.Rpc
+	TestRpc(ctx context.Context) bool
 
 	GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetNativeBalance(ctx context.Context) (*big.Int, error)
@@ -132,13 +124,13 @@ func DeployNewHyperionContract(
 		cfg.GasPriceAdjustment,
 		cfg.MaxGasPrice,
 		signerFn,
-		provider.NewEVMProvider(cfg.EthNodeRPCs),
+		provider.NewEVMProvider(cfg.EthNodeRPC),
 		options...,
 	)
 	if err != nil {
 		return gethcommon.Address{}, 0, err, false
 	}
-	fmt.Println("Deploying Hyperion contract...", cfg.EthNodeRPCs)
+	fmt.Println("Deploying Hyperion contract...", cfg.EthNodeRPC)
 	return hyperion.DeployHyperionContract(context.Background(), ethCommitter)
 }
 
@@ -150,13 +142,12 @@ func NewNetwork(
 	cfg NetworkConfig,
 	options ...committer.EVMCommitterOption,
 ) (Network, error) {
-	log.Info("fromAddr: ", fromAddr)
 	ethCommitter, err := committer.NewEthCommitter(
 		fromAddr,
 		cfg.GasPriceAdjustment,
 		cfg.MaxGasPrice,
 		signerFn,
-		provider.NewEVMProvider(cfg.EthNodeRPCs),
+		provider.NewEVMProvider(cfg.EthNodeRPC),
 		options...,
 	)
 	if err != nil {
@@ -172,17 +163,6 @@ func NewNetwork(
 	if err != nil {
 		return nil, err
 	}
-
-	// If Alchemy Websocket URL is set, then Subscribe to Pending Transaction of Hyperion Contract.
-	// disabled for now
-	// if cfg.EthNodeAlchemyWS != "" {
-	// 	log.WithFields(log.Fields{
-	// 		"url": cfg.EthNodeAlchemyWS,
-	// 	}).Infoln("subscribing to Alchemy websocket")
-	// 	go hyperionContract.SubscribeToPendingTxs(cfg.EthNodeAlchemyWS)
-	// }
-
-	//ethCommitter.Provider().CallContract(context.Background(), ethereum.CallMsg{}, nil)
 
 	n := &network{
 		HyperionContract: hyperionContract,
@@ -237,52 +217,8 @@ func (n *network) FromAddress() gethcommon.Address {
 	return n.FromAddr
 }
 
-func (n *network) GetLastUsedRpc() string {
-	return n.Provider().GetLastUsedRpc()
-}
-
-func (n *network) ReduceReputationOfLastRpc() {
-	n.Provider().ReduceReputationOfLastRpc()
-}
-
-func (n *network) RemoveLastUsedRpc() {
-	n.Provider().RemoveLastUsedRpc()
-}
-
 func (n *network) GetGasPrice(ctx context.Context) (*big.Int, error) {
 	return n.Provider().SuggestGasPrice(ctx)
-}
-
-func (n *network) TestRpcs(ctx context.Context) bool {
-	return n.Provider().TestRpcs(ctx, func(client *ethclient.Client, url string) error {
-		_, err := client.HeaderByNumber(ctx, nil)
-		if err != nil {
-			return err
-		}
-
-		_, err = client.BalanceAt(ctx, n.FromAddr, nil)
-		if err != nil {
-			return err
-		}
-		fmt.Println("ok: ", url)
-		return nil
-	})
-}
-
-func (n *network) GetRpcs() []*hyperiontypes.Rpc {
-	return n.Provider().GetRpcs()
-}
-
-func (n *network) SetRpcs(rpcs []*hyperiontypes.Rpc) {
-	n.Provider().SetRpcs(rpcs)
-}
-
-func (n *network) RemoveRpc(targetUrl string) bool {
-	return n.Provider().RemoveRpc(targetUrl)
-}
-
-func (n *network) SelectBestRatedRpcInRpcPool() string {
-	return n.Provider().SelectBestRatedRpcInRpcPool()
 }
 
 func (n *network) GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error) {
@@ -482,15 +418,23 @@ func (n *network) ExecuteExternalDataTx(ctx context.Context, address gethcommon.
 	}
 	result, err := n.Provider().CallContract(ctx, msg, blockNumber)
 	if err != nil {
-		return []byte{}, []byte(err.Error()), n.Provider().GetLastUsedRpc(), err
+		return []byte{}, []byte(err.Error()), n.Provider().GetRpc().Url, err
 	}
-	return result, []byte{}, n.Provider().GetLastUsedRpc(), nil
+	return result, []byte{}, n.Provider().GetRpc().Url, nil
 }
 
-func (n *network) PenalizeRpc(rpcUrl string, penalty uint64) {
-	n.Provider().PenalizeRpc(rpcUrl, penalty)
+func (n *network) TestRpc(ctx context.Context) bool {
+	_, err := n.Provider().HeaderByNumber(ctx, nil)
+	if err != nil {
+		return false
+	}
+	_, err = n.Provider().BalanceAt(ctx, n.FromAddr, nil)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
-func (n *network) PraiseRpc(rpcUrl string, praise uint64) {
-	n.Provider().PraiseRpc(rpcUrl, praise)
+func (n *network) GetRpc() *rpcs.Rpc {
+	return n.Provider().GetRpc()
 }

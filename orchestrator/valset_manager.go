@@ -9,7 +9,6 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
@@ -76,10 +75,10 @@ func (l *valsetManager) Process(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	if bestRpcURL != "" {
-		ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	}
+	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
+	// if bestRpcURL != "" {
+	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
+	// }
 
 	var pg loops.ParanoidGroup
 
@@ -165,9 +164,9 @@ func (l *valsetManager) getLatestEthValset(ctx context.Context) (*hyperiontypes.
 		if err != nil {
 			l.Log().Infoln("findLatestValsetOnEth - 8")
 			if strings.Contains(err.Error(), "failed to get") || strings.Contains(err.Error(), "attempting to unmarshall") || strings.Contains(err.Error(), "pruned") {
-				usedRpc := provider.GetCurrentRPCURL(ctx)
+				usedRpc := l.ethereum.GetRpc().Url
 				if usedRpc != "" {
-					l.ethereum.PenalizeRpc(usedRpc, 1)
+					// l.ethereum.PenalizeRpc(usedRpc, 1)
 					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for valset manager")
 				}
 				vs, err = l.findLatestValsetOnEth(ctx)
@@ -320,9 +319,9 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
-			usedRpc := provider.GetCurrentRPCURL(ctx)
+			usedRpc := l.ethereum.GetRpc().Url
 			if usedRpc != "" {
-				l.ethereum.PenalizeRpc(usedRpc, 1)
+				// l.ethereum.PenalizeRpc(usedRpc, 1)
 				l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for valset manager")
 			}
 		}
