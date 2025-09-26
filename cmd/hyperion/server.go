@@ -418,14 +418,15 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		return
 	case "add-rpcs":
 		var params struct {
-			ChainID uint64 `json:"chain_id"`
-			Rpcs    string `json:"rpcs"`
+			ChainID   uint64 `json:"chain_id"`
+			Rpcs      string `json:"rpcs"`
+			IsPrimary bool   `json:"is_primary"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := queries.AddStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs)
+		err := queries.AddStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs, params.IsPrimary)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -474,6 +474,9 @@
                                 ></v-textarea>
                             </v-form>
                         </v-card-text>
+                        <v-card-text>
+                            <v-checkbox v-model="isPrimary" label="Is Primary" />
+                        </v-card-text>
                         <v-card-actions>
                             <v-spacer></v-spacer>
                             <v-btn color="error" text @click="showAddRpcsDialog = false">Cancel</v-btn>
@@ -688,6 +691,7 @@
                 },
                 walletAddress: '',
                 newRpcs: '',
+                isPrimary: false,
                 chainSettings: '',
                 settingsError: '',
                 statsInterval: null,
@@ -1268,7 +1272,8 @@
                             },
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
-                                rpcs: rpcsArray.join(',')
+                                rpcs: rpcsArray.join(','),
+                                is_primary: this.isPrimary,
                             }),
                         });
 
@@ -1278,6 +1283,7 @@
 
                         this.showAddRpcsDialog = false;
                         this.newRpcs = '';
+                        this.isPrimary = false;
                         this.showNotification('RPCs added successfully');
                         await this.viewRpcs(this.selectedChainId);
                     } catch (error) {

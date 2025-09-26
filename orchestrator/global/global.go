@@ -219,13 +219,13 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 
 	staticRpcs, err := storage.GetStaticRpcs(chainId)
 	if err != nil {
-		staticRpcs = make([]string, 0)
+		staticRpcs = make([]storage.Rpc, 0)
 	}
 
 	for _, rpc := range staticRpcs {
 		exists := false
 		for _, r := range rpcs {
-			if r.Url == rpc {
+			if r.Url == rpc.Url {
 				exists = true
 				r.Reputation = 10
 				break
@@ -233,7 +233,7 @@ func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*h
 		}
 		if !exists {
 			rpcs = append(rpcs, &hyperiontypes.Rpc{
-				Url:            rpc,
+				Url:            rpc.Url,
 				Reputation:     10,
 				LastHeightUsed: 1,
 			})
@@ -534,11 +534,11 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 
 	// default valset only for initial deployment
 	hyperionIdHash := common.HexToHash(strconv.FormatUint(chainId, 16))
-	powerThreshold := big.NewInt(2863311531) // ≈ 66.6% of 4294967295 who is int32 normalized power
+	powerThreshold := big.NewInt(1431655765) // ≈ 33.3% of 4294967295 who is int32 normalized power
 	validators := make([]gethcommon.Address, 1)
 	powers := make([]*big.Int, 1)
 	validators[0] = g.ethKeyFromAddress
-	powers[0] = big.NewInt(2863311531)
+	powers[0] = big.NewInt(4294967295) // ≈ 100% of 4294967295 for the first validator
 
 	_, blockNumber, err := (*targetNetwork).SendInitializeBlockchainTx(context.Background(), g.ethKeyFromAddress, hyperionIdHash, powerThreshold, validators, powers)
 

@@ -20,9 +20,9 @@ func RemoveStaticRpcs(ctx context.Context, global *global.Global, chainId uint64
 	if err != nil {
 		return err
 	}
-	newRpcsArray := make([]string, 0)
+	newRpcsArray := make([]storage.Rpc, 0)
 	for _, rpc := range rpcsArray {
-		if !slices.Contains(rpcsToRemoveArray, rpc) {
+		if !slices.Contains(rpcsToRemoveArray, rpc.Url) {
 			newRpcsArray = append(newRpcsArray, rpc)
 		}
 	}

@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+type Rpc struct {
+	Url       string `json:"url"`
+	IsPrimary bool   `json:"is_primary"`
+}
+
 func GetFeesFile() ([]map[string]interface{}, error) {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
@@ -398,7 +403,7 @@ func GetHyperionPassword() (string, error) {
 	return string(baseFile), nil
 }
 
-func StoreStaticRpcs(chainId uint64, rpcs []string) error {
+func StoreStaticRpcs(chainId uint64, rpcs []Rpc) error {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -415,7 +420,7 @@ func StoreStaticRpcs(chainId uint64, rpcs []string) error {
 	if err != nil {
 		return err
 	}
-	var baseFileMap map[string][]string
+	var baseFileMap map[string][]Rpc
 	json.Unmarshal(baseFile, &baseFileMap)
 
 	baseFileMap[strconv.FormatUint(chainId, 10)] = rpcs
@@ -427,7 +432,7 @@ func StoreStaticRpcs(chainId uint64, rpcs []string) error {
 	return nil
 }
 
-func GetStaticRpcs(chainId uint64) ([]string, error) {
+func GetStaticRpcs(chainId uint64) ([]Rpc, error) {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -444,10 +449,10 @@ func GetStaticRpcs(chainId uint64) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var baseFileMap map[string][]string
+	var baseFileMap map[string][]Rpc
 	json.Unmarshal(baseFile, &baseFileMap)
 	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
-		return []string{}, nil
+		return []Rpc{}, nil
 	}
 	return baseFileMap[strconv.FormatUint(chainId, 10)], nil
 }

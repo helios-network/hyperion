@@ -10,12 +10,12 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 )
 
-func AddStaticRpcs(ctx context.Context, global *global.Global, chainId uint64, rpcs string) error {
+func AddStaticRpcs(ctx context.Context, global *global.Global, chainId uint64, rpcs string, isPrimary bool) error {
 	rpcs = strings.TrimSpace(rpcs)
 	if rpcs == "" {
 		return fmt.Errorf("rpcs is empty")
 	}
-	rpcsArray := make([]string, 0)
+	rpcsArray := make([]storage.Rpc, 0)
 	for _, rpc := range strings.Split(rpcs, ",") {
 		rpc = strings.TrimSpace(rpc)
 		if rpc == "" {
@@ -24,7 +24,10 @@ func AddStaticRpcs(ctx context.Context, global *global.Global, chainId uint64, r
 		if !strings.HasPrefix(rpc, "http://") && !strings.HasPrefix(rpc, "https://") {
 			return fmt.Errorf("rpc %s is not a valid URL", rpc)
 		}
-		rpcsArray = append(rpcsArray, rpc)
+		rpcsArray = append(rpcsArray, storage.Rpc{
+			Url:       rpc,
+			IsPrimary: isPrimary,
+		})
 		if len(rpcsArray) > 100 {
 			return fmt.Errorf("too many rpcs, max is 100")
 		}
@@ -37,8 +40,10 @@ func AddStaticRpcs(ctx context.Context, global *global.Global, chainId uint64, r
 		return err
 	}
 	for _, rpc := range existingRpcs {
-		if slices.Contains(rpcsArray, rpc) {
-			return fmt.Errorf("rpc %s already exists", rpc)
+		for _, rpcArray := range rpcsArray {
+			if rpcArray.Url == rpc.Url {
+				return fmt.Errorf("rpc %s already exists", rpc.Url)
+			}
 		}
 	}
 	return storage.StoreStaticRpcs(chainId, slices.Concat(existingRpcs, rpcsArray))
