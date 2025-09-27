@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"fmt"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
@@ -12,7 +13,7 @@ func ClaimTokensOfOldContract(ctx context.Context, global *global.Global, hyperi
 
 	amountInSdkMath := sdkmath.NewInt(1000000000000000000).Mul(sdkmath.NewInt(amountInt))
 
-	targetNetwork, err := global.InitTargetNetwork(&hyperiontypes.CounterpartyChainParams{
+	targetNetworks, err := global.InitTargetNetworks(&hyperiontypes.CounterpartyChainParams{
 		HyperionId:                hyperionId,
 		BridgeChainId:             hyperionId,
 		BridgeChainName:           "Hyperion",
@@ -24,6 +25,13 @@ func ClaimTokensOfOldContract(ctx context.Context, global *global.Global, hyperi
 			"error": err.Error(),
 		}
 	}
+
+	if len(targetNetworks) == 0 {
+		return map[string]interface{}{
+			"error": fmt.Errorf("no target networks found for chain %d", hyperionId),
+		}
+	}
+	targetNetwork := targetNetworks[0]
 
 	err = (*targetNetwork).SendClaimTokensOfOldContract(ctx, hyperionId, tokenContract, amountInSdkMath.BigInt(), (*targetNetwork).FromAddress(), (*targetNetwork).GetPersonalSignFn())
 	if err != nil {

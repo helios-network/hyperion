@@ -30,8 +30,8 @@ type PriceFeed interface {
 }
 
 type Global interface {
-	GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
-	InitTargetNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (*ethereum.Network, error)
+	// GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
+	InitTargetNetworks(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) ([]*ethereum.Network, error)
 	GetMinBatchFeeHLS(chainId uint64) float64
 	GetMinTxFeeHLS(chainId uint64) float64
 }
@@ -103,6 +103,7 @@ type Orchestrator struct {
 
 	helios        helios.Network
 	ethereum      ethereum.Network
+	ethereums     []*ethereum.Network
 	priceFeed     PriceFeed
 	firstTimeSync bool
 	global        Global
@@ -118,7 +119,7 @@ type Orchestrator struct {
 
 func NewOrchestrator(
 	helios helios.Network,
-	eth ethereum.Network,
+	eths []*ethereum.Network,
 	priceFeed PriceFeed,
 	cfg Config,
 	global Global,
@@ -129,7 +130,8 @@ func NewOrchestrator(
 		}),
 		svcTags:       metrics.Tags{"svc": "hyperion_orchestrator"},
 		helios:        helios,
-		ethereum:      eth,
+		ethereum:      *eths[0],
+		ethereums:     eths,
 		priceFeed:     priceFeed,
 		cfg:           cfg,
 		maxAttempts:   100,
@@ -186,8 +188,8 @@ func NewOrchestrator(
 
 // Run starts all major loops required to make
 // up the Orchestrator, all of these are async loops.
-func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
-	return s.startValidatorMode(ctx, eth)
+func (s *Orchestrator) Run(ctx context.Context) error {
+	return s.startValidatorMode(ctx)
 }
 
 func (s *Orchestrator) SetEthereum(eth ethereum.Network) {
@@ -243,13 +245,13 @@ func (s *Orchestrator) GetStats() map[string]interface{} {
 
 // startValidatorMode runs all orchestrator processes. This is called
 // when hyperion is run alongside a validator helios node.
-func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Network) error {
+func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	s.logger.Infoln("running orchestrator in validator mode")
 
 	fmt.Println("startValidatorMode")
 
 	// get hyperion ID from contract
-	hyperionIDHash, err := eth.GetHyperionID(ctx)
+	hyperionIDHash, err := s.ethereum.GetHyperionID(ctx)
 	if err != nil {
 		return errors.Wrap(err, "unable to query hyperion ID from contract")
 	}
@@ -367,12 +369,12 @@ func (s *Orchestrator) IsStaticRpcAnonymous() bool {
 	return settings["static_rpc_anonymous"].(bool)
 }
 
-func (s *Orchestrator) UpdateRpcs() {
+// func (s *Orchestrator) UpdateRpcs() {
 
-	targetNetwork, err := s.global.InitTargetNetwork(s.cfg.ChainParams)
-	if err != nil {
-		s.logger.WithError(err).Warningf("failed to update rpcs")
-		return
-	}
-	s.ethereum = *targetNetwork
-}
+// 	targetNetwork, err := s.global.InitTargetNetwork(s.cfg.ChainParams)
+// 	if err != nil {
+// 		s.logger.WithError(err).Warningf("failed to update rpcs")
+// 		return
+// 	}
+// 	s.ethereum = *targetNetwork
+// }

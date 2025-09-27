@@ -294,6 +294,22 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		sendSuccess(w, "Login successful", nil)
 		return
 
+	case "add-new-chain":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.AddNewChain(r.Context(), global, params.ChainID)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
+
 	case "deploy-hyperion":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`

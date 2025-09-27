@@ -428,7 +428,7 @@ func (n *network) TestRpc(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	_, err = n.Provider().BalanceAt(ctx, n.FromAddr, nil)
+	_, err = n.Provider().Balance(ctx, n.FromAddr)
 	if err != nil {
 		return false
 	}

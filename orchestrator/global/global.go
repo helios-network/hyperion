@@ -263,9 +263,12 @@ func (g *Global) GetEVMNetworks(counterpartyChainParams *hyperiontypes.Counterpa
 }
 
 func (g *Global) GetGasPrice(chainId uint64) string {
-
-	rpcs, err := g.TestRpcsAndGetRpcs(chainId, []string{})
+	rpcs, _, err := storage.GetRpcsFromStorge(chainId)
 	if err != nil {
+		return "0"
+	}
+
+	if len(rpcs) == 0 {
 		return "0"
 	}
 
@@ -319,6 +322,23 @@ func (g *Global) TestChainListRpcsAndSaveForChain(chainId uint64) ([]*rpcs.Rpc, 
 		rpcsFromChainList = append(rpcsFromChainList, rpc)
 	}
 	return rpcsFromChainList, nil
+}
+
+func (g *Global) InitTargetNetworks(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) ([]*ethereum.Network, error) {
+	rpcs, _, err := storage.GetRpcsFromStorge(counterpartyChainParams.BridgeChainId)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(rpcs) == 0 {
+		return nil, fmt.Errorf("no rpcs found for chainId: %d", counterpartyChainParams.BridgeChainId)
+	}
+
+	ethNetworks, err := g.GetEVMNetworks(counterpartyChainParams, rpcs)
+	if err != nil {
+		return nil, err
+	}
+	return ethNetworks, nil
 }
 
 // func (g *Global) TestRpcsAndGetRpcs(chainId uint64, rpcsOptional []string) ([]*hyperiontypes.Rpc, error) {
@@ -601,13 +621,17 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 		return 0, err
 	}
 
-	targetNetwork, err := g.InitTargetNetwork(&hyperiontypes.CounterpartyChainParams{
+	targetNetworks, err := g.InitTargetNetworks(&hyperiontypes.CounterpartyChainParams{
 		BridgeChainId:             chainId,
 		BridgeCounterpartyAddress: hyperionContractInfo["hyperionAddress"].(string),
 	})
 	if err != nil {
 		return 0, err
 	}
+	if len(targetNetworks) == 0 {
+		return 0, fmt.Errorf("no target networks found for chainId: %d", chainId)
+	}
+	targetNetwork := targetNetworks[0]
 
 	// default valset only for initial deployment
 	hyperionIdHash := gethcommon.HexToHash(strconv.FormatUint(chainId, 16))
