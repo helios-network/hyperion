@@ -173,6 +173,15 @@
                                                 <v-card-actions>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
+                                                        v-if="chain.address === '0x0000000000000000000000000000000000000000'"
+                                                        color="success"
+                                                        @click="createHyperionContract(chain.chainId)"
+                                                        :loading="isCreatingHyperionContract"
+                                                        class="ml-2"
+                                                    >
+                                                        Deploy Hyperion Contract
+                                                    </v-btn>
+                                                    <v-btn
                                                         v-if="!chain.running && chain.proposed && chain.registered"
                                                         color="success"
                                                         @click="runHyperion(chain.chainId)"
@@ -189,7 +198,7 @@
                                                         Stop
                                                     </v-btn>
                                                     <v-btn
-                                                        v-if="!chain.proposed"
+                                                        v-if="!chain.proposed && chain.address !== '0x0000000000000000000000000000000000000000'"
                                                         color="primary"
                                                         @click="openProposeDialog(chain.chainId)"
                                                         :loading="chain.isLoading"
@@ -328,11 +337,11 @@
                             <v-btn color="error" text @click="showAddChainDialog = false">Cancel</v-btn>
                             <v-btn 
                                 color="primary" 
-                                @click="deployHyperion"
-                                :loading="isDeploying"
-                                :disabled="isDeploying"
+                                @click="addNewChain"
+                                :loading="isAddingChain"
+                                :disabled="isAddingChain"
                             >
-                                Deploy
+                                Add
                             </v-btn>
                         </v-card-actions>
                     </v-card>
@@ -410,13 +419,22 @@
                                 <v-data-table
                                     :headers="[
                                         { text: 'RPC URL', value: 'url' },
-                                        { text: 'Is Tested', value: 'isTested' },
-                                        { text: 'Is Primary', value: 'isPrimary' }
+                                        { text: 'Is Tested', value: 'is_tested' },
+                                        { text: 'Is Primary', value: 'is_primary' },
                                     ]"
                                     :items="rpcs"
                                     :loading="isLoadingRpcs"
                                 >
+                                <!-- add button to remove rpc -->
                                     <template v-slot:item.url="{ item }">
+                                        <v-btn
+                                            text
+                                            small
+                                            color="error"
+                                            @click="removeRpc(item.url)"
+                                        >
+                                            Remove
+                                        </v-btn>
                                         <v-tooltip bottom>
                                             <template v-slot:activator="{ on, attrs }">
                                                 <span v-bind="attrs" v-on="on">{{ item.url }}</span>
@@ -427,13 +445,6 @@
                                                 @click="copyToClipboard(item.url)"
                                             >
                                                 Click to copy
-                                            </v-btn>
-                                            <v-btn
-                                                text
-                                                small
-                                                @click="removeRpc(item.url)"
-                                            >
-                                                Remove
                                             </v-btn>
                                         </v-tooltip>
                                     </template>
@@ -640,7 +651,7 @@
                 selectedChainId: null,
                 newChainId: '',
                 isProposing: false,
-                isDeploying: false,
+                isAddingChain: false,
                 isDeployingToken: false,
                 isLoadingTokens: false,
                 isLoadingRpcs: false,
@@ -648,6 +659,7 @@
                 isDeletingRpc: null,
                 isLoadingTransactions: false,
                 isUpdatingSettings: false,
+                isCreatingHyperionContract: false,
                 tokens: [],
                 rpcs: [],
                 staticRpcs: [],
@@ -874,6 +886,7 @@
                                 inBridgedTxCount: chainStats.inBridgedTxCount || 0
                             });
                         });
+
                     } catch (error) {
                         console.error('Error fetching chains:', error);
                         this.showNotification('Failed to fetch chains', 'error');
@@ -1032,15 +1045,15 @@
                         }
                     }
                 },
-                async deployHyperion() {
+                async addNewChain() {
                     if (!this.newChainId) {
                         this.showNotification('Please enter a Chain ID', 'error');
                         return;
                     }
 
-                    this.isDeploying = true;
+                    this.isAddingChain = true;
                     try {
-                        const response = await fetch('/api/query?type=deploy-hyperion', {
+                        const response = await fetch('/api/query?type=add-new-chain', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -1050,18 +1063,18 @@
 
                         if (!response.ok) {
                             const errorData = await response.json();
-                            throw new Error(errorData.error || 'Failed to deploy Hyperion');
+                            throw new Error(errorData.error || 'Failed to add new chain');
                         }
 
                         this.showAddChainDialog = false;
                         this.newChainId = '';
-                        this.showNotification('Hyperion deployed successfully');
+                        this.showNotification('New chain added successfully');
                         await this.fetchChains();
                     } catch (error) {
-                        console.error('Error deploying Hyperion:', error);
+                        console.error('Error adding new chain:', error);
                         this.showNotification(error.message, 'error');
                     } finally {
-                        this.isDeploying = false;
+                        this.isAddingChain = false;
                     }
                 },
                 openProposeDialog(chainId) {
@@ -1302,6 +1315,31 @@
                         this.showNotification(error.message, 'error');
                     } finally {
                         this.isDeletingRpc = null;
+                    }
+                },
+                async createHyperionContract(chainId) {
+                    this.isCreatingHyperionContract = true;
+                    try {
+                        const response = await fetch('/api/query?type=create-hyperion-contract', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ chain_id: chainId }),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to create Hyperion contract');
+                        }
+
+                        this.showNotification('Hyperion contract created successfully');
+                        await this.fetchWalletAddress(); // Refresh wallet address to get the new contract address
+                    } catch (error) {
+                        console.error('Error creating Hyperion contract:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isCreatingHyperionContract = false;
                     }
                 },
                 async viewSettings(chainId) {
