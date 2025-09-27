@@ -20,6 +20,7 @@ import (
 	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/committer"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/provider"
 	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
@@ -28,6 +29,16 @@ type HyperionContract interface {
 	committer.EVMCommitter
 
 	Address() common.Address
+
+	SendPreparedTx(
+		ctx context.Context,
+		txData []byte,
+	) (*common.Hash, *big.Int, error)
+
+	SendPreparedTxSync(
+		ctx context.Context,
+		txData []byte,
+	) (*common.Hash, *big.Int, error)
 
 	SendToHelios(
 		ctx context.Context,
@@ -38,12 +49,12 @@ type HyperionContract interface {
 		data string,
 	) (*common.Hash, error)
 
-	SendTransactionBatch(
+	PrepareTransactionBatch(
 		ctx context.Context,
 		currentValset *types.Valset,
 		batch *types.OutgoingTxBatch,
 		confirms []*types.MsgConfirmBatch,
-	) (*common.Hash, *big.Int, error)
+	) ([]byte, error)
 
 	SendEthValsetUpdate(
 		ctx context.Context,
@@ -114,6 +125,12 @@ type HyperionContract interface {
 		ctx context.Context,
 		callerAddress common.Address,
 	) (*big.Int, error)
+
+	WaitForTransaction(ctx context.Context, txHash common.Hash) (*gethtypes.Transaction, uint64, error)
+
+	GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash common.Hash) (*big.Int, uint64, error)
+
+	SendClaimTokensOfOldContract(ctx context.Context, hyperionId uint64, tokenContract string, amountInSdkMath *big.Int, ethFrom common.Address, signerFn keystore.PersonalSignFn) error
 }
 
 func DeployHyperionContract(
@@ -126,7 +143,7 @@ func DeployHyperionContract(
 		return common.Address{}, 0, err, false
 	}
 	// wait for the transaction to be handled
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	tx, isPending, err := ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 	if err != nil {
@@ -136,7 +153,7 @@ func DeployHyperionContract(
 
 	if isPending {
 		for isPending {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			tx, isPending, err = ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 			if err != nil {
 				fmt.Println("Error getting transaction by hash:", err)

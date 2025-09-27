@@ -3,13 +3,14 @@ package orchestrator
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
-	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
@@ -26,14 +27,34 @@ func (s *Orchestrator) runSigner(ctx context.Context, hyperionID gethcommon.Hash
 
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Signer...")
 
-	return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
-		// if !s.isRegistered() {
-		// 	signer.Log().Infoln("Orchestrator not registered, skipping...")
-		// 	return nil
-		// }
-		err := signer.sign(ctx)
-		return err
-	})
+	// Use a custom loop that waits for completion before starting next iteration
+	ticker := time.NewTicker(defaultLoopDur)
+	defer ticker.Stop()
+
+	// Run first iteration immediately
+	if err := signer.sign(ctx); err != nil {
+		s.logger.WithError(err).Errorln("signer function returned an error")
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			if s.HyperionState.SignerStatus == "running" {
+				continue
+			}
+
+			start := time.Now()
+			s.HyperionState.SignerStatus = "running"
+			if err := signer.sign(ctx); err != nil {
+				s.logger.WithError(err).Errorln("signer function returned an error")
+			}
+			s.HyperionState.SignerStatus = "idle"
+			s.HyperionState.SignerLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
+			s.HyperionState.SignerNextExecutionTimestamp = uint64(start.Add(defaultLoopDur).Unix())
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
 
 type signer struct {
@@ -58,7 +79,7 @@ func (l *signer) sign(ctx context.Context) error {
 	l.Log().Debugln("signing validator sets done")
 
 	noncesPushed := []uint64{}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 50; i++ {
 		hasPushedABatch, noncePushed, err := l.signNewBatch(ctx, noncesPushed)
 		if err != nil {
 			return err
@@ -69,6 +90,7 @@ func (l *signer) sign(ctx context.Context) error {
 		}
 	}
 	l.Log().Debugln("signing new batch done")
+
 	return nil
 }
 
@@ -125,17 +147,27 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 		return false, 0, nil
 	}
 
-	if err := l.retry(ctx, func() error {
-		return l.helios.SendBatchConfirm(ctx,
-			l.cfg.HyperionId,
-			l.cfg.EthereumAddr,
-			l.hyperionID,
-			l.ethereum.GetPersonalSignFn(),
-			oldestUnsignedBatch,
-		)
-	}); err != nil {
+	symbol, ok := l.Orchestrator.CacheSymbol[gethcommon.HexToAddress(oldestUnsignedBatch.TokenContract)]
+	if !ok {
+		symbol = oldestUnsignedBatch.TokenContract
+	}
+
+	l.Orchestrator.HyperionState.SignerStatus = "signing batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol
+
+	err := l.helios.SendBatchConfirmSync(ctx,
+		l.cfg.HyperionId,
+		l.cfg.EthereumAddr,
+		l.hyperionID,
+		l.ethereum.GetPersonalSignFn(),
+		oldestUnsignedBatch,
+	)
+
+	if err != nil {
+		l.Orchestrator.HyperionState.SignerStatus = "error signing batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol
 		return false, 0, err
 	}
+
+	l.Orchestrator.HyperionState.SignerStatus = "batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol + " signed"
 
 	l.Log().WithFields(log.Fields{"token_contract": oldestUnsignedBatch.TokenContract, "batch_nonce": oldestUnsignedBatch.BatchNonce, "txs": len(oldestUnsignedBatch.Transactions)}).Infoln("confirmed batch on Helios")
 

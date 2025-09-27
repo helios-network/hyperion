@@ -8,8 +8,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -33,7 +35,9 @@ type QueryClient interface {
 
 	OldestUnsignedTransactionBatch(ctx context.Context, hyperionId uint64, valAccountAddress cosmostypes.AccAddress) (*hyperiontypes.OutgoingTxBatch, error)
 	LatestTransactionBatches(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
+	LatestTransactionBatchesWithOptions(ctx context.Context, hyperionId uint64, address string, batchNonce uint64, batchTimeout uint64, tokenContract string, checkIfIHaveSignedBatch bool) ([]*hyperiontypes.OutgoingTxBatch, error)
 	UnbatchedTokensWithFees(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.BatchFees, error)
+	UnbatchedTokensWithMinimumFees(ctx context.Context, hyperionId uint64, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) ([]*hyperiontypes.BatchFeesWithIds, error)
 	TransactionBatchSignatures(ctx context.Context, hyperionId uint64, nonce uint64, tokenContract gethcommon.Address) ([]*hyperiontypes.MsgConfirmBatch, error)
 
 	QueryTokenAddressToDenom(ctx context.Context, hyperionId uint64, tokenAddress gethcommon.Address) (string, bool, error)
@@ -215,6 +219,34 @@ func (c queryClient) LatestTransactionBatches(ctx context.Context, hyperionId ui
 	return resp.Batches, nil
 }
 
+func (c queryClient) LatestTransactionBatchesWithOptions(ctx context.Context, hyperionId uint64, address string, batchNonce uint64, batchTimeout uint64, tokenContract string, checkIfIHaveSignedBatch bool) ([]*hyperiontypes.OutgoingTxBatch, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryOutgoingTxBatchesWithOptionsRequest{
+		HyperionId:              hyperionId,
+		Address:                 address,
+		BatchNonce:              batchNonce,
+		BatchTimeout:            batchTimeout,
+		TokenContract:           tokenContract,
+		CheckIfIHaveSignedBatch: checkIfIHaveSignedBatch,
+	}
+
+	resp, err := c.QueryClient.OutgoingTxBatchesWithOptions(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query OutgoingTxBatchesWithOptions from daemon")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.Batches, nil
+}
+
 func (c queryClient) LatestTransactionExternalCallDataTxs(ctx context.Context, hyperionId uint64) ([]*hyperiontypes.OutgoingExternalDataTx, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
@@ -247,6 +279,29 @@ func (c queryClient) UnbatchedTokensWithFees(ctx context.Context, hyperionId uin
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "failed to query BatchFees from daemon")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.BatchFees, nil
+}
+
+func (c queryClient) UnbatchedTokensWithMinimumFees(ctx context.Context, hyperionId uint64, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) ([]*hyperiontypes.BatchFeesWithIds, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	resp, err := c.QueryClient.BatchFeesWithMinimumFee(ctx, &hyperiontypes.QueryBatchFeeWithMinimumFeeRequest{
+		HyperionId:      hyperionId,
+		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumBatchFee),
+		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumTxFee),
+	})
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query BatchFeesWithMinimumFee")
 	}
 
 	if resp == nil {

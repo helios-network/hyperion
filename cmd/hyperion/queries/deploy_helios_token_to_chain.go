@@ -21,10 +21,15 @@ func DeployHeliosTokenToChain(ctx context.Context, global *global.Global, chainI
 		return nil, fmt.Errorf("helios network not initialized")
 	}
 
-	targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)
+	targetNetworks, err := global.InitTargetNetworks(counterpartyChainParams)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to initialize target network for chain %d", counterpartyChainParams.BridgeChainId))
 	}
+
+	if len(targetNetworks) == 0 {
+		return nil, fmt.Errorf("no target networks found for chain %d", counterpartyChainParams.BridgeChainId)
+	}
+	targetNetwork := targetNetworks[0]
 
 	tx, blockNumber, err := (*targetNetwork).DeployERC20(ctx, global.GetAddress(), denom, name, symbol, decimals)
 	if err != nil {

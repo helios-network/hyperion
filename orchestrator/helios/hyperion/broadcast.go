@@ -11,6 +11,7 @@ import (
 	sdkmath "cosmossdk.io/math"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
@@ -28,7 +29,10 @@ type BroadcastClient interface {
 	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
+	SendBatchConfirmSync(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
+	SendRequestBatchMsg(ctx context.Context, hyperionId uint64, denom string) (cosmostypes.Msg, error)
+	SendRequestBatchWithMinimumFeeMsg(ctx context.Context, hyperionId uint64, denom string, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int, txIds []uint64) (cosmostypes.Msg, error)
 	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
 
 	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
@@ -46,6 +50,9 @@ type BroadcastClient interface {
 	SyncBroadcastMsgs(ctx context.Context, msgs []cosmostypes.Msg) (*cosmostypes.TxResponse, error)
 
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
+	SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
+	SendUpdateOrchestratorAddressesFee(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
+
 	SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
 	SendCancelAllPendingOutTx(ctx context.Context, chainId uint64) error
@@ -169,6 +176,59 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 	return nil
 }
 
+func (c broadcastClient) SendBatchConfirmSync(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	confirmHash := hyperion.EncodeTxBatchConfirm(hyperionID, batch)
+	// log.Info("confirmHash: ", confirmHash, "batch: ", batch, "hyperionID: ", hyperionID, "ethFrom: ", ethFrom.Hex())
+	// log.Info("confirmHashLength: ", len(confirmHash.Bytes()))
+	signature, err := signerFn(ethFrom, confirmHash.Bytes())
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.New("failed to sign validator address")
+	}
+
+	// sigV, sigR, sigS := sigToVRS(gethcommon.Bytes2Hex(signature))
+	// log.Info("sigV: ", sigV, "sigR: ", sigR, "sigS: ", sigS)
+
+	// MsgConfirmBatch
+	// When validators observe a MsgRequestBatch they form a batch by ordering
+	// transactions currently in the txqueue in order of highest to lowest fee,
+	// cutting off when the batch either reaches a hardcoded maximum size (to be
+	// decided, probably around 100) or when transactions stop being profitable
+	// (TODO determine this without nondeterminism) This message includes the batch
+	// as well as an Ethereum signature over this batch by the validator
+	// -------------
+	msg := &hyperiontypes.MsgConfirmBatch{
+		HyperionId:    hyperionId,
+		Orchestrator:  c.FromAddress().String(),
+		Nonce:         batch.BatchNonce,
+		Signature:     gethcommon.Bytes2Hex(signature),
+		EthSigner:     ethFrom.Hex(),
+		TokenContract: batch.TokenContract,
+	}
+	log.Info("start confirm batch, msg", msg)
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgConfirmBatch failed")
+	}
+
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"tx_hash": resp.TxResponse.TxHash,
+			"code":    resp.TxResponse.Code,
+			"Error":   "insufficient fee",
+		}).Infoln("EthOracle sent MsgConfirmBatch")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgConfirmBatch failed")
+	}
+
+	return nil
+}
+
 func (c broadcastClient) SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
@@ -230,6 +290,27 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64
 	return nil
 }
 
+func (c broadcastClient) SendRequestBatchMsg(ctx context.Context, hyperionId uint64, denom string) (cosmostypes.Msg, error) {
+	msg := &hyperiontypes.MsgRequestBatch{
+		HyperionId:   hyperionId,
+		Denom:        denom,
+		Orchestrator: c.FromAddress().String(),
+	}
+	return msg, nil
+}
+
+func (c broadcastClient) SendRequestBatchWithMinimumFeeMsg(ctx context.Context, hyperionId uint64, denom string, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int, txIds []uint64) (cosmostypes.Msg, error) {
+	msg := &hyperiontypes.MsgRequestBatchWithMinimumFee{
+		HyperionId:      hyperionId,
+		Denom:           denom,
+		Orchestrator:    c.FromAddress().String(),
+		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumBatchFee),
+		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumTxFee),
+		TxIds:           txIds,
+	}
+	return msg, nil
+}
+
 func (c broadcastClient) GetTxCost(ctx context.Context, txHash string) (*big.Int, error) {
 	tx, err := c.ChainClient.GetTx(ctx, txHash)
 	if err != nil {
@@ -265,6 +346,89 @@ func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyper
 			"Error":   "insufficient fee",
 		}).Infoln("EthOracle sent MsgSetOrchestratorAddresses")
 		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgSetOrchestratorAddresses failed")
+	}
+
+	// TODO: wait for the tx to be included in a block
+
+	time.Sleep(10 * time.Second)
+
+	return nil
+}
+
+func (c broadcastClient) SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	// MsgSetOrchestratorAddresses
+	// Permit to set the orchestrator address on the hyperion module
+	// -------------
+	msg := &hyperiontypes.MsgSetOrchestratorAddressesWithFee{
+		Sender:          c.FromAddress().String(),
+		HyperionId:      hyperionId,
+		EthAddress:      ethAddress,
+		Orchestrator:    c.FromAddress().String(),
+		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerTx),
+		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerBatch),
+	}
+
+	log.WithFields(log.Fields{
+		"hyperionId":         hyperionId,
+		"ethAddress":         ethAddress,
+		"minimumfeePerTx":    minimumfeePerTx.String(),
+		"minimumfeePerBatch": minimumfeePerBatch.String(),
+		"sender":             c.FromAddress().String(),
+	}).Infoln("Sending MsgSetOrchestratorAddressesWithFee")
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgSetOrchestratorAddresses failed")
+	}
+
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"tx_hash": resp.TxResponse.TxHash,
+			"code":    resp.TxResponse.Code,
+			"Error":   "insufficient fee",
+		}).Infoln("EthOracle sent MsgSetOrchestratorAddresses")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgSetOrchestratorAddresses failed")
+	}
+
+	// TODO: wait for the tx to be included in a block
+
+	time.Sleep(10 * time.Second)
+
+	return nil
+}
+
+func (c broadcastClient) SendUpdateOrchestratorAddressesFee(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	// MsgUpdateOrchestratorAddressesFee
+	// Permit to set the orchestrator address on the hyperion module
+	// -------------
+	msg := &hyperiontypes.MsgUpdateOrchestratorAddressesFee{
+		Sender:          c.FromAddress().String(),
+		HyperionId:      hyperionId,
+		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerTx),
+		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerBatch),
+	}
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgUpdateOrchestratorAddressesFee failed")
+	}
+
+	if resp.TxResponse.Code == 13 {
+		log.WithFields(log.Fields{
+			"tx_hash": resp.TxResponse.TxHash,
+			"code":    resp.TxResponse.Code,
+			"Error":   "insufficient fee",
+		}).Infoln("EthOracle sent MsgUpdateOrchestratorAddressesFee")
+		return errors.Wrap(errors.New("code 13 - insufficient fee"), "broadcasting MsgUpdateOrchestratorAddressesFee failed")
 	}
 
 	// TODO: wait for the tx to be included in a block

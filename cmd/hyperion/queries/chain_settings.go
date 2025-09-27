@@ -17,14 +17,26 @@ var defaultSettings = map[string]interface{}{
 	"batch_offset_dur":         "2m",
 	"static_rpc_anonymous":     true,
 	"static_rpc_only":          false,
+	"min_batch_fee_hls":        0.1,
+	"min_tx_fee_hls":           0.1,
 }
 
 func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uint64, settings map[string]interface{}) error {
-	err := storage.SetChainSettings(chainId, settings)
+	baseSettings, err := GetChainSettings(chainId)
 	if err != nil {
 		return err
 	}
-	storage.UpdateRpcsToStorge(chainId, []string{})
+
+	if settings["min_tx_fee_hls"] != nil && baseSettings["min_tx_fee_hls"] != nil && settings["min_tx_fee_hls"].(float64) != baseSettings["min_tx_fee_hls"].(float64) || settings["min_batch_fee_hls"] != nil && baseSettings["min_batch_fee_hls"] != nil && settings["min_batch_fee_hls"].(float64) != baseSettings["min_batch_fee_hls"].(float64) {
+		err := UpdateFeeHyperion(ctx, global, settings["min_tx_fee_hls"].(float64), settings["min_batch_fee_hls"].(float64), chainId)
+		if err != nil {
+			return err
+		}
+	}
+	err = storage.SetChainSettings(chainId, settings)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

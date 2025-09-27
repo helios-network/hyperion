@@ -24,6 +24,11 @@ type EVMCommitter interface {
 		recipient common.Address,
 		txData []byte,
 	) (txHash common.Hash, cost *big.Int, err error)
+	SendTxSync(
+		ctx context.Context,
+		recipient common.Address,
+		txData []byte,
+	) (txHash common.Hash, cost *big.Int, err error)
 	GetTransactOpts(ctx context.Context) *bind.TransactOpts
 }
 

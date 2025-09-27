@@ -2,36 +2,23 @@ package orchestrator
 
 import (
 	"context"
-	"encoding/hex"
-	"fmt"
-	"math/big"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	sdkmath "cosmossdk.io/math"
-
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
-	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
-	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
 const (
-	defaultRelayerLoopDur = 1 * time.Minute
+	defaultRelayerLoopDur = 30 * time.Second
 )
 
 func (s *Orchestrator) runRelayer(ctx context.Context) error {
@@ -45,14 +32,34 @@ func (s *Orchestrator) runRelayer(ctx context.Context) error {
 	}
 	s.logger.WithFields(log.Fields{"loop_duration": defaultRelayerLoopDur.String(), "relay_token_batches": r.cfg.RelayBatches, "relay_validator_sets": s.cfg.RelayValsets}).Debugln("starting Relayer...")
 
-	return loops.RunLoop(ctx, s.ethereum, defaultRelayerLoopDur, func() error {
-		// if !s.isRegistered() {
-		// 	r.Log().Infoln("Orchestrator not registered, skipping...")
-		// 	return nil
-		// }
-		err := r.relay(ctx)
-		return err
-	})
+	// Use a custom loop that waits for completion before starting next iteration
+	ticker := time.NewTicker(defaultRelayerLoopDur)
+	defer ticker.Stop()
+
+	// Run first iteration immediately
+	if err := r.relay(ctx); err != nil {
+		s.logger.WithError(err).Errorln("relay function returned an error")
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			if s.HyperionState.RelayerStatus == "running" {
+				continue
+			}
+
+			start := time.Now()
+			s.HyperionState.RelayerStatus = "running"
+			if err := r.relay(ctx); err != nil {
+				s.logger.WithError(err).Errorln("relay function returned an error")
+			}
+			s.HyperionState.RelayerStatus = "idle"
+			s.HyperionState.RelayerLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
+			s.HyperionState.RelayerNextExecutionTimestamp = uint64(start.Add(defaultRelayerLoopDur).Unix())
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
 
 type relayer struct {
@@ -69,98 +76,42 @@ func (l *relayer) relay(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
+	// Sélectionner le meilleur RPC basé sur la réputation
+	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
+	// if bestRpcURL != "" {
+	// 	l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for relay")
+	// 	// Ajouter le meilleur RPC au contexte
+	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
+	// }
+
 	var pg loops.ParanoidGroup
 
 	if l.logEnabled {
 		l.Log().Info("relaying getLatestEthValset")
 	}
 
-	if l.cfg.RelayExternalDatas {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayExternalData(ctx)
-			})
-		})
-	}
+	valsetManager := l.GetValsetManager()
 
-	ethValset, err := l.getLatestEthValset(ctx)
-	if err != nil {
-		return err
-	}
-
-	if l.logEnabled {
-		l.Log().Info("relaying makeCheckpoint")
-	}
-
-	heliosCheckpoint, err := l.makeCheckpoint(ctx, ethValset)
-	if err != nil {
-		return err
-	}
-
-	if l.logEnabled {
-		l.Log().Info("relaying getLastValsetCheckpoint")
-	}
-
-	ethCheckpoint, err := l.ethereum.GetLastValsetCheckpoint(ctx)
-	if err != nil {
-		return err
-	}
-
-	if l.logEnabled {
-		l.Log().Info("relaying getLastValsetCheckpoint done")
-	}
-
-	if l.logEnabled {
-		l.Log().WithFields(log.Fields{
-			"Helios": heliosCheckpoint.Hex(),
-			"Eth":    ethCheckpoint.Hex(),
-			"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
-		}).Infoln("Relayer: checkpoints")
-	}
-
-	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
-		if l.logEnabled {
-			l.Log().Infoln("relayer: checkpoint not synced yet waiting (rpc should be untrustable) ...")
-		}
-
-		// json, err := json.Marshal(ethValset)
-		// if err == nil {
-		// 	os.WriteFile("valset-error.json", json, 0644)
-		// }
-
+	if valsetManager == nil || !valsetManager.IsValsetSynced(ctx) {
+		l.Log().Infoln("valset is not synced, skipping relay", " synced ", valsetManager.synced, " consideredSynced ", valsetManager.consideredSynced)
 		return nil
-	} else {
-		if l.logEnabled {
-			l.Log().Info("valset is synced")
-		}
 	}
 
-	// write valset to file
-	// json, err := json.Marshal(ethValset)
-	// if err == nil {
-	// 	os.WriteFile("valset.json", json, 0644)
-	// }
+	l.Log().Info("relaying batches")
 
-	if l.cfg.RelayValsets {
-		pg.Go(func() error {
-			return l.retry(ctx, func() error {
-				return l.relayValset(ctx, ethValset)
-			})
-		})
+	ethValset := valsetManager.GetEthValset(ctx)
+
+	if ethValset == nil {
+		l.Log().Infoln("valset not found, skipping relay")
+		return nil
 	}
 
 	if l.cfg.RelayBatches {
 		pg.Go(func() error {
 			return l.retry(ctx, func() error {
-				for i := 0; i < 5; i++ { // do 5 batch in same time if possible
-					relayed, err := l.relayTokenBatch(ctx, ethValset)
-					if err != nil {
-						return err
-					}
-					if relayed {
-						time.Sleep(15 * time.Second)
-						continue
-					}
+				_, err := l.relayBatchsOptimised(ctx, ethValset)
+				if err != nil {
+					return err
 				}
 				return nil
 			})
@@ -177,287 +128,66 @@ func (l *relayer) relay(ctx context.Context) error {
 
 }
 
-func (l *relayer) encodeData(
-	hyperionId common.Hash,
-	valsetNonce uint64,
-	validators []string,
-	powers []uint64,
-	rewardAmount *big.Int,
-	rewardToken string,
-) (common.Hash, error) {
-
-	methodName := [32]byte{}
-	copy(methodName[:], []byte("checkpoint"))
-
-	// Conversion des validators en common.Address
-	validatorsArr := make([]common.Address, len(validators))
-	for i, v := range validators {
-		validatorsArr[i] = common.HexToAddress(v)
-	}
-
-	// Conversion des powers en []*big.Int
-	powersArr := make([]*big.Int, len(powers))
-	for i, power := range powers {
-		powersArr[i] = new(big.Int).SetUint64(power)
-	}
-
-	bytes32Ty, _ := abi.NewType("bytes32", "", nil)
-	uint256Ty, _ := abi.NewType("uint256", "", nil)
-	addressTy, _ := abi.NewType("address", "", nil)
-	addressArrayTy, _ := abi.NewType("address[]", "", nil)
-	uint256ArrayTy, _ := abi.NewType("uint256[]", "", nil)
-
-	// Préparer les arguments de façon identique à abi.encode() côté Solidity
-	arguments := abi.Arguments{
-		{Type: bytes32Ty},      // hyperionId
-		{Type: bytes32Ty},      // methodName ("checkpoint")
-		{Type: uint256Ty},      // valsetNonce
-		{Type: addressArrayTy}, // validators
-		{Type: uint256ArrayTy}, // powers
-		{Type: uint256Ty},      // rewardAmount
-		{Type: addressTy},      // rewardToken
-	}
-
-	encodedBytes, err := arguments.Pack(
-		hyperionId,
-		methodName,
-		new(big.Int).SetUint64(valsetNonce),
-		validatorsArr,
-		powersArr,
-		rewardAmount,
-		common.HexToAddress(rewardToken),
-	)
-
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	// Enfin, réaliser keccak256 sur les données encodées
-	checkpoint := crypto.Keccak256Hash(encodedBytes)
-
-	return checkpoint, nil
+type BatchAndSigs struct {
+	Batch *hyperiontypes.OutgoingTxBatch
+	Sigs  []*hyperiontypes.MsgConfirmBatch
 }
 
-func (l *relayer) makeCheckpoint(ctx context.Context, valset *hyperiontypes.Valset) (*common.Hash, error) {
-	/** function makeCheckpoint(
-	      ValsetArgs memory _valsetArgs,
-	      bytes32 _hyperionId
-	  ) private pure returns (bytes32) {
-	      // bytes32 encoding of the string "checkpoint"
-	      bytes32 methodName = 0x636865636b706f696e7400000000000000000000000000000000000000000000;
-
-	      bytes32 checkpoint = keccak256(
-	          abi.encode(
-	              _hyperionId,
-	              methodName,
-	              _valsetArgs.valsetNonce,
-	              _valsetArgs.validators,
-	              _valsetArgs.powers,
-	              _valsetArgs.rewardAmount,
-	              _valsetArgs.rewardToken
-	          )
-	      );
-	      return checkpoint;
-	  }
-	*/
-	validators := []string{}
-	powers := []uint64{}
-
-	for _, validator := range valset.Members {
-		validators = append(validators, validator.EthereumAddress)
-		powers = append(powers, validator.Power)
-	}
-
-	hyperionIDHash, err := l.ethereum.GetHyperionID(ctx)
-	if err != nil {
-		l.Log().WithError(err).Errorln("unable to query hyperion ID from contract")
-		return nil, err
-	}
-	// Encoder les données
-	checkpoint, err := l.encodeData(
-		hyperionIDHash,
-		valset.Nonce,
-		validators,
-		powers,
-		valset.RewardAmount.BigInt(),
-		valset.RewardToken,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &checkpoint, nil
-}
-
-func (l *relayer) getLatestEthValset(ctx context.Context) (*hyperiontypes.Valset, error) {
+func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyperiontypes.Valset) (bool, error) {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	var latestEthValset *hyperiontypes.Valset
-	fn := func() error {
-		vs, err := l.findLatestValsetOnEth(ctx)
-		if err != nil {
-			l.Log().Infoln("findLatestValsetOnEth - 8")
-			if strings.Contains(err.Error(), "failed to get") || strings.Contains(err.Error(), "attempting to unmarshall") || strings.Contains(err.Error(), "pruned") {
-				l.ethereum.RemoveLastUsedRpc()
-				vs, err = l.findLatestValsetOnEth(ctx)
-				if err != nil {
-					return err
-				}
-				latestEthValset = vs
-				return nil
-			}
-			return err
-		}
-		latestEthValset = vs
-		return nil
-	}
-
-	if err := l.retry(ctx, fn); err != nil {
-		return nil, err
-	}
-
-	return latestEthValset, nil
-}
-
-func (l *relayer) relayValset(ctx context.Context, latestEthValset *hyperiontypes.Valset) error {
-	metrics.ReportFuncCall(l.svcTags)
-	doneFn := metrics.ReportFuncTiming(l.svcTags)
-	defer doneFn()
-
-	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
+	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to get latest validator set from Helios")
-	}
-
-	var (
-		latestConfirmedValset *hyperiontypes.Valset
-		confirmations         []*hyperiontypes.MsgValsetConfirm
-	)
-
-	for _, set := range latestHeliosValsets {
-		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
+		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
+		usedRpc := l.ethereum.GetRpc().Url
+		if usedRpc != "" {
+			// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+			l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed to get latest " + l.cfg.ChainName + " height")
 		}
-		if len(sigs) == 0 {
-			continue
-		}
-		confirmations = sigs
-		latestConfirmedValset = set
-		break
+		return false, err
 	}
 
-	if latestConfirmedValset == nil {
-		l.Log().Infoln("no validator set to relay")
-		return nil
-	}
+	maxHeightTimeout := uint64(latestEthHeight.Number.Uint64() + 10)
 
-	shouldRelay := l.shouldRelayValset(ctx, latestConfirmedValset)
+	batchesInHelios, err := l.helios.LatestTransactionBatchesWithOptions(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr.String(), 0, maxHeightTimeout, "", true)
 
-	if l.logEnabled {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "hls_nonce": latestConfirmedValset.Nonce, "sigs": len(confirmations), "should_relay": shouldRelay, "synched": latestEthValset.Nonce == latestConfirmedValset.Nonce}).Infoln("relayer try relay Valset")
-	}
-
-	if !shouldRelay {
-		return nil
-	}
-
-	txHash, cost, err := l.ethereum.SendEthValsetUpdate(ctx, latestEthValset, latestConfirmedValset, confirmations)
-	if err != nil {
-		return err
-	}
-
-	storage.UpdateFeesFile(latestEthValset.RewardAmount.BigInt(), latestEthValset.RewardToken, cost, txHash.Hex(), latestEthValset.Height, l.cfg.ChainId, "VALSET")
-
-	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent validator set update to Ethereum")
-
-	return nil
-}
-
-func (l *relayer) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
-	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
-	if err != nil {
-		l.Log().WithError(err).Warningln("failed to get latest valset nonce from " + l.cfg.ChainName)
-		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
-			l.ethereum.RemoveLastUsedRpc()
-		}
-		return false
-	}
-
-	// Check if other validators already updated the valset
-	if vs.Nonce <= latestEthereumValsetNonce.Uint64() {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthereumValsetNonce, "helios_nonce": vs.Nonce}).Infoln("validator set already updated on " + l.cfg.ChainName)
-		return false
-	}
-
-	// Check custom time delay offset for determine if we should relay the valset on chain respecting the offset
-	block, err := l.helios.GetBlock(ctx, int64(vs.Height))
-	if err != nil {
-		latestBlockHeight, err := l.helios.GetLatestBlockHeight(ctx)
-		if err != nil {
-			l.Log().WithError(err).Warningln("unable to get latest block from Helios")
-			return false
-		}
-		block, err = l.helios.GetBlock(ctx, int64(latestBlockHeight))
-		if err != nil {
-			l.Log().WithError(err).Warningln("unable to get latest block from Helios (tryed block:", int64(vs.Height), ")")
-			return false
-		}
-		if block != nil && latestBlockHeight > int64(vs.Height)+1000 { // should be sufficient to avoid race condition
-			l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
-			return true
-		}
-		l.Log().WithError(err).Warningln("unable to get latest block of valset from Helios")
-		return false
-	}
-
-	if timeElapsed := time.Since(block.Block.Time); timeElapsed <= l.cfg.RelayValsetOffsetDur {
-		timeRemaining := time.Duration(int64(l.cfg.RelayValsetOffsetDur) - int64(timeElapsed))
-		l.Log().WithField("time_remaining", timeRemaining.String()).Infoln("valset relay offset not reached yet")
-		return false
-	}
-
-	l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
-
-	return true
-}
-
-func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperiontypes.Valset) (bool, error) {
-	metrics.ReportFuncCall(l.svcTags)
-	doneFn := metrics.ReportFuncTiming(l.svcTags)
-	defer doneFn()
-
-	batches, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
-	if l.logEnabled {
-		numberOfDifferentTokenBatches := 0
-		mapTokenContract := make(map[string]bool)
-		for _, batch := range batches {
-			if _, ok := mapTokenContract[batch.TokenContract]; !ok {
-				mapTokenContract[batch.TokenContract] = true
-				numberOfDifferentTokenBatches++
-			}
-		}
-		l.Log().Info("batches: ", len(batches), "numberOfDifferentTokenBatches: ", numberOfDifferentTokenBatches)
-	}
 	if err != nil {
 		l.Log().Info("failed to get latest transaction batches", err)
 		return false, err
 	}
 
-	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
-	if err != nil {
-		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-		return false, err
+	l.HyperionState.BatchCount = len(batchesInHelios)
+
+	if len(batchesInHelios) == 0 {
+		l.Log().Infoln("no transaction batches to relay")
+		return false, nil
 	}
 
-	sort.Slice(batches, func(i, j int) bool {
-		return batches[i].BatchNonce < batches[j].BatchNonce
+	sort.Slice(batchesInHelios, func(i, j int) bool {
+		return batchesInHelios[i].BatchNonce < batchesInHelios[j].BatchNonce
 	})
+
+	batchsAbleToRelay := make([]*hyperiontypes.OutgoingTxBatch, 0)
+
+	l.HyperionState.TxCount = 0
+	for _, batch := range batchesInHelios {
+		l.HyperionState.TxCount += len(batch.Transactions)
+		l.Log().Info("batch ", batch.BatchNonce, " - txs: ", len(batch.Transactions), " - batchTimeout: ", batch.BatchTimeout, " - latestEthHeight: ", latestEthHeight.Number.Uint64()+uint64(10))
+		if batch.BatchTimeout > maxHeightTimeout {
+			batchsAbleToRelay = append(batchsAbleToRelay, batch)
+		}
+	}
+
+	if len(batchsAbleToRelay) == 0 {
+		l.Log().Infoln("no transaction batches to relay")
+		return false, nil
+	}
 
 	mapBatchPerTokenContract := make(map[string][]*hyperiontypes.OutgoingTxBatch, 0)
 
-	for _, batch := range batches {
+	for _, batch := range batchsAbleToRelay {
 		if _, ok := mapBatchPerTokenContract[batch.TokenContract]; !ok {
 			mapBatchPerTokenContract[batch.TokenContract] = make([]*hyperiontypes.OutgoingTxBatch, 0)
 		}
@@ -468,386 +198,430 @@ func (l *relayer) relayTokenBatch(ctx context.Context, latestEthValset *hyperion
 		return false, nil
 	}
 
-	hasPushedABatch := false
-	errorsBatchs := make([]string, 0)
-	for _, batches := range mapBatchPerTokenContract {
-		err := l.processBatch(ctx, batches, latestEthValset, latestEthHeight)
+	mapLatestBatchNonce := make(map[string]uint64, 0)
+	for tokenContract, _ := range mapBatchPerTokenContract {
+		if _, ok := mapLatestBatchNonce[tokenContract]; ok {
+			continue
+		}
+		latestBatchNonce, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(tokenContract))
 		if err != nil {
-			errorsBatchs = append(errorsBatchs, err.Error())
-		} else {
-			hasPushedABatch = true
+			continue
+		}
+		mapLatestBatchNonce[tokenContract] = latestBatchNonce.Uint64()
+	}
+
+	paquetsOfTokenContractBatchs := make(map[string][]*hyperiontypes.OutgoingTxBatch, 0)
+	// for each token contract, get the latest batch nonce
+	for tokenContract, batches := range mapBatchPerTokenContract {
+
+		if _, ok := mapLatestBatchNonce[tokenContract]; !ok {
+			continue
+		}
+		latestBatchNonce := mapLatestBatchNonce[tokenContract]
+
+		for _, batch := range batches {
+			if batch.BatchNonce > latestBatchNonce {
+				paquetsOfTokenContractBatchs[tokenContract] = append(paquetsOfTokenContractBatchs[tokenContract], batch)
+				mapLatestBatchNonce[tokenContract] = batch.BatchNonce
+			} else {
+				l.Log().Info("batch refused ", batch.BatchNonce, " for tokenContract: ", batch.TokenContract, " Nonce less than latestBatchNonce: ", latestBatchNonce)
+			}
 		}
 	}
 
-	if !hasPushedABatch {
-		return false, errors.New(strings.Join(errorsBatchs, "\n"))
+	grpOfSignedBatchs := make(map[string][]*BatchAndSigs, 0)
+
+	for tokenContrat, batchs := range paquetsOfTokenContractBatchs {
+
+		sort.Slice(batchs, func(i, j int) bool {
+			return batchs[i].BatchNonce < batchs[j].BatchNonce
+		})
+
+		packSigned := make([]*BatchAndSigs, 0)
+
+		for _, batch := range batchs {
+			packSigned = append(packSigned, &BatchAndSigs{Batch: batch, Sigs: nil})
+		}
+
+		if len(packSigned) == 0 {
+			continue
+		}
+
+		grpOfSignedBatchs[tokenContrat] = packSigned
+	}
+
+	for tokenContract, batchs := range grpOfSignedBatchs {
+		symbol, ok := l.CacheSymbol[gethcommon.HexToAddress(tokenContract)]
+		if !ok {
+			symbol = "unknown"
+		}
+		l.Log().Info("tokenContract: ", tokenContract, " - batchs: ", len(batchs), " - symbol: "+symbol)
+	}
+
+	if len(grpOfSignedBatchs) == 0 {
+		l.Log().Infoln("no signed batches to relay ", "actualBatchNonce On Contract: ", grpOfSignedBatchs)
+		return false, nil
+	}
+
+	// process by taking 1 of each grp then send tx and iterate like this
+	stopGrp := make(map[string]bool, 0)
+	retryGrp := make(map[string]bool, 0)
+	for {
+		// take 1 of each grp
+		batchToRelay := make([]*BatchAndSigs, 0)
+
+		for tokenContract, batchAndSigs := range grpOfSignedBatchs {
+			if len(batchAndSigs) == 0 || stopGrp[tokenContract] {
+				continue
+			}
+			batchAndSig := batchAndSigs[0]
+			sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batchAndSig.Batch.BatchNonce, gethcommon.HexToAddress(batchAndSig.Batch.TokenContract))
+			if err != nil {
+				l.Log().WithError(err).Warningln("failed to get transaction batch signatures")
+				continue
+			}
+			batchAndSig.Sigs = sigs
+			batchToRelay = append(batchToRelay, batchAndSig)
+		}
+
+		if len(batchToRelay) == 0 || len(grpOfSignedBatchs) == 0 {
+			break
+		}
+
+		// send tx
+		for _, batchAndSig := range batchToRelay {
+
+			symbol, ok := l.CacheSymbol[gethcommon.HexToAddress(batchAndSig.Batch.TokenContract)]
+			if !ok {
+				symbol = batchAndSig.Batch.TokenContract
+			}
+
+			l.Orchestrator.HyperionState.RelayerStatus = "sending batch " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol
+			txData, err := l.ethereum.PrepareTransactionBatch(ctx, latestEthValset, batchAndSig.Batch, batchAndSig.Sigs)
+			if err != nil {
+				stopGrp[batchAndSig.Batch.TokenContract] = true
+				l.Orchestrator.HyperionState.RelayerStatus = "error preparing batch " + symbol
+				l.Log().WithError(err).Warningln("failed to prepare outgoing tx batch")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			txHash, cost, err := l.ethereum.SendPreparedTx(ctx, txData)
+			if err != nil {
+				stopGrp[batchAndSig.Batch.TokenContract] = true
+				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
+				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
+				usedRpc := l.ethereum.GetRpc().Url
+				if usedRpc != "" {
+					// l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
+					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed transaction")
+				}
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			time.Sleep(5 * time.Second) // wait for transaction to in pool on multiple nodes
+			_, blockNumber, err := l.ethereum.WaitForTransaction(ctx, *txHash)
+			if err != nil {
+				stopGrp[batchAndSig.Batch.TokenContract] = true
+				l.Orchestrator.HyperionState.RelayerStatus = "error waiting for transaction " + symbol
+				l.Log().WithError(err).Warningln("failed to wait for transaction")
+				usedRpc := l.ethereum.GetRpc().Url
+				// Pénaliser le RPC utilisé pour cet échec
+				if usedRpc != "" {
+					// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for transaction not found")
+				}
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			l.Orchestrator.HyperionState.RelayerStatus = "batch sent " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol + " - block number: " + strconv.Itoa(int(blockNumber))
+			l.HyperionState.OutBridgedTxCount += len(batchAndSig.Batch.Transactions)
+			feesTaken := batchAndSig.Batch.GetFees().BigInt()
+			storage.UpdateFeesFile(feesTaken, batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
+			///////
+
+			usedRpc := l.ethereum.GetRpc().Url
+			// Féliciter le RPC utilisé pour ce succès
+			if usedRpc != "" {
+				// l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
+				l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful transaction")
+			}
+
+			l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)
+		}
+
+		for tokenContract, batchAndSigs := range grpOfSignedBatchs {
+			if len(batchAndSigs) == 0 || stopGrp[tokenContract] {
+				stopGrp[tokenContract] = true
+				continue
+			}
+			if retryGrp[tokenContract] {
+				retryGrp[tokenContract] = false
+				continue
+			}
+			grpOfSignedBatchs[tokenContract] = batchAndSigs[1:]
+		}
+		// wait 1 second
+		// l.Orchestrator.HyperionState.RelayerStatus = "waiting 20sec before next batch"
+		time.Sleep(1 * time.Second)
 	}
 
 	return true, nil
+
 }
 
-func (l *relayer) SignBatch(ctx context.Context, batch *hyperiontypes.OutgoingTxBatch) error {
-	hyperionIdHash := common.HexToHash(strconv.FormatUint(l.cfg.HyperionId, 16))
+func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontypes.Valset) (bool, error) {
+	metrics.ReportFuncCall(l.svcTags)
+	doneFn := metrics.ReportFuncTiming(l.svcTags)
+	defer doneFn()
 
-	if err := l.retry(ctx, func() error {
-		return l.helios.SendBatchConfirm(ctx,
-			l.cfg.HyperionId,
-			l.cfg.EthereumAddr,
-			hyperionIdHash,
-			l.ethereum.GetPersonalSignFn(),
-			batch,
-		)
-	}); err != nil {
-		return err
+	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+	if err != nil {
+		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
+		usedRpc := l.ethereum.GetRpc().Url
+		if usedRpc != "" {
+			// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+			l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed to get latest " + l.cfg.ChainName + " height")
+		}
+		return false, err
 	}
-	return nil
+
+	batchesInHelios, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
+
+	if err != nil {
+		l.Log().Info("failed to get latest transaction batches", err)
+		return false, err
+	}
+
+	l.HyperionState.BatchCount = len(batchesInHelios)
+
+	if len(batchesInHelios) == 0 {
+		l.Log().Infoln("no transaction batches to relay")
+		return false, nil
+	}
+
+	sort.Slice(batchesInHelios, func(i, j int) bool {
+		return batchesInHelios[i].BatchNonce < batchesInHelios[j].BatchNonce
+	})
+
+	batchsAbleToRelay := make([]*hyperiontypes.OutgoingTxBatch, 0)
+
+	l.HyperionState.TxCount = 0
+	for _, batch := range batchesInHelios {
+		l.HyperionState.TxCount += len(batch.Transactions)
+		l.Log().Info("batch ", batch.BatchNonce, " - txs: ", len(batch.Transactions), " - batchTimeout: ", batch.BatchTimeout, " - latestEthHeight: ", latestEthHeight.Number.Uint64()+uint64(10))
+		if batch.BatchTimeout > uint64(latestEthHeight.Number.Uint64()+uint64(10)) {
+			batchsAbleToRelay = append(batchsAbleToRelay, batch)
+		}
+	}
+
+	if len(batchsAbleToRelay) == 0 {
+		l.Log().Infoln("no transaction batches to relay")
+		return false, nil
+	}
+
+	mapBatchPerTokenContract := make(map[string][]*hyperiontypes.OutgoingTxBatch, 0)
+
+	for _, batch := range batchsAbleToRelay {
+		if _, ok := mapBatchPerTokenContract[batch.TokenContract]; !ok {
+			mapBatchPerTokenContract[batch.TokenContract] = make([]*hyperiontypes.OutgoingTxBatch, 0)
+		}
+		mapBatchPerTokenContract[batch.TokenContract] = append(mapBatchPerTokenContract[batch.TokenContract], batch)
+	}
+
+	if len(mapBatchPerTokenContract) == 0 {
+		return false, nil
+	}
+
+	mapLatestBatchNonce := make(map[string]uint64, 0)
+	for tokenContract, _ := range mapBatchPerTokenContract {
+		if _, ok := mapLatestBatchNonce[tokenContract]; ok {
+			continue
+		}
+		latestBatchNonce, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(tokenContract))
+		if err != nil {
+			continue
+		}
+		mapLatestBatchNonce[tokenContract] = latestBatchNonce.Uint64()
+	}
+
+	paquetsOfTokenContractBatchs := make(map[string][]*hyperiontypes.OutgoingTxBatch, 0)
+	// for each token contract, get the latest batch nonce
+	for tokenContract, batches := range mapBatchPerTokenContract {
+
+		if _, ok := mapLatestBatchNonce[tokenContract]; !ok {
+			continue
+		}
+		latestBatchNonce := mapLatestBatchNonce[tokenContract]
+
+		for _, batch := range batches {
+			if batch.BatchNonce > latestBatchNonce {
+				paquetsOfTokenContractBatchs[tokenContract] = append(paquetsOfTokenContractBatchs[tokenContract], batch)
+				mapLatestBatchNonce[tokenContract] = batch.BatchNonce
+			} else {
+				l.Log().Info("batch refused ", batch.BatchNonce, " for tokenContract: ", batch.TokenContract, " Nonce less than latestBatchNonce: ", latestBatchNonce)
+			}
+		}
+	}
+
+	grpOfSignedBatchs := make(map[string][]*BatchAndSigs, 0)
+
+	for tokenContrat, batchs := range paquetsOfTokenContractBatchs {
+
+		sort.Slice(batchs, func(i, j int) bool {
+			return batchs[i].BatchNonce < batchs[j].BatchNonce
+		})
+
+		packSigned := make([]*BatchAndSigs, 0)
+
+		for _, batch := range batchs {
+			sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+			if err != nil {
+				break // should be relayed later with signature
+			}
+
+			iHaveSigned := false
+			for _, sig := range sigs {
+				if sig.EthSigner == l.cfg.EthereumAddr.Hex() {
+					iHaveSigned = true
+					break
+				}
+			}
+
+			symbol, ok := l.CacheSymbol[gethcommon.HexToAddress(batch.TokenContract)]
+			if !ok {
+				symbol = batch.TokenContract
+			}
+			l.Log().Info("batch ", batch.BatchNonce, " - tokenContract: ", batch.TokenContract, " - sigs: ", len(sigs), " - iHaveSigned: ", iHaveSigned, " - symbol: ", symbol)
+
+			if iHaveSigned {
+				packSigned = append(packSigned, &BatchAndSigs{Batch: batch, Sigs: sigs})
+			}
+		}
+
+		if len(packSigned) == 0 {
+			continue
+		}
+
+		grpOfSignedBatchs[tokenContrat] = packSigned
+	}
+
+	for tokenContract, batchs := range grpOfSignedBatchs {
+		symbol, ok := l.CacheSymbol[gethcommon.HexToAddress(tokenContract)]
+		if !ok {
+			symbol = "unknown"
+		}
+		l.Log().Info("tokenContract: ", tokenContract, " - batchs: ", len(batchs), " - symbol: "+symbol)
+	}
+
+	if len(grpOfSignedBatchs) == 0 {
+		l.Log().Infoln("no signed batches to relay ", "actualBatchNonce On Contract: ", grpOfSignedBatchs)
+		return false, nil
+	}
+
+	// process by taking 1 of each grp then send tx and iterate like this
+	stopGrp := make(map[string]bool, 0)
+	retryGrp := make(map[string]bool, 0)
+	for {
+		// take 1 of each grp
+		batchToRelay := make([]*BatchAndSigs, 0)
+
+		for tokenContract, batchAndSigs := range grpOfSignedBatchs {
+			if len(batchAndSigs) == 0 || stopGrp[tokenContract] {
+				continue
+			}
+			batchAndSig := batchAndSigs[0]
+			batchToRelay = append(batchToRelay, batchAndSig)
+		}
+
+		if len(batchToRelay) == 0 || len(grpOfSignedBatchs) == 0 {
+			break
+		}
+
+		// send tx
+		for _, batchAndSig := range batchToRelay {
+
+			symbol, ok := l.CacheSymbol[gethcommon.HexToAddress(batchAndSig.Batch.TokenContract)]
+			if !ok {
+				symbol = batchAndSig.Batch.TokenContract
+			}
+
+			l.Orchestrator.HyperionState.RelayerStatus = "sending batch " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol
+			txData, err := l.ethereum.PrepareTransactionBatch(ctx, latestEthValset, batchAndSig.Batch, batchAndSig.Sigs)
+			if err != nil {
+				stopGrp[batchAndSig.Batch.TokenContract] = true
+				l.Orchestrator.HyperionState.RelayerStatus = "error preparing batch " + symbol
+				l.Log().WithError(err).Warningln("failed to prepare outgoing tx batch")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			txHash, cost, err := l.ethereum.SendPreparedTx(ctx, txData)
+			if err != nil {
+				stopGrp[batchAndSig.Batch.TokenContract] = true
+				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
+				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
+				usedRpc := l.ethereum.GetRpc().Url
+				if usedRpc != "" {
+					// l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
+					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed transaction")
+				}
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			time.Sleep(5 * time.Second) // wait for transaction to in pool on multiple nodes
+			_, blockNumber, err := l.ethereum.WaitForTransaction(ctx, *txHash)
+			if err != nil {
+				stopGrp[batchAndSig.Batch.TokenContract] = true
+				l.Orchestrator.HyperionState.RelayerStatus = "error waiting for transaction " + symbol
+				l.Log().WithError(err).Warningln("failed to wait for transaction")
+				usedRpc := l.ethereum.GetRpc().Url
+				// Pénaliser le RPC utilisé pour cet échec
+				if usedRpc != "" {
+					// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
+					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for transaction not found")
+				}
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			l.Orchestrator.HyperionState.RelayerStatus = "batch sent " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol + " - block number: " + strconv.Itoa(int(blockNumber))
+			l.HyperionState.OutBridgedTxCount += len(batchAndSig.Batch.Transactions)
+			feesTaken := batchAndSig.Batch.GetFees().BigInt()
+			storage.UpdateFeesFile(feesTaken, batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
+			///////
+
+			usedRpc := l.ethereum.GetRpc().Url
+			// Féliciter le RPC utilisé pour ce succès
+			if usedRpc != "" {
+				// l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
+				l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful transaction")
+			}
+
+			l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)
+		}
+
+		for tokenContract, batchAndSigs := range grpOfSignedBatchs {
+			if len(batchAndSigs) == 0 || stopGrp[tokenContract] {
+				stopGrp[tokenContract] = true
+				continue
+			}
+			if retryGrp[tokenContract] {
+				retryGrp[tokenContract] = false
+				continue
+			}
+			grpOfSignedBatchs[tokenContract] = batchAndSigs[1:]
+		}
+		// wait 1 second
+		// l.Orchestrator.HyperionState.RelayerStatus = "waiting 20sec before next batch"
+		time.Sleep(1 * time.Second)
+	}
+
+	return true, nil
+
 }
 
 type BatchToSign struct {
 	Batch  *hyperiontypes.OutgoingTxBatch
 	Signed bool
 }
-
-func (l *relayer) processBatch(ctx context.Context, batches []*hyperiontypes.OutgoingTxBatch, latestEthValset *hyperiontypes.Valset, latestEthHeight *gethtypes.Header) error {
-
-	var (
-		oldestConfirmedBatch *hyperiontypes.OutgoingTxBatch
-		confirmations        []*hyperiontypes.MsgConfirmBatch
-	)
-
-	mapBatchNonce := make(map[string]uint64, 0)
-
-	sort.Slice(batches, func(i, j int) bool {
-		return batches[i].BatchNonce < batches[j].BatchNonce
-	})
-
-	for _, batch := range batches {
-		l.Log().Info("", batch.BatchNonce)
-	}
-
-	batchsTimeout := make([]*hyperiontypes.OutgoingTxBatch, 0)
-	batchsNotConfirmed := make([]BatchToSign, 0)
-	batchsWithExpiredNonce := make([]*hyperiontypes.OutgoingTxBatch, 0)
-
-	for _, batch := range batches {
-		// l.Log().Info("batch details: ", batch)
-
-		if batch.HyperionId != l.cfg.HyperionId {
-			continue
-		}
-
-		if batch.BatchTimeout <= latestEthHeight.Number.Uint64() {
-			l.Log().WithFields(log.Fields{"batch_nonce": batch.BatchNonce, "batch_timeout_height": batch.BatchTimeout, "latest_eth_height": latestEthHeight.Number.Uint64()}).Debugln("skipping timed out batch")
-			batchsTimeout = append(batchsTimeout, batch)
-			continue
-		}
-
-		sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
-		// l.Log().Info("sigs", sigs)
-		if err != nil {
-			return err
-		}
-
-		iHaveSigned := false
-		for _, sig := range sigs {
-			if sig.EthSigner == l.cfg.EthereumAddr.Hex() {
-				iHaveSigned = true
-				break
-			}
-		}
-
-		if len(sigs) == 0 {
-			batchsNotConfirmed = append(batchsNotConfirmed, BatchToSign{Batch: batch, Signed: iHaveSigned})
-			continue
-		}
-
-		if _, ok := mapBatchNonce[batch.TokenContract]; ok {
-			if batch.BatchNonce <= mapBatchNonce[batch.TokenContract] {
-				batchsWithExpiredNonce = append(batchsWithExpiredNonce, batch)
-				continue
-			}
-		} else {
-			latestBatchNonce, err := l.ethereum.GetTxBatchNonce(ctx, gethcommon.HexToAddress(batch.TokenContract))
-			if err != nil {
-				return err
-			}
-			mapBatchNonce[batch.TokenContract] = latestBatchNonce.Uint64()
-			if batch.BatchNonce <= mapBatchNonce[batch.TokenContract] {
-				batchsWithExpiredNonce = append(batchsWithExpiredNonce, batch)
-				continue
-			}
-		}
-
-		oldestConfirmedBatch = batch
-		confirmations = sigs
-		if oldestConfirmedBatch != nil {
-			break
-		}
-	}
-
-	if oldestConfirmedBatch == nil {
-		if l.logEnabled {
-			l.Log().Infoln("no token batch to relay - batchsTimeout: ", len(batchsTimeout), " - batchsNotConfirmed: ", len(batchsNotConfirmed), " - batchsWithExpiredNonce: ", len(batchsWithExpiredNonce))
-		}
-		if len(batchsNotConfirmed) > 0 {
-			for _, batch := range batchsNotConfirmed {
-				if !batch.Signed {
-					l.Log().Infoln("signing batch - batch: ", batch.Batch.BatchNonce, " - tokenContract: ", batch.Batch.TokenContract)
-					l.SignBatch(ctx, batch.Batch)
-				}
-			}
-		}
-		return nil
-	} else {
-		currentNonceIsWellSuperiorToExpiredNonces := false
-		for _, batch := range batchsWithExpiredNonce {
-			if batch.BatchNonce > oldestConfirmedBatch.BatchNonce {
-				currentNonceIsWellSuperiorToExpiredNonces = true
-				break
-			}
-		}
-		l.Log().Infoln("relaying batch - batchsTimeout: ", len(batchsTimeout), " - batchsNotConfirmed: ", len(batchsNotConfirmed), " - batchsWithExpiredNonce: ", len(batchsWithExpiredNonce), " - currentNonceIsWellSuperiorToExpiredNonces: ", currentNonceIsWellSuperiorToExpiredNonces)
-	}
-	// l.Log().Info("oldestConfirmedBatch", oldestConfirmedBatch)
-
-	// l.Log().Info("shouldRelayBatch", l.shouldRelayBatch(ctx, oldestConfirmedBatch))
-	// if !l.shouldRelayBatch(ctx, oldestConfirmedBatch) {
-	// 	return nil
-	// }
-
-	// if l.logEnabled {
-	// l.Log().Infoln("latestEthValset", latestEthValset)
-	l.Log().Infoln("Nonce", oldestConfirmedBatch.BatchNonce, "ContractNonce", mapBatchNonce[oldestConfirmedBatch.TokenContract])
-	// l.Log().Infoln("confirmations", confirmations)
-	// }
-
-	txHash, cost, err := l.ethereum.SendTransactionBatch(ctx, latestEthValset, oldestConfirmedBatch, confirmations)
-	if err != nil {
-		// Returning an error here triggers retries which don't help much except risk a binary crash
-		// Better to warn the user and try again in the next loop interval
-		l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
-		return err
-	}
-
-	feesTaken := oldestConfirmedBatch.GetFees().BigInt()
-	// TODO: save fees taken and expenses
-	storage.UpdateFeesFile(feesTaken, oldestConfirmedBatch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
-	///////
-
-	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)
-	return nil
-}
-
-// func (l *relayer) testRelayExternalData(ctx context.Context) {
-
-// 	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
-// 	if err != nil {
-// 		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-// 		return
-// 	}
-// 	//0x3931ab520000000000000000000000000000000000000000000000000000000000000000
-// 	data, err := hex.DecodeString("3931ab520000000000000000000000000000000000000000000000000000000000000000")
-// 	if err != nil {
-// 		l.Log().Info("failed to decode abi call hex", err)
-// 		return
-// 	}
-// 	callData, callErr, rpcUsed, _ := l.ethereum.ExecuteExternalDataTx(ctx, gethcommon.HexToAddress("0x61F2AB7B0C0E10E18a3ed1C3bC7958540374A8DC"), data, latestEthHeight.Number)
-// 	l.Log().Info("callData", callData, "callErr", callErr, "rpcUsed", rpcUsed)
-// }
-
-func (l *relayer) selectBestClaimFromListOfClaims(claims []*types.MsgExternalDataClaim) *types.MsgExternalDataClaim {
-	// If no claims, return nil
-	if len(claims) == 0 {
-		return nil
-	}
-
-	// If only one claim, return it
-	if len(claims) == 1 {
-		return claims[0]
-	}
-
-	// Map to store frequency of each combination
-	frequencies := make(map[string]int)
-	claimsByKey := make(map[string]*types.MsgExternalDataClaim)
-
-	// Count frequencies of each unique combination
-	for _, claim := range claims {
-		// Create a unique key combining the relevant fields
-		key := fmt.Sprintf("%d|%s|%s",
-			claim.TxNonce,
-			claim.CallDataResult,
-			claim.CallDataResultError,
-		)
-
-		frequencies[key]++
-		claimsByKey[key] = claim
-	}
-
-	// Find the key with highest frequency
-	var maxFreq int
-	var bestKey string
-	for key, freq := range frequencies {
-		if freq > maxFreq {
-			maxFreq = freq
-			bestKey = key
-		}
-	}
-
-	// Return the claim corresponding to the most frequent combination
-	return claimsByKey[bestKey]
-}
-
-func (l *relayer) relayExternalData(ctx context.Context) error {
-	metrics.ReportFuncCall(l.svcTags)
-	doneFn := metrics.ReportFuncTiming(l.svcTags)
-	defer doneFn()
-
-	txs, err := l.helios.LatestTransactionExternalCallDataTxs(ctx, l.cfg.HyperionId)
-	if l.logEnabled {
-		l.Log().Info("txs: ", txs)
-	}
-	if err != nil {
-		l.Log().Info("failed to get latest transaction external call data txs", err)
-		return err
-	}
-
-	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
-	if err != nil {
-		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-		return err
-	}
-
-	for _, tx := range txs {
-		l.Log().Info("tx details: ", tx)
-
-		if tx.HyperionId != l.cfg.HyperionId {
-			continue
-		}
-
-		targetHeight := latestEthHeight.Number.Uint64()
-
-		if slices.Contains(tx.Votes, l.ethereum.FromAddress().Hex()) {
-			l.Log().Info("skipping already claimed tx", tx.Id)
-			continue
-		}
-
-		bestClaim := l.selectBestClaimFromListOfClaims(tx.Claims)
-
-		if bestClaim != nil {
-			targetHeight = bestClaim.BlockHeight
-		}
-
-		data, err := hex.DecodeString(strings.TrimPrefix(tx.AbiCallHex, "0x"))
-		if err != nil {
-			l.Log().Info("failed to decode abi call hex", err, "tx_id", tx.Id)
-			continue
-		}
-		callData, callErr, rpcUsed, err := l.ethereum.ExecuteExternalDataTx(ctx, gethcommon.HexToAddress(tx.ExternalContractAddress), data, big.NewInt(int64(targetHeight)))
-		l.Log().Info("callData", callData, "callErr", callErr)
-
-		if err != nil {
-			l.Log().Info("failed to execute external data tx with rpc", err, "rpcUsed", rpcUsed)
-			continue
-		}
-
-		_, err = l.helios.SendExternalDataClaim(ctx, l.cfg.HyperionId, tx.Nonce, latestEthHeight.Number.Uint64(), tx.ExternalContractAddress, callData, callErr, rpcUsed)
-
-		if err != nil {
-			l.Log().Info("failed to send external data claim", err)
-			continue
-		}
-	}
-
-	// TODO: get external data batch from helios (maybe edit batch_creator for build special batch who contains only external data)
-	// TODO: format abi from tx information then call external data on ethereum
-	// TODO: send special claimData to helios
-
-	return nil
-}
-
-// FindLatestValset finds the latest valset on the Hyperion contract by looking back through the event
-// history and finding the most recent ValsetUpdatedEvent. Most of the time this will be very fast
-// as the latest update will be in recent blockchain history and the search moves from the present
-// backwards in time. In the case that the validator set has not been updated for a very long time
-// this will take longer.
-func (l *relayer) findLatestValsetOnEth(ctx context.Context) (*hyperiontypes.Valset, error) {
-
-	lastValsetUpdatedEventHeight, err := l.ethereum.GetLastValsetUpdatedEventHeight(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get last valset updated event")
-	}
-
-	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
-	if err != nil {
-		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
-			l.ethereum.RemoveLastUsedRpc()
-		}
-		return nil, errors.Wrap(err, "failed to get latest valset nonce")
-	}
-
-	cosmosValset, err := l.helios.ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get Helios valset")
-	}
-
-	if lastValsetUpdatedEventHeight.Uint64() > 0 {
-		valsetUpdatedEvents, err := l.ethereum.GetValsetUpdatedEventsAtSpecificBlock(lastValsetUpdatedEventHeight.Uint64())
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events")
-		}
-
-		// by default the lowest found valset goes first, we want the highest
-		//
-		// TODO(xlab): this follows the original impl, but sort might be skipped there:
-		// we could access just the latest element later.
-		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
-
-		if len(valsetUpdatedEvents) == 0 { // return the cosmos valset if no event is found
-			return cosmosValset, nil
-			// return nil, errors.New("failed to get latest valset (Maybe rpc not answering correctly?)")
-		}
-
-		// we take only the first event if we find any at all.
-		event := valsetUpdatedEvents[0]
-
-		if l.logEnabled {
-			l.Log().Info("found valset at block: ", event.Raw.BlockNumber, " with nonce: ", event.NewValsetNonce.Uint64())
-		}
-
-		valset := &hyperiontypes.Valset{
-			Nonce:        event.NewValsetNonce.Uint64(),
-			Members:      make([]*hyperiontypes.BridgeValidator, 0, len(event.Powers)),
-			RewardAmount: sdkmath.NewIntFromBigInt(event.RewardAmount),
-			RewardToken:  event.RewardToken.Hex(),
-		}
-
-		for idx, p := range event.Powers {
-			valset.Members = append(valset.Members, &hyperiontypes.BridgeValidator{
-				Power:           p.Uint64(),
-				EthereumAddress: event.Validators[idx].Hex(),
-			})
-		}
-
-		if l.logEnabled {
-			checkIfValsetsDiffer(cosmosValset, valset)
-		}
-
-		return valset, nil
-
-	}
-
-	return nil, ErrNotFound
-}
-
-var ErrNotFound = errors.New("not found")
-
-type HyperionValsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
-
-func (a HyperionValsetUpdatedEvents) Len() int { return len(a) }
-func (a HyperionValsetUpdatedEvents) Less(i, j int) bool {
-	return a[i].NewValsetNonce.Cmp(a[j].NewValsetNonce) < 0
-}
-func (a HyperionValsetUpdatedEvents) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // This function exists to provide a warning if Cosmos and Ethereum have different validator sets
 // for a given nonce. In the mundane version of this warning the validator sets disagree on sorting order

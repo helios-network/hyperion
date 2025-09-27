@@ -56,7 +56,8 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 		CosmosAddr:           global.GetCosmosAddress(),
 		ValidatorAddress:     cosmostypes.ValAddress(global.GetCosmosAddress().Bytes()),
 		EthereumAddr:         global.GetAddress(),
-		MinBatchFeeUSD:       global.GetMinBatchFeeUSD(),
+		MinBatchFeeHLS:       global.GetMinBatchFeeHLS(counterpartyChainParams.BridgeChainId),
+		MinTxFeeHLS:          global.GetMinTxFeeHLS(counterpartyChainParams.BridgeChainId),
 		RelayValsetOffsetDur: valsetDur,
 		RelayBatchOffsetDur:  batchDur,
 		RelayValsets:         true,
@@ -99,7 +100,8 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			}
 
 			// Initialize new target network
-			targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)
+			// targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)
+			targetNetworks, err := global.InitTargetNetworks(counterpartyChainParams)
 			if err != nil {
 				fmt.Println("Error initializing target network:", err)
 				cancel()
@@ -116,7 +118,7 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			// Create new hyperion instance
 			hyperion, err := orchestrator.NewOrchestrator(
 				*heliosNetwork,
-				*targetNetwork,
+				targetNetworks,
 				pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: "https://api.coingecko.com/api/v3"}),
 				orchestratorCfg,
 				global,
@@ -157,7 +159,7 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 					}
 				}()
 
-				err := hyperion.Run(ctxCancellable, network, *targetNetwork)
+				err := hyperion.Run(ctxCancellable)
 				errChan <- err
 			}()
 

@@ -39,7 +39,7 @@ func CreateHyperionContract(ctx context.Context, global *global.Global, chainId 
 
 	fmt.Println("hyperionContractInfo: ", hyperionContractInfo)
 
-	err = storage.AddOneNewHyperionDeployedAddress(hyperionContractInfo)
+	err = storage.UpdateHyperionContractInfo(chainId, hyperionAddress.Hex(), hyperionContractInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -50,5 +50,9 @@ func CreateHyperionContract(ctx context.Context, global *global.Global, chainId 
 		return nil, err
 	}
 	hyperionContractInfo["initializedAtBlockNumber"] = blockNumber
+	err = storage.UpdateHyperionContractInfo(chainId, hyperionAddress.Hex(), hyperionContractInfo)
+	if err != nil {
+		return nil, err
+	}
 	return hyperionContractInfo, nil
 }

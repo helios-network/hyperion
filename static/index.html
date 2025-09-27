@@ -13,6 +13,14 @@
         .chain-card {
             margin-bottom: 16px;
         }
+        .grp-status {
+            display: flex ;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .container {
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -52,7 +60,7 @@
             <!-- Dashboard -->
             <v-container v-else-if="!showTokensPage && !showRpcsPage && !showSettingsPage">
                 <v-row>
-                    <v-col cols="12">
+                    <v-col class="col col-12">
                         <v-card>
                             <v-card-title class="d-flex align-center">
                                 <div>Hyperion Chains</div>
@@ -77,7 +85,7 @@
                             </v-card-title>
                             <v-card-text>
                                 <v-row>
-                                    <v-col v-for="(chain, id) in chains" :key="id" cols="12" md="6" lg="4">
+                                    <v-col v-for="(chain, id) in chains" :key="id" cols="12" md="6" lg="3">
                                         <v-card class="chain-card">
                                             <v-card-text>
                                                 <div class="text-h6 mb-2">Chain ID: {{ chain.chainId }}</div>
@@ -97,7 +105,7 @@
                                                     <v-list-item>
                                                         <v-list-item-content>
                                                             <v-list-item-title>Status</v-list-item-title>
-                                                            <v-list-item-subtitle>
+                                                            <v-list-item-subtitle class="grp-status">
                                                                 <v-chip
                                                                     :color="chain.running ? 'success' : 'error'"
                                                                     small
@@ -107,7 +115,6 @@
                                                                 <v-chip
                                                                     :color="chain.registered ? 'success' : 'warning'"
                                                                     small
-                                                                    class="ml-2"
                                                                 >
                                                                     {{ chain.registered ? 'Registered' : 'Unregistered' }}
                                                                 </v-chip>
@@ -115,14 +122,12 @@
                                                                     v-if="chain.paused"
                                                                     color="warning"
                                                                     small
-                                                                    class="ml-2"
                                                                 >
                                                                     Paused
                                                                 </v-chip>
                                                                 <v-chip
-                                                                    :color="chain.isSynced ? 'success' : 'error'"
+                                                                    :color="!chain.paused && chain.isSynced ? 'success' : 'error'"
                                                                     small
-                                                                    class="ml-2"
                                                                 >
                                                                     {{ chain.isSynced ? 'Synced' : 'Out of Sync' }}
                                                                 </v-chip>
@@ -136,14 +141,46 @@
                                                                 Height: {{ chain.height }} | Target: {{ chain.targetHeight }} | Diff: {{ chain.heightDiff }}
                                                             </v-list-item-subtitle>
                                                             <v-list-item-title>Stats</v-list-item-title>
-                                                            <v-list-item-subtitle>
-                                                                Total Txs: {{ chain.totalTxs }} | Batches: {{ chain.batches }}
+                                                            <v-list-item-subtitle class="grp-status">
+                                                                <v-chip color="primary" small>
+                                                                    Total Txs: {{ chain.totalTxs }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    Batches: {{ chain.batches }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small> 
+                                                                    Out Bridged Txs: {{ chain.outBridgedTxCount }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    In Bridged Txs: {{ chain.inBridgedTxCount }}
+                                                                </v-chip>
+                                                            </v-list-item-subtitle>
+                                                            <v-list-item-title>States</v-list-item-title>
+                                                            <v-list-item-subtitle class="grp-status">
+                                                                <v-chip
+                                                                    v-for="state in chain.states"
+                                                                    :key="state.name"
+                                                                    :color="state.value !== 'idle' ? 'success' : 'error'"
+                                                                    small
+                                                                >
+                                                                    {{ state.name }}: {{ state.value }} {{ state.value === 'idle' ? `(Next: ${state.nextExecutionTimestamp}, Last: ${state.lastExecutionFinishedTimestamp})` : '' }}
+                                                                </v-chip>
+
                                                             </v-list-item-subtitle>
                                                         </v-list-item-content>
                                                     </v-list-item>
                                                 </v-list>
                                                 <v-card-actions>
                                                     <v-spacer></v-spacer>
+                                                    <v-btn
+                                                        v-if="chain.address === '0x0000000000000000000000000000000000000000'"
+                                                        color="success"
+                                                        @click="createHyperionContract(chain.chainId)"
+                                                        :loading="isCreatingHyperionContract"
+                                                        class="ml-2"
+                                                    >
+                                                        Deploy Hyperion Contract
+                                                    </v-btn>
                                                     <v-btn
                                                         v-if="!chain.running && chain.proposed && chain.registered"
                                                         color="success"
@@ -161,7 +198,7 @@
                                                         Stop
                                                     </v-btn>
                                                     <v-btn
-                                                        v-if="!chain.proposed"
+                                                        v-if="!chain.proposed && chain.address !== '0x0000000000000000000000000000000000000000'"
                                                         color="primary"
                                                         @click="openProposeDialog(chain.chainId)"
                                                         :loading="chain.isLoading"
@@ -300,11 +337,11 @@
                             <v-btn color="error" text @click="showAddChainDialog = false">Cancel</v-btn>
                             <v-btn 
                                 color="primary" 
-                                @click="deployHyperion"
-                                :loading="isDeploying"
-                                :disabled="isDeploying"
+                                @click="addNewChain"
+                                :loading="isAddingChain"
+                                :disabled="isAddingChain"
                             >
-                                Deploy
+                                Add
                             </v-btn>
                         </v-card-actions>
                     </v-card>
@@ -382,7 +419,9 @@
                                 <v-data-table
                                     :headers="[
                                         { text: 'RPC URL', value: 'url' },
-                                        { text: 'Reputation', value: 'reputation' }
+                                        { text: 'Is Tested', value: 'is_tested' },
+                                        { text: 'Is Primary', value: 'is_primary' },
+                                        { text: 'Actions', value: 'actions', sortable: false },
                                     ]"
                                     :items="rpcs"
                                     :loading="isLoadingRpcs"
@@ -401,30 +440,33 @@
                                             </v-btn>
                                         </v-tooltip>
                                     </template>
+                                    <template v-slot:item.is_primary="{ item }">
+                                        <v-icon :color="item.is_primary ? 'success' : 'error'">
+                                            {{ item.is_primary ? 'mdi-check-circle' : 'mdi-close-circle' }}
+                                        </v-icon>
+                                    </template>
+                                    <template v-slot:item.actions="{ item }">
+                                        <v-btn
+                                            v-if="!item.is_primary"
+                                            color="primary"
+                                            small
+                                            @click="setPrimaryRpc(item.url)"
+                                            :loading="isSettingPrimaryRpc === item.url"
+                                            :disabled="isSettingPrimaryRpc !== null && isSettingPrimaryRpc !== item.url"
+                                        >
+                                            Set as Primary
+                                        </v-btn>
+                                        <v-btn
+                                            color="error"
+                                            small
+                                            @click="removeRpc(item.url)"
+                                            :loading="isDeletingRpc === item.url"
+                                            :disabled="isDeletingRpc !== null && isDeletingRpc !== item.url"
+                                        >
+                                            Remove
+                                        </v-btn>
+                                    </template>
                                 </v-data-table>
-                            </v-card-text>
-                        </v-card>
-                        <v-card>
-                            <v-card-title>Static RPCs</v-card-title>
-                            <v-card-text>
-                                <v-list>
-                                    <v-list-item v-for="rpc in staticRpcs" :key="rpc">
-                                        <v-list-item-content>
-                                            <v-list-item-title>{{ rpc }}</v-list-item-title>
-                                        </v-list-item-content>
-                                        <v-list-item-action>
-                                            <v-btn
-                                                icon
-                                                small
-                                                color="error"
-                                                @click="removeRpc(rpc)"
-                                                :loading="isDeletingRpc === rpc"
-                                            >
-                                                <v-icon>mdi-delete</v-icon>
-                                            </v-btn>
-                                        </v-list-item-action>
-                                    </v-list-item>
-                                </v-list>
                             </v-card-text>
                         </v-card>
                     </v-col>
@@ -445,6 +487,9 @@
                                     :rules="[v => !!v || 'At least one RPC is required']"
                                 ></v-textarea>
                             </v-form>
+                        </v-card-text>
+                        <v-card-text>
+                            <v-checkbox v-model="isPrimary" label="Set as Primary" />
                         </v-card-text>
                         <v-card-actions>
                             <v-spacer></v-spacer>
@@ -624,14 +669,16 @@
                 selectedChainId: null,
                 newChainId: '',
                 isProposing: false,
-                isDeploying: false,
+                isAddingChain: false,
                 isDeployingToken: false,
                 isLoadingTokens: false,
                 isLoadingRpcs: false,
                 isAddingRpcs: false,
                 isDeletingRpc: null,
+                isSettingPrimaryRpc: null,
                 isLoadingTransactions: false,
                 isUpdatingSettings: false,
+                isCreatingHyperionContract: false,
                 tokens: [],
                 rpcs: [],
                 staticRpcs: [],
@@ -660,8 +707,11 @@
                 },
                 walletAddress: '',
                 newRpcs: '',
+                isPrimary: false,
                 chainSettings: '',
-                settingsError: ''
+                settingsError: '',
+                statsInterval: null,
+                stats: {}
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -670,7 +720,11 @@
                     this.fetchChains();
                     this.fetchTransactions();
                     this.fetchWalletAddress();
+                    this.startStatsInterval();
                 }
+            },
+            beforeDestroy() {
+                this.stopStatsInterval();
             },
             watch: {
                 tableOptions: {
@@ -799,6 +853,7 @@
                         this.isAuthenticated = true;
                         this.error = null;
                         this.fetchChains();
+                        this.startStatsInterval();
                     } catch (error) {
                         this.error = error.message;
                     }
@@ -812,24 +867,30 @@
                         const resp = await response.json();
                         
                         // Fetch stats to get height information
-                        const statsResponse = await fetch('/api/query?type=get-stats');
-                        let stats = {};
-                        if (statsResponse.ok) {
-                            const statsData = await statsResponse.json();
-                            if (statsData.success && statsData.data) {
-                                stats = statsData.data;
-                            }
-                        }
+                        await this.fetchStats();
                         
                         // Add isLoading property to each chain and sync status
                         this.chains = [];
                         Object.keys(resp.data).forEach(key => {
-                            const chain = resp.data[key];
-                            const chainStats = stats[key] || {};
+                            let chain = resp.data[key];
+                            const chainStats = this.stats[key] || {};
                             const height = chainStats.height || 0;
                             const targetHeight = chainStats.targetHeight || 0;
                             const heightDiff = Math.abs(targetHeight - height);
                             const isSynced = heightDiff <= 1000;
+                            chain.states = [];
+
+                            Object.keys(chainStats.hyperionState ?? {}).forEach(key => {
+                                if (!key.includes("Status")) {
+                                    return;
+                                }
+                                chain.states.push({
+                                    name: key.replace("Status", ""),
+                                    value: chainStats.hyperionState[key],
+                                    nextExecutionTimestamp: chainStats.hyperionState[key.replace("Status", "") + "NextExecutionTimestamp"] ? this.timeSinceString(chainStats.hyperionState[key.replace("Status", "") + "NextExecutionTimestamp"]) : 'N/A',
+                                    lastExecutionFinishedTimestamp: chainStats.hyperionState[key.replace("Status", "") + "LastExecutionFinishedTimestamp"] ? this.timeSinceString(chainStats.hyperionState[key.replace("Status", "") + "LastExecutionFinishedTimestamp"]) : 'N/A'
+                                });
+                            });
                             
                             this.chains.push({
                                 ...chain,
@@ -839,12 +900,104 @@
                                 isSynced: isSynced,
                                 heightDiff: heightDiff,
                                 totalTxs: chainStats.totalTxs || 0,
-                                batches: chainStats.batches || 0
+                                batches: chainStats.batches || 0,
+                                outBridgedTxCount: chainStats.outBridgedTxCount || 0,
+                                inBridgedTxCount: chainStats.inBridgedTxCount || 0
                             });
                         });
+
                     } catch (error) {
                         console.error('Error fetching chains:', error);
                         this.showNotification('Failed to fetch chains', 'error');
+                    }
+                },
+                async fetchStats() {
+                    try {
+                        const statsResponse = await fetch('/api/query?type=get-stats');
+                        if (statsResponse.ok) {
+                            const statsData = await statsResponse.json();
+                            if (statsData.success && statsData.data) {
+                                this.stats = statsData.data;
+                                // Update existing chains with new stats
+                                this.updateChainsWithStats();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error fetching stats:', error);
+                    }
+                },
+                updateChainsWithStats() {
+                    this.chains.forEach(chain => {
+                        const chainStats = this.stats[chain.chainId] || {};
+                        const height = chainStats.height || 0;
+                        const targetHeight = chainStats.targetHeight || 0;
+                        const heightDiff = Math.abs(targetHeight - height);
+                        const isSynced = heightDiff <= 1000;
+                        
+                        chain.height = height;
+                        chain.targetHeight = targetHeight;
+                        chain.isSynced = isSynced;
+                        chain.heightDiff = heightDiff;
+                        chain.totalTxs = chainStats.totalTxs || 0;
+                        chain.batches = chainStats.batches || 0;
+                        chain.outBridgedTxCount = chainStats.outBridgedTxCount || 0;
+                        chain.inBridgedTxCount = chainStats.inBridgedTxCount || 0;
+                        
+                        // Update states
+                        chain.states = [];
+                        Object.keys(chainStats.hyperionState ?? {}).forEach(key => {
+                            if (!key.includes("Status")) {
+                                return;
+                            }
+                            chain.states.push({
+                                name: key.replace("Status", ""),
+                                value: chainStats.hyperionState[key],
+                                nextExecutionTimestamp: chainStats.hyperionState[key.replace("Status", "") + "NextExecutionTimestamp"] ? this.timeSinceString(chainStats.hyperionState[key.replace("Status", "") + "NextExecutionTimestamp"]) : 'N/A',
+                                lastExecutionFinishedTimestamp: chainStats.hyperionState[key.replace("Status", "") + "LastExecutionFinishedTimestamp"] ? this.timeSinceString(chainStats.hyperionState[key.replace("Status", "") + "LastExecutionFinishedTimestamp"]) : 'N/A'
+                            });
+                        });
+                    });
+                },
+                startStatsInterval() {
+                    // Clear any existing interval
+                    if (this.statsInterval) {
+                        clearInterval(this.statsInterval);
+                    }
+                    // Start new interval to fetch stats every 20 seconds
+                    this.statsInterval = setInterval(() => {
+                        this.fetchStats();
+                    }, 1000);
+                },
+                timeSinceString(timestamp) {
+                    const now = new Date();
+                    const then = new Date(timestamp * 1000);
+                    const diff = now.getTime() - then.getTime();
+                    const diffInSeconds = Math.floor(diff / 1000);
+                    const diffInMinutes = Math.floor(diffInSeconds / 60);
+                    const diffInHours = Math.floor(diffInMinutes / 60);
+                    const diffInDays = Math.floor(diffInHours / 24);
+                    const diffInMonths = Math.floor(diffInDays / 30);
+                    const diffInYears = Math.floor(diffInDays / 365);
+
+                    if (diffInYears > 0) {
+                        return diffInYears + 'y ' + diffInMonths + 'mo ' + diffInDays + 'd ' + diffInHours + 'h ' + diffInMinutes + 'm ' + diffInSeconds + 's';
+                    } else if (diffInMonths > 0) {
+                        return diffInMonths + 'mo ' + diffInDays + 'd ' + diffInHours + 'h ' + diffInMinutes + 'm ' + diffInSeconds + 's';
+                    } else if (diffInDays > 0) {
+                        return diffInDays + 'd ' + diffInHours + 'h ' + diffInMinutes + 'm ' + diffInSeconds + 's';
+                    } else if (diffInHours > 0) {
+                        return diffInHours + 'h ' + diffInMinutes + 'm ' + diffInSeconds + 's';
+                    } else if (diffInMinutes > 0) {
+                        return diffInMinutes + 'm ' + diffInSeconds + 's';
+                    } else {
+                        return diffInSeconds + 's';
+                    }
+                    return 'N/A';
+                },
+                stopStatsInterval() {
+                    if (this.statsInterval) {
+                        clearInterval(this.statsInterval);
+                        this.statsInterval = null;
                     }
                 },
                 async runHyperion(chainId) {
@@ -911,15 +1064,15 @@
                         }
                     }
                 },
-                async deployHyperion() {
+                async addNewChain() {
                     if (!this.newChainId) {
                         this.showNotification('Please enter a Chain ID', 'error');
                         return;
                     }
 
-                    this.isDeploying = true;
+                    this.isAddingChain = true;
                     try {
-                        const response = await fetch('/api/query?type=deploy-hyperion', {
+                        const response = await fetch('/api/query?type=add-new-chain', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -929,18 +1082,18 @@
 
                         if (!response.ok) {
                             const errorData = await response.json();
-                            throw new Error(errorData.error || 'Failed to deploy Hyperion');
+                            throw new Error(errorData.error || 'Failed to add new chain');
                         }
 
                         this.showAddChainDialog = false;
                         this.newChainId = '';
-                        this.showNotification('Hyperion deployed successfully');
+                        this.showNotification('New chain added successfully');
                         await this.fetchChains();
                     } catch (error) {
-                        console.error('Error deploying Hyperion:', error);
+                        console.error('Error adding new chain:', error);
                         this.showNotification(error.message, 'error');
                     } finally {
-                        this.isDeploying = false;
+                        this.isAddingChain = false;
                     }
                 },
                 openProposeDialog(chainId) {
@@ -1073,14 +1226,40 @@
 
                         const data = await response.json();
                         if (data.success) {
-                            this.rpcs = data.data.rpcs.sort((a, b) => b.reputation - a.reputation);
-                            this.staticRpcs = data.data.staticRpcs;
+                            this.rpcs = data.data;
                         }
                     } catch (error) {
                         console.error('Error fetching RPCs:', error);
                         this.showNotification('Failed to fetch RPCs', 'error');
                     } finally {
                         this.isLoadingRpcs = false;
+                    }
+                },
+                async setPrimaryRpc(rpcUrl) {
+                    this.isSettingPrimaryRpc = rpcUrl;
+                    try {
+                        const response = await fetch('/api/query?type=set-primary-rpc', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                rpc_url: rpcUrl,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to set primary RPC');
+                        }
+
+                        this.showNotification('Primary RPC updated successfully');
+                        await this.viewRpcs(this.selectedChainId);
+                    } catch (error) {
+                        console.error('Error setting primary RPC:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isSettingPrimaryRpc = null;
                     }
                 },
                 async fetchTransactions() {
@@ -1136,7 +1315,8 @@
                             },
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
-                                rpcs: rpcsArray.join(',')
+                                rpcs: rpcsArray.join(','),
+                                is_primary: this.isPrimary,
                             }),
                         });
 
@@ -1146,6 +1326,7 @@
 
                         this.showAddRpcsDialog = false;
                         this.newRpcs = '';
+                        this.isPrimary = false;
                         this.showNotification('RPCs added successfully');
                         await this.viewRpcs(this.selectedChainId);
                     } catch (error) {
@@ -1180,6 +1361,32 @@
                         this.showNotification(error.message, 'error');
                     } finally {
                         this.isDeletingRpc = null;
+                    }
+                },
+                async createHyperionContract(chainId) {
+                    this.isCreatingHyperionContract = true;
+                    try {
+                        const response = await fetch('/api/query?type=deploy-hyperion-contract', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ chain_id: chainId }),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to create Hyperion contract');
+                        }
+
+                        this.showNotification('Hyperion contract created successfully');
+                        await this.fetchWalletAddress(); // Refresh wallet address to get the new contract address
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error creating Hyperion contract:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isCreatingHyperionContract = false;
                     }
                 },
                 async viewSettings(chainId) {

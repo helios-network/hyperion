@@ -108,11 +108,11 @@ func startServer(cmd *cli.Cmd) {
 		}))
 
 		// Start runners at start up
-		go func() {
-			global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
-				return queries.RunHyperion(ctx, g, chainId)
-			})
-		}()
+		// go func() {
+		// 	global.StartRunnersAtStartUp(func(ctx context.Context, g *globaltypes.Global, chainId uint64) error {
+		// 		return queries.RunHyperion(ctx, g, chainId)
+		// 	})
+		// }()
 
 		// Start server
 		port := os.Getenv("PORT")
@@ -294,7 +294,23 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		sendSuccess(w, "Login successful", nil)
 		return
 
-	case "deploy-hyperion":
+	case "add-new-chain":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.AddNewChain(r.Context(), global, params.ChainID)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
+
+	case "deploy-hyperion-contract":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`
 		}
@@ -418,14 +434,15 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		return
 	case "add-rpcs":
 		var params struct {
-			ChainID uint64 `json:"chain_id"`
-			Rpcs    string `json:"rpcs"`
+			ChainID   uint64 `json:"chain_id"`
+			Rpcs      string `json:"rpcs"`
+			IsPrimary bool   `json:"is_primary"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := queries.AddStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs)
+		err := queries.AddRpcs(r.Context(), global, params.ChainID, params.Rpcs, params.IsPrimary)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -441,12 +458,28 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := queries.RemoveStaticRpcs(r.Context(), global, params.ChainID, params.Rpcs)
+		err := queries.RemoveRpcs(r.Context(), global, params.ChainID, params.Rpcs)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		sendSuccess(w, "RPCs removed successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "set-primary-rpc":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			RpcUrl  string `json:"rpc_url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		err := queries.SetPrimaryRpc(r.Context(), global, params.ChainID, params.RpcUrl)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "Primary RPC set successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
 		return
 	case "update-chain-settings":
 		var params struct {
@@ -463,6 +496,20 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sendSuccess(w, "Chain settings updated successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "claim-tokens-of-old-contract":
+		var params struct {
+			ChainID       uint64 `json:"chain_id"`
+			Contract      string `json:"contract"`
+			TokenContract string `json:"token_contract"`
+			AmountInt     int64  `json:"amount_int"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response := queries.ClaimTokensOfOldContract(r.Context(), global, params.ChainID, params.Contract, params.TokenContract, params.AmountInt)
+		sendSuccess(w, response, nil)
 		return
 	}
 	sendError(w, "Unknown query type", http.StatusBadRequest)

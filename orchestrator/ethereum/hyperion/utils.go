@@ -203,7 +203,7 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 
 	if isPending {
 		for isPending {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
 			if err != nil {
 				fmt.Println("Error getting transaction by hash:", err)
@@ -221,6 +221,47 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 	}
 
 	return tx, receipt.BlockNumber.Uint64(), nil
+}
+
+func (s *hyperionContract) WaitForTransaction(ctx context.Context, txHash common.Hash) (*gethtypes.Transaction, uint64, error) {
+	tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, txHash)
+	if err != nil {
+		fmt.Println("Error getting transaction by hash:", err)
+		return nil, 0, err
+	}
+
+	if isPending {
+		for isPending {
+			time.Sleep(5 * time.Second)
+			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+			if err != nil {
+				fmt.Println("Error getting transaction by hash:", err)
+				return nil, 0, err
+			}
+		}
+	}
+
+	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
+	if err != nil {
+		return nil, 0, err
+	}
+	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+		return nil, 0, errors.New("transaction failed")
+	}
+
+	return tx, receipt.BlockNumber.Uint64(), nil
+}
+
+func (s *hyperionContract) GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash common.Hash) (*big.Int, uint64, error) {
+	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, txHash)
+	if err != nil {
+		return nil, 0, err
+	}
+	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+		return nil, 0, errors.New("transaction failed")
+	}
+
+	return big.NewInt(0).Mul(big.NewInt(int64(receipt.GasUsed)), receipt.EffectiveGasPrice), receipt.BlockNumber.Uint64(), nil
 }
 
 func (s *hyperionContract) DeployERC20(

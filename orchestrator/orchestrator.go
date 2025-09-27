@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	defaultLoopDur = 60 * time.Second
+	defaultLoopDur = 30 * time.Second
 )
 
 // PriceFeed provides token price for a given contract address
@@ -30,8 +30,10 @@ type PriceFeed interface {
 }
 
 type Global interface {
-	GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
-	InitTargetNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (*ethereum.Network, error)
+	// GetRpcs(chainId uint64) ([]*hyperiontypes.Rpc, error)
+	InitTargetNetworks(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) ([]*ethereum.Network, error)
+	GetMinBatchFeeHLS(chainId uint64) float64
+	GetMinTxFeeHLS(chainId uint64) float64
 }
 
 type Config struct {
@@ -42,7 +44,8 @@ type Config struct {
 	ChainName            string
 	ChainId              uint64
 	EthereumAddr         gethcommon.Address
-	MinBatchFeeUSD       float64
+	MinBatchFeeHLS       float64
+	MinTxFeeHLS          float64
 	RelayValsetOffsetDur time.Duration
 	RelayBatchOffsetDur  time.Duration
 	RelayValsets         bool
@@ -50,6 +53,46 @@ type Config struct {
 	RelayExternalDatas   bool
 	RelayerMode          bool
 	ChainParams          *hyperiontypes.CounterpartyChainParams
+}
+
+type HyperionState struct {
+	HyperionID             uint64
+	Height                 uint64
+	TargetHeight           uint64
+	LastObservedHeight     uint64
+	LastObservedEventNonce uint64
+	LastEventNonce         uint64
+	LastClaimBlockHeight   uint64
+	LastClaimEventNonce    uint64
+
+	BatchCount        int
+	TxCount           int
+	OutBridgedTxCount int
+	InBridgedTxCount  int
+
+	BatchCreatorStatus  string
+	ExternalDataStatus  string
+	OracleStatus        string
+	RelayerStatus       string
+	SignerStatus        string
+	UpdaterStatus       string
+	ValsetManagerStatus string
+
+	BatchCreatorNextExecutionTimestamp  uint64
+	ExternalDataNextExecutionTimestamp  uint64
+	OracleNextExecutionTimestamp        uint64
+	RelayerNextExecutionTimestamp       uint64
+	SignerNextExecutionTimestamp        uint64
+	UpdaterNextExecutionTimestamp       uint64
+	ValsetManagerNextExecutionTimestamp uint64
+
+	BatchCreatorLastExecutionFinishedTimestamp  uint64
+	ExternalDataLastExecutionFinishedTimestamp  uint64
+	OracleLastExecutionFinishedTimestamp        uint64
+	RelayerLastExecutionFinishedTimestamp       uint64
+	SignerLastExecutionFinishedTimestamp        uint64
+	UpdaterLastExecutionFinishedTimestamp       uint64
+	ValsetManagerLastExecutionFinishedTimestamp uint64
 }
 
 type Orchestrator struct {
@@ -60,17 +103,23 @@ type Orchestrator struct {
 
 	helios        helios.Network
 	ethereum      ethereum.Network
+	ethereums     []*ethereum.Network
 	priceFeed     PriceFeed
 	firstTimeSync bool
 	global        Global
 
-	height       uint64
-	targetHeight uint64
+	height        uint64
+	targetHeight  uint64
+	valsetManager valsetManager
+
+	HyperionState HyperionState
+
+	CacheSymbol map[gethcommon.Address]string
 }
 
 func NewOrchestrator(
 	helios helios.Network,
-	eth ethereum.Network,
+	eths []*ethereum.Network,
 	priceFeed PriceFeed,
 	cfg Config,
 	global Global,
@@ -81,7 +130,8 @@ func NewOrchestrator(
 		}),
 		svcTags:       metrics.Tags{"svc": "hyperion_orchestrator"},
 		helios:        helios,
-		ethereum:      eth,
+		ethereum:      *eths[0],
+		ethereums:     eths,
 		priceFeed:     priceFeed,
 		cfg:           cfg,
 		maxAttempts:   100,
@@ -90,6 +140,47 @@ func NewOrchestrator(
 
 		height:       0,
 		targetHeight: 0,
+
+		HyperionState: HyperionState{
+			HyperionID:             cfg.HyperionId,
+			Height:                 0,
+			TargetHeight:           0,
+			LastObservedHeight:     0,
+			LastObservedEventNonce: 0,
+			LastEventNonce:         0,
+			LastClaimBlockHeight:   0,
+			LastClaimEventNonce:    0,
+
+			BatchCount:        0,
+			OutBridgedTxCount: 0,
+			InBridgedTxCount:  0,
+
+			BatchCreatorStatus:  "idle",
+			ExternalDataStatus:  "idle",
+			OracleStatus:        "idle",
+			RelayerStatus:       "idle",
+			SignerStatus:        "idle",
+			UpdaterStatus:       "idle",
+			ValsetManagerStatus: "idle",
+
+			BatchCreatorNextExecutionTimestamp:  0,
+			ExternalDataNextExecutionTimestamp:  0,
+			OracleNextExecutionTimestamp:        0,
+			RelayerNextExecutionTimestamp:       0,
+			SignerNextExecutionTimestamp:        0,
+			UpdaterNextExecutionTimestamp:       0,
+			ValsetManagerNextExecutionTimestamp: 0,
+
+			BatchCreatorLastExecutionFinishedTimestamp:  0,
+			ExternalDataLastExecutionFinishedTimestamp:  0,
+			OracleLastExecutionFinishedTimestamp:        0,
+			RelayerLastExecutionFinishedTimestamp:       0,
+			SignerLastExecutionFinishedTimestamp:        0,
+			UpdaterLastExecutionFinishedTimestamp:       0,
+			ValsetManagerLastExecutionFinishedTimestamp: 0,
+		},
+
+		CacheSymbol: make(map[gethcommon.Address]string),
 	}
 
 	return o, nil
@@ -97,16 +188,32 @@ func NewOrchestrator(
 
 // Run starts all major loops required to make
 // up the Orchestrator, all of these are async loops.
-func (s *Orchestrator) Run(ctx context.Context, helios helios.Network, eth ethereum.Network) error {
-	return s.startValidatorMode(ctx, eth)
+func (s *Orchestrator) Run(ctx context.Context) error {
+	return s.startValidatorMode(ctx)
 }
 
 func (s *Orchestrator) SetEthereum(eth ethereum.Network) {
 	s.ethereum = eth
 }
 
+func (s *Orchestrator) SetValsetManager(valsetManager *valsetManager) {
+	s.valsetManager = *valsetManager
+}
+
+func (s *Orchestrator) GetValsetManager() *valsetManager {
+	return &s.valsetManager
+}
+
 func (s *Orchestrator) GetEthereum() ethereum.Network {
 	return s.ethereum
+}
+
+func (s *Orchestrator) GetHelios() helios.Network {
+	return s.helios
+}
+
+func (s *Orchestrator) GetConfig() Config {
+	return s.cfg
 }
 
 func (s *Orchestrator) SetHeight(height uint64) {
@@ -125,6 +232,10 @@ func (s *Orchestrator) GetTargetHeight() uint64 {
 	return s.targetHeight
 }
 
+func (s *Orchestrator) GetLogger() log.Logger {
+	return s.logger
+}
+
 func (s *Orchestrator) GetStats() map[string]interface{} {
 	return map[string]interface{}{
 		"height":       s.height,
@@ -134,13 +245,13 @@ func (s *Orchestrator) GetStats() map[string]interface{} {
 
 // startValidatorMode runs all orchestrator processes. This is called
 // when hyperion is run alongside a validator helios node.
-func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Network) error {
+func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	s.logger.Infoln("running orchestrator in validator mode")
 
 	fmt.Println("startValidatorMode")
 
 	// get hyperion ID from contract
-	hyperionIDHash, err := eth.GetHyperionID(ctx)
+	hyperionIDHash, err := s.ethereum.GetHyperionID(ctx)
 	if err != nil {
 		return errors.Wrap(err, "unable to query hyperion ID from contract")
 	}
@@ -185,6 +296,10 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Netw
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
 	pg.Go(func() error { return s.runUpdater(ctx) })
+	pg.Go(func() error { return s.runExternalData(ctx) })
+	if s.cfg.RelayValsets {
+		pg.Go(func() error { return s.runValsetManager(ctx) })
+	}
 
 	return pg.Wait()
 }
@@ -192,17 +307,17 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context, eth ethereum.Netw
 // startRelayerMode runs orchestrator processes that only relay specific
 // messages that do not require a validator's signature. This mode is run
 // alongside a non-validator helios node
-func (s *Orchestrator) startRelayerMode(ctx context.Context) error {
-	log.Infoln("running orchestrator in relayer mode")
+// func (s *Orchestrator) startRelayerMode(ctx context.Context) error {
+// 	log.Infoln("running orchestrator in relayer mode")
 
-	var pg loops.ParanoidGroup
+// 	var pg loops.ParanoidGroup
 
-	pg.Go(func() error { return s.runBatchCreator(ctx) })
-	pg.Go(func() error { return s.runRelayer(ctx) })
-	pg.Go(func() error { return s.runUpdater(ctx) })
+// 	pg.Go(func() error { return s.runBatchCreator(ctx) })
+// 	pg.Go(func() error { return s.runRelayer(ctx) })
+// 	pg.Go(func() error { return s.runUpdater(ctx) })
 
-	return pg.Wait()
-}
+// 	return pg.Wait()
+// }
 
 func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios helios.Network) (uint64, error) {
 	claim, err := helios.LastClaimEventByAddr(ctx, s.cfg.HyperionId, s.cfg.CosmosAddr)
@@ -221,24 +336,22 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		retry.Delay(200*time.Millisecond),
 		retry.Attempts(s.maxAttempts),
 		retry.OnRetry(func(n uint, err error) {
-			if strings.Contains(err.Error(), "unavailable on our public API") { // remove rpc if it's unavailable
-				s.ethereum.RemoveLastUsedRpc()
-			}
-			if strings.Contains(err.Error(), "no contract code at given address") {
-				s.ethereum.RemoveLastUsedRpc()
-			}
-			if strings.Contains(err.Error(), "History has been pruned for this block") || strings.Contains(err.Error(), "public API") {
-				s.ethereum.RemoveLastUsedRpc()
+			if strings.Contains(err.Error(), "unavailable on our public API") || strings.Contains(err.Error(), "no contract code at given address") || strings.Contains(err.Error(), "History has been pruned for this block") || strings.Contains(err.Error(), "public API") {
+				usedRpc := s.ethereum.GetRpc().Url
+				if usedRpc != "" {
+					// s.ethereum.PenalizeRpc(usedRpc, 1)
+					s.logger.WithField("rpc", usedRpc).Debug("Penalized RPC for unavailable on our public API")
+				}
 				return
 			}
 			if strings.Contains(err.Error(), "no RPC clients available") {
 				s.logger.Warningf("no RPC clients available, refreshing rpcs... (#%d)", n+1)
-				rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
-				if err != nil {
-					s.logger.WithError(err).Warningf("failed to get rpcs")
-					return
-				}
-				s.ethereum.SetRpcs(rpcs)
+				// rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
+				// if err != nil {
+				// 	s.logger.WithError(err).Warningf("failed to get rpcs")
+				// 	return
+				// }
+				// s.ethereum.SetRpcs(rpcs)
 				return
 			}
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)
@@ -256,12 +369,12 @@ func (s *Orchestrator) IsStaticRpcAnonymous() bool {
 	return settings["static_rpc_anonymous"].(bool)
 }
 
-func (s *Orchestrator) UpdateRpcs() {
+// func (s *Orchestrator) UpdateRpcs() {
 
-	targetNetwork, err := s.global.InitTargetNetwork(s.cfg.ChainParams)
-	if err != nil {
-		s.logger.WithError(err).Warningf("failed to update rpcs")
-		return
-	}
-	s.ethereum = *targetNetwork
-}
+// 	targetNetwork, err := s.global.InitTargetNetwork(s.cfg.ChainParams)
+// 	if err != nil {
+// 		s.logger.WithError(err).Warningf("failed to update rpcs")
+// 		return
+// 	}
+// 	s.ethereum = *targetNetwork
+// }

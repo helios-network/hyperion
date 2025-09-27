@@ -1,4 +1,4 @@
-package rpcchainlist
+package rpcs
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ const (
 	maxRespBytes       = 10 * 1024 * 1024
 )
 
-var zeroPrice = float64(0)
+// var zeroPrice = float64(0)
 
 type Config struct {
 	BaseURL string
