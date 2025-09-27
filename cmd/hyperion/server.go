@@ -310,7 +310,7 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		sendSuccess(w, response, nil)
 		return
 
-	case "deploy-hyperion":
+	case "deploy-hyperion-contract":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`
 		}
@@ -464,6 +464,22 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sendSuccess(w, "RPCs removed successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "set-primary-rpc":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			RpcUrl  string `json:"rpc_url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		err := queries.SetPrimaryRpc(r.Context(), global, params.ChainID, params.RpcUrl)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "Primary RPC set successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
 		return
 	case "update-chain-settings":
 		var params struct {

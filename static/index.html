@@ -421,20 +421,12 @@
                                         { text: 'RPC URL', value: 'url' },
                                         { text: 'Is Tested', value: 'is_tested' },
                                         { text: 'Is Primary', value: 'is_primary' },
+                                        { text: 'Actions', value: 'actions', sortable: false },
                                     ]"
                                     :items="rpcs"
                                     :loading="isLoadingRpcs"
                                 >
-                                <!-- add button to remove rpc -->
                                     <template v-slot:item.url="{ item }">
-                                        <v-btn
-                                            text
-                                            small
-                                            color="error"
-                                            @click="removeRpc(item.url)"
-                                        >
-                                            Remove
-                                        </v-btn>
                                         <v-tooltip bottom>
                                             <template v-slot:activator="{ on, attrs }">
                                                 <span v-bind="attrs" v-on="on">{{ item.url }}</span>
@@ -447,6 +439,32 @@
                                                 Click to copy
                                             </v-btn>
                                         </v-tooltip>
+                                    </template>
+                                    <template v-slot:item.is_primary="{ item }">
+                                        <v-icon :color="item.is_primary ? 'success' : 'error'">
+                                            {{ item.is_primary ? 'mdi-check-circle' : 'mdi-close-circle' }}
+                                        </v-icon>
+                                    </template>
+                                    <template v-slot:item.actions="{ item }">
+                                        <v-btn
+                                            v-if="!item.is_primary"
+                                            color="primary"
+                                            small
+                                            @click="setPrimaryRpc(item.url)"
+                                            :loading="isSettingPrimaryRpc === item.url"
+                                            :disabled="isSettingPrimaryRpc !== null && isSettingPrimaryRpc !== item.url"
+                                        >
+                                            Set as Primary
+                                        </v-btn>
+                                        <v-btn
+                                            color="error"
+                                            small
+                                            @click="removeRpc(item.url)"
+                                            :loading="isDeletingRpc === item.url"
+                                            :disabled="isDeletingRpc !== null && isDeletingRpc !== item.url"
+                                        >
+                                            Remove
+                                        </v-btn>
                                     </template>
                                 </v-data-table>
                             </v-card-text>
@@ -471,7 +489,7 @@
                             </v-form>
                         </v-card-text>
                         <v-card-text>
-                            <v-checkbox v-model="isPrimary" label="Is Primary" />
+                            <v-checkbox v-model="isPrimary" label="Set as Primary" />
                         </v-card-text>
                         <v-card-actions>
                             <v-spacer></v-spacer>
@@ -657,6 +675,7 @@
                 isLoadingRpcs: false,
                 isAddingRpcs: false,
                 isDeletingRpc: null,
+                isSettingPrimaryRpc: null,
                 isLoadingTransactions: false,
                 isUpdatingSettings: false,
                 isCreatingHyperionContract: false,
@@ -1216,6 +1235,33 @@
                         this.isLoadingRpcs = false;
                     }
                 },
+                async setPrimaryRpc(rpcUrl) {
+                    this.isSettingPrimaryRpc = rpcUrl;
+                    try {
+                        const response = await fetch('/api/query?type=set-primary-rpc', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                rpc_url: rpcUrl,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to set primary RPC');
+                        }
+
+                        this.showNotification('Primary RPC updated successfully');
+                        await this.viewRpcs(this.selectedChainId);
+                    } catch (error) {
+                        console.error('Error setting primary RPC:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isSettingPrimaryRpc = null;
+                    }
+                },
                 async fetchTransactions() {
                     if (!this.isAuthenticated) return;
                     
@@ -1320,7 +1366,7 @@
                 async createHyperionContract(chainId) {
                     this.isCreatingHyperionContract = true;
                     try {
-                        const response = await fetch('/api/query?type=create-hyperion-contract', {
+                        const response = await fetch('/api/query?type=deploy-hyperion-contract', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -1335,6 +1381,7 @@
 
                         this.showNotification('Hyperion contract created successfully');
                         await this.fetchWalletAddress(); // Refresh wallet address to get the new contract address
+                        await this.fetchChains();
                     } catch (error) {
                         console.error('Error creating Hyperion contract:', error);
                         this.showNotification(error.message, 'error');

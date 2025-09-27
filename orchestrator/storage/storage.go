@@ -122,6 +122,8 @@ func GetRpcsFromStorge(chainId uint64) ([]*rpcs.Rpc, time.Duration, error) {
 
 	stat.ModTime()
 
+	baseFileArray = OrderRpcsByPrimaryFirst(baseFileArray)
+
 	return baseFileArray, time.Since(stat.ModTime()), nil
 }
 
@@ -158,11 +160,26 @@ func RemoveRpcFromStorge(chainId uint64, rpc *rpcs.Rpc) error {
 	return UpdateRpcsToStorge(chainId, newRpcs)
 }
 
+func OrderRpcsByPrimaryFirst(rpcsList []*rpcs.Rpc) []*rpcs.Rpc {
+	primaryRpcs := make([]*rpcs.Rpc, 0)
+	secondaryRpcs := make([]*rpcs.Rpc, 0)
+	for _, r := range rpcsList {
+		if r.IsPrimary {
+			primaryRpcs = append(primaryRpcs, r)
+		} else {
+			secondaryRpcs = append(secondaryRpcs, r)
+		}
+	}
+	return append(primaryRpcs, secondaryRpcs...)
+}
+
 func UpdateRpcsToStorge(chainId uint64, rpcsList []*rpcs.Rpc) error {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
+
+	rpcsList = OrderRpcsByPrimaryFirst(rpcsList)
 
 	dirPath := filepath.Join(homePath, ".heliades", "hyperion")
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
@@ -237,7 +254,7 @@ func UpdateHyperionContractInfo(chainId uint64, contractAddress string, info map
 		return err
 	}
 	for _, hyperion := range hyperions {
-		if uint64(hyperion["chainId"].(float64)) == chainId && hyperion["hyperionAddress"].(string) == contractAddress {
+		if uint64(hyperion["chainId"].(float64)) == chainId && (hyperion["hyperionAddress"].(string) == contractAddress || hyperion["hyperionAddress"].(string) == "0x0000000000000000000000000000000000000000") {
 			for key, value := range info {
 				hyperion[key] = value
 			}

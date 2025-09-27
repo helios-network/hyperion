@@ -47,5 +47,19 @@ func AddRpcs(ctx context.Context, global *global.Global, chainId uint64, rpcsLis
 			}
 		}
 	}
-	return storage.UpdateRpcsToStorge(chainId, slices.Concat(existingRpcs, rpcsArray))
+
+	finalRpcs := slices.Concat(existingRpcs, rpcsArray)
+	// check if has primary rpc
+	hasPrimary := false
+	for _, rpc := range finalRpcs {
+		if rpc.IsPrimary {
+			hasPrimary = true
+			break
+		}
+	}
+	if !hasPrimary { // set the first rpc as primary
+		finalRpcs[0].IsPrimary = true
+	}
+	finalRpcs = storage.OrderRpcsByPrimaryFirst(finalRpcs)
+	return storage.UpdateRpcsToStorge(chainId, finalRpcs)
 }
