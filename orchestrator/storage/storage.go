@@ -248,13 +248,13 @@ func GetMyHyperionsDeployedAddresses() ([]map[string]interface{}, error) {
 	return baseFileArray, nil
 }
 
-func UpdateHyperionContractInfo(chainId uint64, contractAddress string, info map[string]interface{}) error {
+func UpdateHyperionContractInfo(chainId uint64, info map[string]interface{}) error {
 	hyperions, err := GetMyHyperionsDeployedAddresses()
 	if err != nil {
 		return err
 	}
 	for _, hyperion := range hyperions {
-		if uint64(hyperion["chainId"].(float64)) == chainId && (hyperion["hyperionAddress"].(string) == contractAddress || hyperion["hyperionAddress"].(string) == "0x0000000000000000000000000000000000000000") {
+		if uint64(hyperion["chainId"].(float64)) == chainId {
 			for key, value := range info {
 				hyperion[key] = value
 			}
@@ -263,14 +263,14 @@ func UpdateHyperionContractInfo(chainId uint64, contractAddress string, info map
 	return UpdateMyHyperionsDeployedAddresses(hyperions)
 }
 
-func RemoveHyperionContractInfo(chainId uint64, contractAddress string) error {
+func RemoveHyperionContractInfo(chainId uint64) error {
 	hyperions, err := GetMyHyperionsDeployedAddresses()
 	if err != nil {
 		return err
 	}
 	index := -1
 	for i, hyperion := range hyperions {
-		if uint64(hyperion["chainId"].(float64)) == chainId && hyperion["hyperionAddress"].(string) == contractAddress {
+		if uint64(hyperion["chainId"].(float64)) == chainId {
 			index = i
 			break
 		}

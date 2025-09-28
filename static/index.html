@@ -100,6 +100,8 @@
                                                         <v-list-item-content>
                                                             <v-list-item-title>Address</v-list-item-title>
                                                             <v-list-item-subtitle>{{ chain.address }}</v-list-item-subtitle>
+                                                            <v-list-item-title v-if="chain.oldAddress !== undefined">Old Address</v-list-item-title>
+                                                            <v-list-item-subtitle v-if="chain.oldAddress !== undefined">{{ chain.oldAddress }}</v-list-item-subtitle>
                                                         </v-list-item-content>
                                                     </v-list-item>
                                                     <v-list-item>
@@ -173,7 +175,6 @@
                                                 <v-card-actions>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
-                                                        v-if="chain.address === '0x0000000000000000000000000000000000000000'"
                                                         color="success"
                                                         @click="createHyperionContract(chain.chainId)"
                                                         :loading="isCreatingHyperionContract"
@@ -205,6 +206,15 @@
                                                         class="ml-2"
                                                     >
                                                         Propose
+                                                    </v-btn>
+                                                    <v-btn
+                                                        v-if="!chain.proposed && chain.type === 'update'"
+                                                        color="info"
+                                                        @click="openProposeUpdateDialog(chain.chainId)"
+                                                        :loading="chain.isLoading"
+                                                        class="ml-2"
+                                                    >
+                                                        Propose Update
                                                     </v-btn>
                                                     <v-btn
                                                         v-if="chain.registered && !chain.running"
@@ -394,6 +404,58 @@
                             <v-btn color="error" text @click="showProposeDialog = false">Cancel</v-btn>
                             <v-btn color="primary" @click="proposeHyperion" :loading="isProposing">
                                 Propose
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Propose Hyperion Update Dialog -->
+                <v-dialog v-model="showProposeUpdateDialog" max-width="600px">
+                    <v-card>
+                        <v-card-title>Propose Hyperion Update</v-card-title>
+                        <v-card-text>
+                            <v-form ref="proposeUpdateForm">
+                                <v-text-field
+                                    v-model="proposeForm.title"
+                                    label="Title"
+                                    required
+                                    :rules="[v => !!v || 'Title is required']"
+                                ></v-text-field>
+                                <v-textarea
+                                    v-model="proposeForm.description"
+                                    label="Description"
+                                    required
+                                    :rules="[v => !!v || 'Description is required']"
+                                ></v-textarea>
+                                <v-text-field
+                                    v-model="proposeForm.bridge_chain_id"
+                                    label="Bridge Chain ID"
+                                    type="number"
+                                    disabled
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeForm.bridge_chain_name"
+                                    label="Bridge Chain Name"
+                                    required
+                                    :rules="[v => !!v || 'Bridge Chain Name is required']"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeForm.average_counterparty_block_time"
+                                    label="Average Block Time (ms)"
+                                    type="number"
+                                    required
+                                    :rules="[
+                                        v => !!v || 'Block time is required',
+                                        v => v > 0 || 'Block time must be positive'
+                                    ]"
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showProposeUpdateDialog = false">Cancel</v-btn>
+                            <v-btn color="primary" @click="proposeHyperionUpdate" :loading="isProposingUpdate">
+                                Propose Update
                             </v-btn>
                         </v-card-actions>
                     </v-card>
@@ -700,6 +762,8 @@
                     bridge_chain_name: '',
                     average_counterparty_block_time: 12000
                 },
+                showProposeUpdateDialog: false,
+                isProposingUpdate: false,
                 snackbar: {
                     show: false,
                     text: '',
@@ -1139,6 +1203,51 @@
                         this.showNotification(`Failed to propose Hyperion: ${error.message}`, 'error');
                     } finally {
                         this.isProposing = false;
+                    }
+                },
+                openProposeUpdateDialog(chainId) {
+                    this.proposeForm = {
+                        title: '',
+                        description: '',
+                        bridge_chain_id: chainId,
+                        bridge_chain_name: '',
+                        average_counterparty_block_time: 12000
+                    };
+                    this.showProposeUpdateDialog = true;
+                },
+                async proposeHyperionUpdate() {
+                    if (!this.$refs.proposeUpdateForm.validate()) {
+                        return;
+                    }
+
+                    this.isProposingUpdate = true;
+                    try {
+                        const response = await fetch('/api/query?type=propose-hyperion-update', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                title: this.proposeForm.title,
+                                description: this.proposeForm.description,
+                                bridge_chain_id: Number(this.proposeForm.bridge_chain_id),
+                                bridge_chain_name: this.proposeForm.bridge_chain_name,
+                                average_counterparty_block_time: Number(this.proposeForm.average_counterparty_block_time)
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to propose Hyperion update');
+                        }
+
+                        this.showProposeUpdateDialog = false;
+                        this.showNotification('Hyperion update proposed successfully');
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error proposing Hyperion update:', error);
+                        this.showNotification(`Failed to propose Hyperion update: ${error.message}`, 'error');
+                    } finally {
+                        this.isProposingUpdate = false;
                     }
                 },
                 async unregisterHyperion(chainId) {

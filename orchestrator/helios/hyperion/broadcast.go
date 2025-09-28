@@ -57,6 +57,8 @@ type BroadcastClient interface {
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
 	SendCancelAllPendingOutTx(ctx context.Context, chainId uint64) error
 	SendCancelPendingOutTxs(ctx context.Context, chainId uint64, count uint64) error
+
+	UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error
 }
 
 type broadcastClient struct {
@@ -1050,4 +1052,31 @@ func (c broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []cosmostyp
 	}
 
 	return resp.TxResponse, nil
+}
+
+func (c broadcastClient) UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &hyperiontypes.MsgUpdateChainSmartContract{
+		ChainId:                   chainId,
+		BridgeContractAddress:     bridgeContractAddress,
+		BridgeContractStartHeight: bridgeContractStartHeight,
+		ContractSourceHash:        contractSourceCodeHash,
+		FirstOrchestratorAddress:  ethFrom.Hex(),
+		Signer:                    c.FromAddress().String(),
+	}
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgUpdateChainSmartContract failed")
+	}
+
+	log.WithFields(log.Fields{
+		"tx_hash": resp.TxResponse.TxHash,
+	}).Infoln("Oracle sent MsgUpdateChainSmartContract")
+
+	return nil
 }

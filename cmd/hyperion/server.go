@@ -346,6 +346,26 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, response, nil)
 		return
+	case "propose-hyperion-update":
+		var params struct {
+			Title                        string `json:"title"`
+			Description                  string `json:"description"`
+			BridgeChainId                uint64 `json:"bridge_chain_id"`
+			BridgeChainName              string `json:"bridge_chain_name"`
+			AverageCounterpartyBlockTime uint64 `json:"average_counterparty_block_time"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.ProposeHyperionUpdate(r.Context(), global, params.Title, params.Description, params.BridgeChainId, params.BridgeChainName, params.AverageCounterpartyBlockTime)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
 	case "run-hyperion":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`

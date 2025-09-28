@@ -42,6 +42,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 		"valset_nonce":  newValset.Nonce,
 		"validators":    len(newValset.Members),
 		"confirmations": len(confirms),
+		"members":       newValset.Members,
 	}).Infoln("checking signatures and submitting valset update")
 
 	newValidators, newPowers := validatorsAndPowers(newValset)
@@ -88,6 +89,12 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	// 		bytes32[] memory _r,
 	// 		bytes32[] memory _s
 	// )
+
+	log.WithFields(log.Fields{
+		"newValset": newValsetArgs,
+		"oldValset": currentValsetArgs,
+		"confirms":  len(confirms),
+	}).Infoln("Sending valset update")
 
 	txData, err := hyperionABI.Pack("updateValset",
 		newValsetArgs,

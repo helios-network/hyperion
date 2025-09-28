@@ -490,6 +490,32 @@ func (g *Global) InitTargetNetworks(counterpartyChainParams *hyperiontypes.Count
 // 	return provider.NewEVMProvider(rpcs), nil
 // }
 
+func (g *Global) ProposeHyperionUpdate(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
+	heliosNetwork := g.GetHeliosNetwork()
+
+	if heliosNetwork == nil {
+		return 0, fmt.Errorf("helios network not initialized")
+	}
+
+	hash := sha256.Sum256([]byte(wrappers.HyperionBin))
+	hashString := hex.EncodeToString(hash[:])
+
+	contentI := map[string]interface{}{
+		"@type":                        "/helios.hyperion.v1.MsgUpdateChainSmartContract",
+		"chain_id":                     counterpartyChainParams.BridgeChainId,
+		"bridge_contract_address":      counterpartyChainParams.BridgeCounterpartyAddress,
+		"bridge_contract_start_height": counterpartyChainParams.BridgeContractStartHeight,
+		"contract_source_hash":         hashString,
+		"first_orchestrator_address":   g.ethKeyFromAddress.Hex(),
+	}
+	content, _ := json.Marshal(contentI)
+	proposalId, err := (*g.heliosNetwork).SendProposal(context.Background(), title, description, string(content), g.accAddress, math.NewInt(1000000000000000000))
+	if err != nil {
+		return 0, err
+	}
+	return proposalId, nil
+}
+
 func (g *Global) CreateNewBlockchainProposal(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
 	heliosNetwork := g.GetHeliosNetwork()
 
@@ -559,6 +585,7 @@ func (g *Global) CreateNewBlockchainProposal(title string, description string, c
 			"paused":                     false,
 		},
 	}
+	fmt.Println("contentI: ", contentI)
 	content, _ := json.Marshal(contentI)
 	proposalId, err := (*g.heliosNetwork).SendProposal(context.Background(), title, description, string(content), g.accAddress, math.NewInt(1000000000000000000))
 	if err != nil {
@@ -660,7 +687,7 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 		}
 	}
 
-	storage.UpdateHyperionContractInfo(chainId, hyperionContractInfo["hyperionAddress"].(string), map[string]interface{}{
+	storage.UpdateHyperionContractInfo(chainId, map[string]interface{}{
 		"initializedAtBlockNumber": blockNumber,
 	})
 
