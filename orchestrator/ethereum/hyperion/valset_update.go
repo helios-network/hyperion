@@ -43,6 +43,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 		"validators":    len(newValset.Members),
 		"confirmations": len(confirms),
 		"members":       newValset.Members,
+		"confirms":      confirms,
 	}).Infoln("checking signatures and submitting valset update")
 
 	newValidators, newPowers := validatorsAndPowers(newValset)

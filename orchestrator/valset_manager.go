@@ -109,13 +109,13 @@ func (l *valsetManager) Process(ctx context.Context) error {
 		l.Log().Info("relaying getLastValsetCheckpoint done")
 	}
 
-	if l.logEnabled {
-		l.Log().WithFields(log.Fields{
-			"Helios": heliosCheckpoint.Hex(),
-			"Eth":    ethCheckpoint.Hex(),
-			"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
-		}).Infoln("Relayer: checkpoints")
-	}
+	// if l.logEnabled {
+	l.Log().WithFields(log.Fields{
+		"Helios": heliosCheckpoint.Hex(),
+		"Eth":    ethCheckpoint.Hex(),
+		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
+	}).Infoln("Relayer: checkpoints")
+	// }
 
 	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
 		if l.logEnabled {

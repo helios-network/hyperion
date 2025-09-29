@@ -407,6 +407,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 
 		newEvents := filterEvents(events, lastClaim.EthereumEventNonce)
 		if len(newEvents) == 0 {
+			log.Infoln("No new events to send lastClaimNonce on Helios: ", lastClaim.EthereumEventNonce)
 			return nil
 		}
 
