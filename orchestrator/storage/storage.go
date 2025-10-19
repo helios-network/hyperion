@@ -253,12 +253,18 @@ func UpdateHyperionContractInfo(chainId uint64, info map[string]interface{}) err
 	if err != nil {
 		return err
 	}
+	replaced := false
 	for _, hyperion := range hyperions {
 		if uint64(hyperion["chainId"].(float64)) == chainId {
 			for key, value := range info {
 				hyperion[key] = value
 			}
+			replaced = true
+			break
 		}
+	}
+	if !replaced {
+		hyperions = append(hyperions, info)
 	}
 	return UpdateMyHyperionsDeployedAddresses(hyperions)
 }
