@@ -77,7 +77,7 @@ func (g *Global) GetCosmosAddress() cosmostypes.AccAddress {
 }
 
 func (g *Global) GetMinBatchFeeHLS(chainId uint64) float64 {
-	hyperionSettings, err := storage.GetChainSettings(chainId, map[string]interface{}{})
+	hyperionSettings, err := storage.GetChainSettings(chainId)
 	if err != nil {
 		return 0.0
 	}
@@ -88,7 +88,7 @@ func (g *Global) GetMinBatchFeeHLS(chainId uint64) float64 {
 }
 
 func (g *Global) GetMinTxFeeHLS(chainId uint64) float64 {
-	hyperionSettings, err := storage.GetChainSettings(chainId, map[string]interface{}{})
+	hyperionSettings, err := storage.GetChainSettings(chainId)
 	if err != nil {
 		return 0.0
 	}
@@ -212,7 +212,7 @@ func (g *Global) GetAnonymousEVMNetworks(chainId uint64, rpcs []*rpcs.Rpc) ([]*e
 func (g *Global) GetEVMNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams, rpc *rpcs.Rpc) (*ethereum.Network, error) {
 	hyperionContractAddr := gethcommon.HexToAddress(counterpartyChainParams.BridgeCounterpartyAddress)
 
-	settings, err := storage.GetChainSettings(counterpartyChainParams.BridgeChainId, map[string]interface{}{})
+	settings, err := storage.GetChainSettings(counterpartyChainParams.BridgeChainId)
 	if err != nil {
 		return nil, err
 	}

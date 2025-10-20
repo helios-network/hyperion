@@ -360,7 +360,7 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 }
 
 func (s *Orchestrator) IsStaticRpcAnonymous() bool {
-	settings, err := storage.GetChainSettings(s.cfg.ChainId, map[string]interface{}{})
+	settings, err := storage.GetChainSettings(s.cfg.ChainId)
 	if err != nil {
 		return false
 	}

@@ -485,7 +485,22 @@ func SetChainSettings(chainId uint64, settings map[string]interface{}) error {
 	return nil
 }
 
-func GetChainSettings(chainId uint64, defaultSettings map[string]interface{}) (map[string]interface{}, error) {
+var DefaultChainSettingsMap = map[string]interface{}{
+	"min_batch_fee_usd":                   0,
+	"eth_gas_price_adjustment":            1.3,
+	"eth_max_gas_price":                   "100gwei",
+	"estimate_gas":                        true,
+	"eth_gas_price":                       "10gwei",
+	"valset_offset_dur":                   "5m",
+	"batch_offset_dur":                    "2m",
+	"static_rpc_anonymous":                true,
+	"static_rpc_only":                     false,
+	"min_batch_fee_hls":                   0.1,
+	"min_tx_fee_hls":                      0.1,
+	"oracle_eth_default_blocks_to_search": uint64(2000),
+}
+
+func GetChainSettings(chainId uint64) (map[string]interface{}, error) {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -505,7 +520,7 @@ func GetChainSettings(chainId uint64, defaultSettings map[string]interface{}) (m
 	var baseFileMap map[string]interface{}
 	json.Unmarshal(baseFile, &baseFileMap)
 	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
-		return defaultSettings, nil
+		return DefaultChainSettingsMap, nil
 	}
 	return baseFileMap[strconv.FormatUint(chainId, 10)].(map[string]interface{}), nil
 }

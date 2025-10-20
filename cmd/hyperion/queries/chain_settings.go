@@ -7,20 +7,6 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 )
 
-var defaultSettings = map[string]interface{}{
-	"min_batch_fee_usd":        0,
-	"eth_gas_price_adjustment": 1.3,
-	"eth_max_gas_price":        "100gwei",
-	"estimate_gas":             true,
-	"eth_gas_price":            "10gwei",
-	"valset_offset_dur":        "5m",
-	"batch_offset_dur":         "2m",
-	"static_rpc_anonymous":     true,
-	"static_rpc_only":          false,
-	"min_batch_fee_hls":        0.1,
-	"min_tx_fee_hls":           0.1,
-}
-
 func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uint64, settings map[string]interface{}) error {
 	baseSettings, err := GetChainSettings(chainId)
 	if err != nil {
@@ -42,12 +28,12 @@ func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uin
 }
 
 func GetChainSettings(chainId uint64) (map[string]interface{}, error) {
-	settings, err := storage.GetChainSettings(chainId, defaultSettings)
+	settings, err := storage.GetChainSettings(chainId)
 	if err != nil {
 		return nil, err
 	}
 
-	for key, value := range defaultSettings {
+	for key, value := range storage.DefaultChainSettingsMap {
 		if _, ok := settings[key]; !ok {
 			settings[key] = value
 		}

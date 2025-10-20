@@ -26,7 +26,7 @@ const (
 	// Maximum block range for Ethereum event query. If the orchestrator has been offline for a long time,
 	// the oracle loop can potentially run longer than defaultLoopDur due to a surge of events. This usually happens
 	// when there are more than ~50 events to claim in a single run.
-	defaultBlocksToSearch uint64 = 2000
+	// defaultBlocksToSearch uint64 = 2000
 
 	// Auto re-sync to catch up the validator's last observed event nonce. Reasons why event nonce fall behind:
 	// 1. It takes some time for events to be indexed on Ethereum. So if hyperion queried events immediately as block produced, there is a chance the event is missed.
@@ -99,6 +99,12 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	metrics.ReportFuncCall(l.svcTags)
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
+
+	settings, err := storage.GetChainSettings(l.cfg.ChainId)
+	if err != nil {
+		return errors.Wrap(err, "failed to get chain settings")
+	}
+	defaultBlocksToSearch, _ := settings["oracle_eth_default_blocks_to_search"].(uint64)
 
 	// Sélectionner le meilleur RPC basé sur la réputation
 	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
