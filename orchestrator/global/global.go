@@ -713,3 +713,15 @@ func (g *Global) VoteOnProposal(proposalId uint64) error {
 	}
 	return nil
 }
+
+func (g *Global) VoteOnProposalWithOption(proposalId uint64, voteOption govtypes.VoteOption) error {
+	heliosNetwork := g.GetHeliosNetwork()
+	if heliosNetwork == nil {
+		return fmt.Errorf("helios network not initialized")
+	}
+	err := (*g.heliosNetwork).VoteOnProposalWithOption(context.Background(), proposalId, g.accAddress, voteOption)
+	if err != nil {
+		return err
+	}
+	return nil
+}
