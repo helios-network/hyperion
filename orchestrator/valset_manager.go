@@ -80,8 +80,6 @@ func (l *valsetManager) Process(ctx context.Context) error {
 	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
 	// }
 
-	var pg loops.ParanoidGroup
-
 	ethValset, err := l.getLatestEthValset(ctx)
 	if err != nil {
 		return err
@@ -137,6 +135,8 @@ func (l *valsetManager) Process(ctx context.Context) error {
 	// 	os.WriteFile("valset.json", json, 0644)
 	// }
 
+	var pg loops.ParanoidGroup
+
 	pg.Go(func() error {
 		return l.retry(ctx, func() error {
 			return l.relayValset(ctx, ethValset)
@@ -162,13 +162,8 @@ func (l *valsetManager) getLatestEthValset(ctx context.Context) (*hyperiontypes.
 	fn := func() error {
 		vs, err := l.findLatestValsetOnEth(ctx)
 		if err != nil {
-			l.Log().Infoln("findLatestValsetOnEth - 8")
 			if strings.Contains(err.Error(), "failed to get") || strings.Contains(err.Error(), "attempting to unmarshall") || strings.Contains(err.Error(), "pruned") {
-				usedRpc := l.ethereum.GetRpc().Url
-				if usedRpc != "" {
-					// l.ethereum.PenalizeRpc(usedRpc, 1)
-					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for valset manager")
-				}
+				l.Orchestrator.RotateRpc()
 				vs, err = l.findLatestValsetOnEth(ctx)
 				if err != nil {
 					return err

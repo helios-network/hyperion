@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -367,6 +368,25 @@ func (s *Orchestrator) IsStaticRpcAnonymous() bool {
 		return false
 	}
 	return settings["static_rpc_anonymous"].(bool)
+}
+
+func (s *Orchestrator) RotateRpc() {
+	usedRpc := s.ethereum.GetRpc().Url
+
+	lstOfclients := make([]*ethereum.Network, 0)
+
+	for _, eth := range s.ethereums {
+		if (*eth).GetRpc().Url != usedRpc {
+			lstOfclients = append(lstOfclients, eth)
+			break
+		}
+	}
+	if len(lstOfclients) == 0 {
+		s.logger.Warning("No other rpcs available, using the same rpc")
+		return
+	}
+	s.ethereum = *lstOfclients[rand.Intn(len(lstOfclients))]
+	s.logger.Info("Rotated rpc to", "rpc", s.ethereum.GetRpc().Url)
 }
 
 // func (s *Orchestrator) UpdateRpcs() {
