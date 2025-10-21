@@ -15,7 +15,7 @@ func VoteForProposal(ctx context.Context, global *global.Global, proposalId uint
 			"voteOption": voteOption,
 			"success":    false,
 			"error":      err.Error(),
-		}, err
+		}, nil
 	}
 	return map[string]interface{}{
 		"proposalId": proposalId,

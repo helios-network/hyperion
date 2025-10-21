@@ -58,7 +58,7 @@
             </v-container>
 
             <!-- Dashboard -->
-            <v-container v-else-if="!showTokensPage && !showRpcsPage && !showSettingsPage">
+            <v-container v-else-if="!showTokensPage && !showRpcsPage && !showSettingsPage && !showGovernancePage">
                 <v-row>
                     <v-col class="col col-12">
                         <v-card>
@@ -82,6 +82,11 @@
                                 <v-btn color="primary" @click="showAddChainDialog = true">
                                     Add Chain
                                 </v-btn>
+                                <span class="mr-2"></span>
+                                    <v-btn color="info" @click="showGovernancePage = true">
+                                        Governance
+                                    </v-btn>
+                                </span>
                             </v-card-title>
                             <v-card-text>
                                 <v-row>
@@ -689,6 +694,125 @@
                 </v-row>
             </v-container>
 
+            <!-- Governance Page -->
+            <v-container v-else-if="showGovernancePage">
+                <v-row>
+                    <v-col cols="12">
+                        <v-card>
+                            <v-card-title>
+                                Governance
+                                <v-spacer></v-spacer>
+                                <v-btn color="secondary" class="ml-2" @click="showGovernancePage = false">
+                                    Back to Chains
+                                </v-btn>
+                            </v-card-title>
+                            <v-card-text>
+                                <v-data-table
+                                    :headers="[
+                                        { text: 'Proposal ID', value: 'id' },
+                                        { text: 'Title', value: 'title' },
+                                        { text: 'Status', value: 'status' },
+                                        { text: 'Yes Votes', value: 'yes_count' },
+                                        { text: 'No Votes', value: 'no_count' },
+                                        { text: 'Actions', value: 'actions', sortable: false },
+                                    ]"
+                                    :items="governanceProposals"
+                                    :loading="isLoadingGovernanceProposals"
+                                    :options.sync="governanceTableOptions"
+                                    :server-items-length="totalProposals"
+                                    :footer-props="{
+                                        'items-per-page-options': [5, 10, 20, 50],
+                                        showFirstLastPage: true
+                                    }"
+                                >
+                                    <template v-slot:item.id="{ item }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <span v-bind="attrs" v-on="on">{{ item.id }}</span>
+                                            </template>
+                                            <v-btn
+                                                text
+                                                small
+                                                @click="copyToClipboard(item.id)"
+                                            >
+                                                Click to copy
+                                            </v-btn>
+                                        </v-tooltip>
+                                    </template>
+                                    <template v-slot:item.status="{ item }">
+                                        <v-chip :color="item.status === 'VOTING_PERIOD' ? 'success' : 'info'">
+                                            {{ item.status }}
+                                        </v-chip>
+                                    </template>
+                                    <template v-slot:item.actions="{ item }">
+                                        <v-btn
+                                            color="success"
+                                            small
+                                            @click="voteForProposal(item.id, 'yes')"
+                                            :loading="voteLoading[item.id] === true"
+                                            :disabled="item.voted || voteLoading[item.id] === true"
+                                            class="mr-2"
+                                        >
+                                            Vote Yes
+                                        </v-btn>
+                                        <v-btn
+                                            color="error"
+                                            small
+                                            @click="voteForProposal(item.id, 'no')"
+                                            :loading="voteLoading[item.id] === true"
+                                            :disabled="item.voted || voteLoading[item.id] === true"
+                                        >
+                                            Vote No
+                                        </v-btn>
+                                        <span v-if="item.voted" class="ml-2 grey--text">Voted {{ item.vote_option }}</span>
+                                    </template>
+                                </v-data-table>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+
+                <!-- Proposal Details Dialog -->
+                <v-dialog v-model="showProposalDetailsDialog" max-width="800px">
+                    <v-card>
+                        <v-card-title>Proposal Details</v-card-title>
+                        <v-card-text>
+                            <v-container fluid>
+                                <v-row>
+                                    <v-col cols="12" md="6">
+                                        <p><strong>Proposal ID:</strong> {{ currentProposalDetails.proposal_id }}</p>
+                                        <p><strong>Title:</strong> {{ currentProposalDetails.title }}</p>
+                                        <p><strong>Description:</strong> {{ currentProposalDetails.description }}</p>
+                                        <p><strong>Status:</strong> {{ currentProposalDetails.status }}</p>
+                                        <p><strong>Created At:</strong> {{ currentProposalDetails.created_at }}</p>
+                                        <p><strong>Voting Start:</strong> {{ currentProposalDetails.voting_start }}</p>
+                                        <p><strong>Voting End:</strong> {{ currentProposalDetails.voting_end }}</p>
+                                        <p><strong>Total Votes:</strong> {{ currentProposalDetails.total_votes }}</p>
+                                        <p><strong>Yes Votes:</strong> {{ currentProposalDetails.yes_votes }}</p>
+                                        <p><strong>No Votes:</strong> {{ currentProposalDetails.no_votes }}</p>
+                                        <p><strong>Abstain Votes:</strong> {{ currentProposalDetails.abstain_votes }}</p>
+                                    </v-col>
+                                    <v-col cols="12" md="6">
+                                        <p><strong>Proposer:</strong> {{ currentProposalDetails.proposer }}</p>
+                                        <p><strong>Deposit:</strong> {{ currentProposalDetails.deposit }}</p>
+                                        <p><strong>Deposit Token:</strong> {{ currentProposalDetails.deposit_token }}</p>
+                                        <p><strong>Proposal Type:</strong> {{ currentProposalDetails.proposal_type }}</p>
+                                        <p><strong>Deposit End:</strong> {{ currentProposalDetails.deposit_end }}</p>
+                                        <p><strong>Final Tally:</strong> {{ currentProposalDetails.final_tally }}</p>
+                                        <p><strong>Final Result:</strong> {{ currentProposalDetails.final_result }}</p>
+                                        <p><strong>Finalization Time:</strong> {{ currentProposalDetails.finalization_time }}</p>
+                                    </v-col>
+                                </v-row>
+                            </v-container>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showProposalDetailsDialog = false">Close</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+            </v-container>
+
             <!-- Snackbar for notifications -->
             <v-snackbar
                 v-model="snackbar.show"
@@ -775,7 +899,19 @@
                 chainSettings: '',
                 settingsError: '',
                 statsInterval: null,
-                stats: {}
+                stats: {},
+                showGovernancePage: false,
+                governanceProposals: [],
+                isLoadingGovernanceProposals: false,
+                governanceTableOptions: {
+                    page: 1,
+                    itemsPerPage: 10,
+                },
+                totalProposals: 0,
+                showProposalDetailsDialog: false,
+                currentProposalDetails: {},
+                hasVoted: {},
+                voteLoading: {},
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -804,7 +940,15 @@
                         this.fetchTransactions();
                     },
                     deep: true
-                }
+                },
+                showGovernancePage: {
+                    handler(newValue) {
+                        if (newValue) {
+                            this.fetchProposals();
+                        }
+                    },
+                    immediate: false,
+                },
             },
             methods: {
                 showNotification(text, color = 'success') {
@@ -1559,6 +1703,118 @@
                         this.showNotification(error.message, 'error');
                     } finally {
                         this.isUpdatingSettings = false;
+                    }
+                },
+                async fetchGovernanceProposals() {
+                    this.isLoadingGovernanceProposals = true;
+                    try {
+                        const response = await fetch(`/api/query?type=get-list-governance-proposals&chain_id=${this.selectedChainId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch governance proposals');
+                        }
+                        const data = await response.json();
+                        if (data.success && data.data.proposals) {
+                            this.governanceProposals = data.data.proposals.map(proposal => ({
+                                id: proposal.id,
+                                title: proposal.title,
+                                status: proposal.status,
+                                yes_count: proposal.currentTallyResult.yes_count,
+                                no_count: proposal.currentTallyResult.no_count,
+                                abstain_count: proposal.currentTallyResult.abstain_count,
+                                no_with_veto_count: proposal.currentTallyResult.no_with_veto_count,
+                                voted: localStorage.getItem(`voted_proposal_${proposal.id}`) === 'true',
+                                vote_option: localStorage.getItem(`vote_option_${proposal.id}`),
+                            }));
+                            this.totalProposals = data.data.total;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching governance proposals:', error);
+                        this.showNotification('Failed to fetch governance proposals', 'error');
+                    } finally {
+                        this.isLoadingGovernanceProposals = false;
+                    }
+                },
+                async viewProposalDetails(proposalId) {
+                    this.showProposalDetailsDialog = true;
+                    this.currentProposalDetails = {};
+                    try {
+                        const response = await fetch(`/api/query?type=get-governance-proposal-details&proposal_id=${proposalId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch proposal details');
+                        }
+                        const data = await response.json();
+                        if (data.success && data.data) {
+                            this.currentProposalDetails = data.data;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching proposal details:', error);
+                        this.showNotification('Failed to fetch proposal details', 'error');
+                    }
+                },
+                async fetchProposals() {
+                    this.isLoadingGovernanceProposals = true;
+                    try {
+                        const page = this.governanceTableOptions.page;
+                        const itemsPerPage = this.governanceTableOptions.itemsPerPage;
+                        const response = await fetch(`/api/query?type=get-list-proposals&page=${page}&size=${itemsPerPage}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch proposals');
+                        }
+                        const data = await response.json();
+                        if (data.success && data.data.proposals) {
+                            this.governanceProposals = data.data.proposals.map(proposal => ({
+                                id: proposal.id,
+                                title: proposal.title,
+                                status: proposal.status,
+                                yes_count: proposal.currentTallyResult.yes_count,
+                                no_count: proposal.currentTallyResult.no_count,
+                                abstain_count: proposal.currentTallyResult.abstain_count,
+                                no_with_veto_count: proposal.currentTallyResult.no_with_veto_count,
+                                voted: localStorage.getItem(`voted_proposal_${proposal.id}`) === 'true',
+                                vote_option: localStorage.getItem(`vote_option_${proposal.id}`),
+                            }));
+                            this.totalProposals = data.data.total;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching proposals:', error);
+                        this.showNotification('Failed to fetch proposals', 'error');
+                    } finally {
+                        this.isLoadingGovernanceProposals = false;
+                    }
+                },
+                async voteForProposal(proposalId, voteOption) {
+                    this.$set(this.voteLoading, proposalId, true);
+                    try {
+                        const response = await fetch('/api/query?type=vote-for-proposal', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                proposal_id: proposalId,
+                                vote_option: voteOption,
+                            }),
+                        });
+ 
+                        if (!response.ok) {
+                            throw new Error('Failed to cast vote');
+                        }
+ 
+                        const data = await response.json();
+                        if (data.success) {
+                            localStorage.setItem(`voted_proposal_${proposalId}`, 'true');
+                            localStorage.setItem(`vote_option_${proposalId}`, voteOption);
+                            this.$set(this.hasVoted, proposalId, true);
+                            this.showNotification(`Successfully voted ${voteOption} for proposal ${proposalId}`);
+                            this.fetchProposals(); // Refresh the proposals list to update vote counts
+                        } else {
+                            throw new Error(data.error || 'Failed to cast vote');
+                        }
+                    } catch (error) {
+                        console.error('Error casting vote:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.$set(this.voteLoading, proposalId, false);
                     }
                 },
             },
