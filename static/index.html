@@ -180,14 +180,6 @@
                                                 <v-card-actions>
                                                     <v-spacer></v-spacer>
                                                     <v-btn
-                                                        color="success"
-                                                        @click="createHyperionContract(chain.chainId)"
-                                                        :loading="isCreatingHyperionContract"
-                                                        class="ml-2"
-                                                    >
-                                                        Deploy Hyperion Contract
-                                                    </v-btn>
-                                                    <v-btn
                                                         v-if="!chain.running && chain.proposed && chain.registered"
                                                         color="success"
                                                         @click="runHyperion(chain.chainId)"
@@ -202,24 +194,6 @@
                                                         :loading="chain.isLoading"
                                                     >
                                                         Stop
-                                                    </v-btn>
-                                                    <v-btn
-                                                        v-if="!chain.proposed && chain.address !== '0x0000000000000000000000000000000000000000'"
-                                                        color="primary"
-                                                        @click="openProposeDialog(chain.chainId)"
-                                                        :loading="chain.isLoading"
-                                                        class="ml-2"
-                                                    >
-                                                        Propose
-                                                    </v-btn>
-                                                    <v-btn
-                                                        v-if="!chain.proposed && chain.type === 'update'"
-                                                        color="info"
-                                                        @click="openProposeUpdateDialog(chain.chainId)"
-                                                        :loading="chain.isLoading"
-                                                        class="ml-2"
-                                                    >
-                                                        Propose Update
                                                     </v-btn>
                                                     <v-btn
                                                         v-if="chain.registered && !chain.running"
@@ -239,31 +213,13 @@
                                                     >
                                                         Register
                                                     </v-btn>
-                                                </v-card-actions>
-                                                <v-card-actions>
-                                                    <v-btn
-                                                        v-if="chain.proposed"
-                                                        color="info"
-                                                        @click="viewTokens(chain.chainId)"
-                                                        class="mr-2"
-                                                    >
-                                                        Tokens
-                                                    </v-btn>
                                                     <v-btn
                                                         color="info"
-                                                        @click="viewRpcs(chain.chainId)"
-                                                        class="mr-2"
+                                                        @click="selectedChainId = chain.chainId; showOthersModal = true"
+                                                        class="ml-2"
                                                     >
-                                                        RPCs
+                                                        Others
                                                     </v-btn>
-                                                    <v-btn
-                                                        color="info"
-                                                        @click="viewSettings(chain.chainId)"
-                                                        class="mr-2"
-                                                    >
-                                                        Settings
-                                                    </v-btn>
-                                                    <v-spacer></v-spacer>
                                                 </v-card-actions>
                                             </v-card-text>
                                         </v-card>
@@ -273,6 +229,83 @@
                         </v-card>
                     </v-col>
                 </v-row>
+
+                <!-- Other Actions Modal -->
+                <v-dialog v-model="showOthersModal" max-width="500px">
+                    <v-card>
+                        <v-card-title>Other Actions for Chain {{ selectedChainId }}</v-card-title>
+                        <v-card-text>
+                            <v-card-actions class="d-flex flex-column">
+                                <v-row>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="success"
+                                            @click="createHyperionContract(selectedChainId); showOthersModal = false;"
+                                            :loading="isCreatingHyperionContract"
+                                            block
+                                        >
+                                            Deploy Hyperion Contract
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            v-if="!chains.find(chain => chain.chainId === selectedChainId)?.proposed && chains.find(chain => chain.chainId === selectedChainId)?.address !== '0x0000000000000000000000000000000000000000'"
+                                            color="primary"
+                                            @click="openProposeDialog(selectedChainId); showOthersModal = false;"
+                                            :loading="chains.find(chain => chain.chainId === selectedChainId)?.isLoading"
+                                            block
+                                        >
+                                            Propose
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            v-if="!chains.find(chain => chain.chainId === selectedChainId)?.proposed && chains.find(chain => chain.chainId === selectedChainId)?.type === 'update'"
+                                            color="info"
+                                            @click="openProposeUpdateDialog(selectedChainId); showOthersModal = false;"
+                                            :loading="chains.find(chain => chain.chainId === selectedChainId)?.isLoading"
+                                            block
+                                        >
+                                            Propose Update
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            v-if="chains.find(chain => chain.chainId === selectedChainId)?.proposed"
+                                            color="info"
+                                            @click="viewTokens(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Tokens
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="viewRpcs(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            RPCs
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="viewSettings(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Chain Settings
+                                        </v-btn>
+                                    </v-col>
+                                </v-row>
+                            </v-card-actions>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showOthersModal = false">Close</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
 
                 <!-- Transactions Table -->
                 <v-row class="mt-4">
@@ -888,6 +921,7 @@
                 },
                 showProposeUpdateDialog: false,
                 isProposingUpdate: false,
+                showOthersModal: false,
                 snackbar: {
                     show: false,
                     text: '',
