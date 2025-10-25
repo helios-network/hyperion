@@ -104,7 +104,14 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get chain settings")
 	}
-	defaultBlocksToSearch, _ := settings["oracle_eth_default_blocks_to_search"].(uint64)
+	defaultBlocksToSearch, ok := settings["oracle_eth_default_blocks_to_search"].(float64)
+
+	if !ok {
+		l.Log().Infoln("oracle_eth_default_blocks_to_search not found in chain settings, using default value 2000")
+		defaultBlocksToSearch = 2000
+	} else {
+		l.Log().Infoln("oracle_eth_default_blocks_to_search found in chain settings, using value", defaultBlocksToSearch)
+	}
 
 	// Sélectionner le meilleur RPC basé sur la réputation
 	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
@@ -204,13 +211,13 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	targetHeightForSync := targetHeight
 	for i := 0; i < 100 && latestHeight > targetHeightForSync; i++ {
-		if targetHeightForSync > l.lastObservedEthHeight+defaultBlocksToSearch {
-			targetHeightForSync = l.lastObservedEthHeight + defaultBlocksToSearch
+		if targetHeightForSync > l.lastObservedEthHeight+uint64(defaultBlocksToSearch) {
+			targetHeightForSync = l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
 		}
 		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync); err != nil {
 			return err
 		}
-		targetHeightForSync = targetHeightForSync + defaultBlocksToSearch
+		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
 	}
 
 	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
@@ -227,7 +234,10 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
 	l.Orchestrator.SetTargetHeight(latestHeight - ethBlockConfirmationDelay)
 
-	l.Log().Infoln("Sync", strconv.FormatUint(targetHeight-l.lastObservedEthHeight, 10), "Blocks", strconv.FormatUint(l.lastObservedEthHeight, 10)+"("+strconv.FormatUint(((l.lastObservedEthHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%) to", strconv.FormatUint(targetHeight, 10)+"("+strconv.FormatUint(((targetHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%)")
+	if targetHeight-l.lastObservedEthHeight == 0 {
+		l.Log().Infoln("No blocks to sync", "last_observed_eth_height", l.lastObservedEthHeight, "latest_height", latestHeight, "target_height", targetHeight)
+		return nil
+	}
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
 	if err != nil {
