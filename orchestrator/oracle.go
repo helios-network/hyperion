@@ -431,6 +431,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 				if err != nil {
 					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
 					return err
 				}
 				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
@@ -448,6 +449,8 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 			resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
+				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
 				return err
 			}
 			cost, err := l.helios.GetTxCost(ctx, resp.TxHash)

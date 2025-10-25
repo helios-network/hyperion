@@ -498,6 +498,7 @@ var DefaultChainSettingsMap = map[string]interface{}{
 	"min_batch_fee_hls":                   0.1,
 	"min_tx_fee_hls":                      0.1,
 	"oracle_eth_default_blocks_to_search": uint64(2000),
+	"gas_limit":                           5000000,
 }
 
 func GetChainSettings(chainId uint64) (map[string]interface{}, error) {

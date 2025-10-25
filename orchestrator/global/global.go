@@ -224,16 +224,21 @@ func (g *Global) GetEVMNetwork(counterpartyChainParams *hyperiontypes.Counterpar
 	}
 
 	options := make([]committer.EVMCommitterOption, 0)
+	gasLimit := 5000000
+
+	if settings["gas_limit"] != nil {
+		gasLimit = int(settings["gas_limit"].(float64))
+	}
 
 	if settings["estimate_gas"] != nil && !settings["estimate_gas"].(bool) {
 		gasPrice := strconv.FormatInt(committer.ParseGasPrice(settings["eth_gas_price"].(string)), 10)
 		options = append(options, committer.OptionGasPriceFromString(gasPrice))
-		options = append(options, committer.OptionGasLimit(5000000))
+		options = append(options, committer.OptionGasLimit(uint64(gasLimit)))
 		options = append(options, committer.OptionEstimateGas(false))
 	} else {
 		gasPrice := g.GetGasPrice(counterpartyChainParams.BridgeChainId)
 		options = append(options, committer.OptionGasPriceFromString(gasPrice))
-		options = append(options, committer.OptionGasLimit(5000000))
+		options = append(options, committer.OptionGasLimit(uint64(gasLimit)))
 	}
 
 	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
@@ -616,9 +621,19 @@ func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, 
 	}
 
 	gasPrice := g.GetGasPrice(chainId)
+
+	gasLimit := 5000000
+	settings, err := storage.GetChainSettings(chainId)
+	if err != nil {
+		return gethcommon.Address{}, 0, false
+	}
+	if settings["gas_limit"] != nil {
+		gasLimit = int(settings["gas_limit"].(float64))
+	}
+	fmt.Println("gasLimit:", gasLimit)
 	options := []committer.EVMCommitterOption{
 		committer.OptionGasPriceFromString(gasPrice),
-		committer.OptionGasLimit(5000000),
+		committer.OptionGasLimit(uint64(gasLimit)),
 	}
 
 	fmt.Println("Deploying Hyperion contract...", ethKeyFromAddress.Hex())
