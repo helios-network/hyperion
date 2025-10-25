@@ -2,6 +2,7 @@ package hyperion
 
 import (
 	"context"
+	"strconv"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -419,7 +420,7 @@ func (c queryClient) GetValidatorAddress(ctx context.Context, hyperionId uint64,
 	resp, err := c.QueryClient.GetDelegateKeyByEth(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client "+addr.Hex()+" on hyperionId "+strconv.FormatUint(hyperionId, 10))
 	}
 
 	if resp == nil {
@@ -449,7 +450,7 @@ func (c queryClient) GetListOfNetworksWhereRegistered(ctx context.Context, addr 
 	resp, err := c.QueryClient.QueryGetDelegateKeysByAddress(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query QueryGetDelegateKeysByAddress from client")
 	}
 
 	if resp == nil {
@@ -472,7 +473,7 @@ func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context
 	resp, err := c.QueryClient.QueryGetLastObservedEthereumBlockHeight(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query QueryGetLastObservedEthereumBlockHeight from client")
 	}
 
 	if resp == nil {
@@ -495,7 +496,7 @@ func (c queryClient) QueryGetLastObservedEventNonce(ctx context.Context, hyperio
 	resp, err := c.QueryClient.QueryGetLastObservedEventNonce(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return 0, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return 0, errors.Wrap(err, "failed to query QueryGetLastObservedEventNonceRequest from client on hyperionId "+strconv.FormatUint(hyperionId, 10))
 	}
 
 	if resp == nil {
@@ -519,7 +520,7 @@ func (c queryClient) QueryDenomToTokenAddress(ctx context.Context, hyperionId ui
 	resp, err := c.QueryClient.DenomToTokenAddress(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return gethcommon.Address{}, false, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return gethcommon.Address{}, false, errors.Wrap(err, "failed to query DenomToTokenAddress from client")
 	}
 
 	if resp == nil {
@@ -591,7 +592,7 @@ func (c queryClient) QueryGetListOutgoingTxs(ctx context.Context, chainId uint64
 	resp, err := c.QueryClient.OutgoingTxBatches(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query OutgoingTxBatches from client")
 	}
 
 	if resp == nil {
@@ -614,7 +615,7 @@ func (c queryClient) QueryGetAllPendingSendToChain(ctx context.Context, chainId 
 	resp, err := c.QueryClient.GetAllPendingSendToChain(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, nil, errors.Wrap(err, "failed to query GetAllPendingSendToChain from client")
 	}
 
 	if resp == nil {
