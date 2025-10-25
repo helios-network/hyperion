@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sort"
 	"strings"
@@ -43,6 +44,11 @@ func (s *Orchestrator) runValsetManager(ctx context.Context) error {
 		s.HyperionState.ValsetManagerStatus = "idle"
 		s.HyperionState.ValsetManagerLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
 		s.HyperionState.ValsetManagerNextExecutionTimestamp = uint64(start.Add(defaultValsetManagerLoopDur).Unix())
+
+		if err != nil {
+			s.logger.WithError(err).Errorln("valset manager function returned an error")
+		}
+
 		return err
 	})
 }
@@ -107,13 +113,11 @@ func (l *valsetManager) Process(ctx context.Context) error {
 		l.Log().Info("relaying getLastValsetCheckpoint done")
 	}
 
-	// if l.logEnabled {
 	l.Log().WithFields(log.Fields{
 		"Helios": heliosCheckpoint.Hex(),
 		"Eth":    ethCheckpoint.Hex(),
 		"Synced": heliosCheckpoint.Hex() == ethCheckpoint.Hex(),
 	}).Infoln("Relayer: checkpoints")
-	// }
 
 	if heliosCheckpoint.Hex() != ethCheckpoint.Hex() {
 		if l.logEnabled {
@@ -228,6 +232,8 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 		return nil
 	}
 
+	fmt.Println("Sending valset update to Ethereum", latestEthValset, latestConfirmedValset, confirmations)
+
 	txHash, cost, err := l.ethereum.SendEthValsetUpdate(ctx, latestEthValset, latestConfirmedValset, confirmations)
 	if err != nil {
 		return err
@@ -323,6 +329,8 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 		return nil, errors.Wrap(err, "failed to get latest valset nonce")
 	}
 
+	fmt.Println("latestEthereumValsetNonce", latestEthereumValsetNonce.Uint64())
+
 	cosmosValset, err := l.helios.ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get Helios valset")
@@ -334,6 +342,20 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 			return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events")
 		}
 
+		// manage case where the blockchain not manage correctly the block.number (like arbitrum)
+		if len(valsetUpdatedEvents) == 0 {
+			latestBlockHeader, err := l.ethereum.GetHeaderByNumber(ctx, nil)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get latest block height")
+			}
+
+			valsetUpdatedEvents, err = l.ethereum.GetValsetUpdatedEventsWithIndexedNonce(latestEthereumValsetNonce.Uint64(), l.Orchestrator.cfg.ChainParams.BridgeContractStartHeight, latestBlockHeader.Number.Uint64())
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to filter past ValsetUpdated events")
+			}
+			fmt.Println("[Warning] - GetValsetUpdatedEventsWithIndexedNonce : ", len(valsetUpdatedEvents))
+		}
+
 		// by default the lowest found valset goes first, we want the highest
 		//
 		// TODO(xlab): this follows the original impl, but sort might be skipped there:
@@ -341,8 +363,8 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 		sort.Sort(sort.Reverse(HyperionValsetUpdatedEvents(valsetUpdatedEvents)))
 
 		if len(valsetUpdatedEvents) == 0 { // return the cosmos valset if no event is found
+			fmt.Println("No valset on "+l.cfg.ChainName+" updated events found, returning cosmos valset", cosmosValset)
 			return cosmosValset, nil
-			// return nil, errors.New("failed to get latest valset (Maybe rpc not answering correctly?)")
 		}
 
 		// we take only the first event if we find any at all.
@@ -470,6 +492,11 @@ func (l *valsetManager) makeCheckpoint(ctx context.Context, valset *hyperiontype
 	      return checkpoint;
 	  }
 	*/
+
+	if valset == nil {
+		return nil, errors.New("valset is nil")
+	}
+
 	validators := []string{}
 	powers := []uint64{}
 

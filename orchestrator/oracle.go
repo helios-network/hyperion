@@ -52,9 +52,9 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	defer ticker.Stop()
 
 	// Run first iteration immediately
-	if err := oracle.observeEthEvents(ctx); err != nil {
-		s.logger.WithError(err).Errorln("oracle function returned an error")
-	}
+	// if err := oracle.observeEthEvents(ctx); err != nil {
+	// 	s.logger.WithError(err).Errorln("oracle function returned an error")
+	// }
 
 	for {
 		select {
@@ -245,14 +245,17 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return err
 	}
 
-	lastObservedEventNonce, err := l.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
+	lastObservedEventNonce, err := l.Orchestrator.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
-		l.Log().WithError(err).Errorln("failed to get last observed event nonce on " + l.cfg.ChainName)
+		l.Log().WithError(err).Errorln("failed to get last observed event nonce for " + l.cfg.ChainName + " on helios network")
 		return err
 	}
 
-	lastEventNonce, err := l.ethereum.GetLastEventNonce(ctx)
+	lastEventNonce, err := l.Orchestrator.ethereum.GetLastEventNonce(ctx)
 	if err != nil {
+		if strings.Contains(err.Error(), "no contract code at given address") {
+			l.Orchestrator.RotateRpc()
+		}
 		l.Log().WithError(err).Errorln("failed to get last event nonce on " + l.cfg.ChainName)
 		return err
 	}

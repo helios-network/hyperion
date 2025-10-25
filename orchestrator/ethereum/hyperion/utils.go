@@ -63,7 +63,7 @@ func (s *hyperionContract) GetLastEventNonce(
 	})
 
 	if err != nil {
-		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		err = errors.Wrap(err, "StateLastEventNonce call failed for hyperion contract "+s.hyperionAddress.Hex())
 		return nil, err
 	}
 
@@ -81,7 +81,7 @@ func (s *hyperionContract) GetLastValsetCheckpoint(
 	})
 
 	if err != nil {
-		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		err = errors.Wrap(err, "StateLastValsetCheckpoint call failed")
 		return nil, err
 	}
 
@@ -105,7 +105,7 @@ func (s *hyperionContract) GetLastValsetUpdatedEventHeight(
 	})
 
 	if err != nil {
-		err = errors.Wrap(err, "StateLastEventNonce call failed")
+		err = errors.Wrap(err, "StateLastValsetHeight call failed")
 		return nil, err
 	}
 
@@ -193,26 +193,32 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 		return nil, 0, err
 	}
 
-	time.Sleep(5 * time.Second)
-
-	tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
-	if err != nil {
-		fmt.Println("Error getting transaction by hash:", err)
-		return nil, 0, err
-	}
-
-	if isPending {
-		for isPending {
+	maxRetries := 50 // 50 * 5 seconds = 250 seconds = 4 minutes and 10 seconds
+	retryCount := 0
+	var txHash common.Hash
+	fmt.Println("Checking deployment hyperion contract transaction status...", tx.Hash().String())
+	for retryCount < maxRetries {
+		fmt.Println("Checking deployment hyperion contract transaction status...", retryCount)
+		tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+		if err != nil {
 			time.Sleep(5 * time.Second)
-			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
-			if err != nil {
-				fmt.Println("Error getting transaction by hash:", err)
-				return nil, 0, err
-			}
+			retryCount++
+			continue
 		}
+		if isPending {
+			time.Sleep(5 * time.Second)
+			retryCount++
+			continue
+		}
+		txHash = tx.Hash()
+		break
 	}
 
-	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
+	if txHash == (common.Hash{}) {
+		return nil, 0, errors.New("transaction not found on the blockchain")
+	}
+
+	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, txHash)
 	if err != nil {
 		return nil, 0, err
 	}

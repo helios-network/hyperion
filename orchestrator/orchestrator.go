@@ -258,7 +258,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	}
 	hyperionID := hyperionIDHash.Big().Uint64()
 
-	s.logger.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
+	s.logger.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex(), "hyperionAddress", s.ethereum.GetHyperionContractAddress().Hex())
 
 	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
 	if err != nil {
@@ -378,7 +378,6 @@ func (s *Orchestrator) RotateRpc() {
 	for _, eth := range s.ethereums {
 		if (*eth).GetRpc().Url != usedRpc {
 			lstOfclients = append(lstOfclients, eth)
-			break
 		}
 	}
 	if len(lstOfclients) == 0 {
@@ -386,7 +385,7 @@ func (s *Orchestrator) RotateRpc() {
 		return
 	}
 	s.ethereum = *lstOfclients[rand.Intn(len(lstOfclients))]
-	s.logger.Info("Rotated rpc to", "rpc", s.ethereum.GetRpc().Url)
+	s.logger.Info("Rotated rpc to rpc ", s.ethereum.GetRpc().Url, " / total rpcs ", len(lstOfclients))
 }
 
 // func (s *Orchestrator) UpdateRpcs() {

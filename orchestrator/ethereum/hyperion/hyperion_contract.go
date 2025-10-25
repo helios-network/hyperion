@@ -142,27 +142,32 @@ func DeployHyperionContract(
 	if err != nil {
 		return common.Address{}, 0, err, false
 	}
-	// wait for the transaction to be handled
-	time.Sleep(5 * time.Second)
-
-	tx, isPending, err := ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
-	if err != nil {
-		fmt.Println("Error getting transaction by hash:", err)
-		return common.Address{}, 0, err, false
-	}
-
-	if isPending {
-		for isPending {
+	maxRetries := 50 // 50 * 5 seconds = 250 seconds = 4 minutes and 10 seconds
+	retryCount := 0
+	var txHash common.Hash
+	fmt.Println("Checking deployment hyperion contract transaction status...", tx.Hash().String())
+	for retryCount < maxRetries {
+		fmt.Println("Checking deployment hyperion contract transaction status...", retryCount)
+		tx, isPending, err := ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
+		if err != nil {
 			time.Sleep(5 * time.Second)
-			tx, isPending, err = ethCommitter.Provider().TransactionByHash(ctx, tx.Hash())
-			if err != nil {
-				fmt.Println("Error getting transaction by hash:", err)
-				return common.Address{}, 0, err, false
-			}
+			retryCount++
+			continue
 		}
+		if isPending {
+			time.Sleep(5 * time.Second)
+			retryCount++
+			continue
+		}
+		txHash = tx.Hash()
+		break
 	}
 
-	receipt, err := ethCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
+	if txHash == (common.Hash{}) {
+		return common.Address{}, 0, errors.New("transaction not found on the blockchain"), false
+	}
+
+	receipt, err := ethCommitter.Provider().TransactionReceipt(ctx, txHash)
 	if err != nil {
 		return common.Address{}, 0, err, false
 	}
@@ -181,12 +186,15 @@ func NewHyperionContract(
 	pendingTxWaitDuration time.Duration,
 	signerFn bind.SignerFn,
 ) (HyperionContract, error) {
-	fmt.Println("Contract hyperionAddress", hyperionAddress.String())
-	// wrappers.DeployHyperion(ethCommitter.GetTransactOpts(ctx), ethCommitter.Provider())
+	var ethHyperion *wrappers.Hyperion
+	var err error
 
-	ethHyperion, err := wrappers.NewHyperion(hyperionAddress, ethCommitter.Provider())
-	if err != nil {
-		return nil, err
+	if hyperionAddress != (common.Address{}) {
+		fmt.Println("Contract hyperionAddress", hyperionAddress.String())
+		ethHyperion, err = wrappers.NewHyperion(hyperionAddress, ethCommitter.Provider())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	svc := &hyperionContract{

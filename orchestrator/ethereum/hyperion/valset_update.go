@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -34,7 +35,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 
 	if newValset.Nonce <= oldValset.Nonce {
 		metrics.ReportFuncError(s.svcTags)
-		err := errors.New("new valset nonce should be greater than old valset nonce")
+		err := errors.New("new valset nonce should be greater than old valset nonce newValset=" + strconv.FormatUint(newValset.Nonce, 10) + " <= oldValset=" + strconv.FormatUint(oldValset.Nonce, 10))
 		return nil, big.NewInt(0), err
 	}
 
