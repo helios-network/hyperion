@@ -54,6 +54,7 @@ type BroadcastClient interface {
 	SendERC20DeployedClaimMsg(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (sdk.Msg, error)
 
 	SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error)
+	SyncBroadcastMsgsSimulate(ctx context.Context, msgs []sdk.Msg) error
 
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
@@ -65,6 +66,7 @@ type BroadcastClient interface {
 	SendCancelPendingOutTxs(ctx context.Context, chainId uint64, count uint64) error
 
 	UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error
+	UpdateChainLogoMsg(ctx context.Context, chainId uint64, logo string) (sdk.Msg, error)
 }
 
 type broadcastClient struct {
@@ -1140,6 +1142,25 @@ func (c *broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg)
 	}
 }
 
+func (c *broadcastClient) SyncBroadcastMsgsSimulate(ctx context.Context, msgs []sdk.Msg) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	resp, err := c.ChainClient.SimulateMsg(c.ClientContext(), msgs...)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting Msgs failed")
+	}
+
+	if resp.GasInfo.GasUsed > resp.GasInfo.GasWanted {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.New("gas used is greater than gas wanted")
+	}
+
+	return nil
+}
+
 func (c *broadcastClient) UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
@@ -1165,6 +1186,18 @@ func (c *broadcastClient) UpdateChainSmartContract(ctx context.Context, chainId 
 	}).Infoln("Oracle sent MsgUpdateChainSmartContract")
 
 	return nil
+}
+
+func (c *broadcastClient) UpdateChainLogoMsg(ctx context.Context, chainId uint64, logo string) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+	msg := &hyperiontypes.MsgUpdateChainLogo{
+		ChainId: chainId,
+		Logo:    logo,
+		Signer:  c.FromAddress().String(),
+	}
+	return msg, nil
 }
 
 func (c *broadcastClient) SendBatchConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) (sdk.Msg, error) {

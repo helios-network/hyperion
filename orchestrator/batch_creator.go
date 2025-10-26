@@ -83,7 +83,12 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 			paquetOfTenMsgs = append(paquetOfTenMsgs, msg)
 			if len(paquetOfTenMsgs) == 10 {
 				l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
-				_, err := l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+				err := l.helios.SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
+				if err != nil {
+					l.Log().WithError(err).Warningln("failed to simulate token batches")
+					return err
+				}
+				_, err = l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
 				if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
 					l.Log().Infoln("no unbatched txs found, skipping")
 				} else if err != nil {
@@ -95,7 +100,12 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 		}
 		if len(paquetOfTenMsgs) > 0 {
 			l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
-			_, err := l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+			err := l.helios.SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
+			if err != nil {
+				l.Log().WithError(err).Warningln("failed to simulate token batches")
+				return err
+			}
+			_, err = l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
 			if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
 				l.Log().Infoln("no unbatched txs found, skipping")
 			} else if err != nil {

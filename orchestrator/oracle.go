@@ -21,7 +21,7 @@ import (
 
 const (
 	// Minimum number of confirmations for an Ethereum block to be considered valid
-	ethBlockConfirmationDelay uint64 = 4
+	// ethBlockConfirmationDelay uint64 = 4
 
 	// Maximum block range for Ethereum event query. If the orchestrator has been offline for a long time,
 	// the oracle loop can potentially run longer than defaultLoopDur due to a surge of events. This usually happens
@@ -113,6 +113,14 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("oracle_eth_default_blocks_to_search found in chain settings, using value", defaultBlocksToSearch)
 	}
 
+	ethBlockConfirmationDelay, ok := settings["oracle_block_confirmation_delay"].(float64)
+	if !ok {
+		l.Log().Infoln("oracle_block_confirmation_delay not found in chain settings, using default value 4")
+		ethBlockConfirmationDelay = 4
+	} else {
+		l.Log().Infoln("oracle_block_confirmation_delay found in chain settings, using value", ethBlockConfirmationDelay)
+	}
+
 	// Sélectionner le meilleur RPC basé sur la réputation
 	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
 	// if bestRpcURL != "" {
@@ -192,18 +200,18 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	// state
 	l.HyperionState.Height = latestHeight
-	l.HyperionState.TargetHeight = latestHeight - ethBlockConfirmationDelay
+	l.HyperionState.TargetHeight = latestHeight - uint64(ethBlockConfirmationDelay)
 
 	targetHeight := latestHeight
 
 	// not enough blocks on ethereum yet
-	if targetHeight <= ethBlockConfirmationDelay {
+	if targetHeight <= uint64(ethBlockConfirmationDelay) {
 		l.Log().Debugln("not enough blocks on " + l.cfg.ChainName)
 		return nil
 	}
 
 	// ensure that latest block has minimum confirmations
-	targetHeight = targetHeight - ethBlockConfirmationDelay
+	targetHeight = targetHeight - uint64(ethBlockConfirmationDelay)
 	if targetHeight <= l.lastObservedEthHeight {
 		l.Log().Infoln("Synced", l.lastObservedEthHeight, "to", targetHeight)
 		return nil
@@ -214,7 +222,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		if targetHeightForSync > l.lastObservedEthHeight+uint64(defaultBlocksToSearch) {
 			targetHeightForSync = l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
 		}
-		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync); err != nil {
+		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync, uint64(ethBlockConfirmationDelay)); err != nil {
 			return err
 		}
 		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
@@ -229,10 +237,10 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	return nil
 }
 
-func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64) error {
+func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64, ethBlockConfirmationDelay uint64) error {
 
 	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
-	l.Orchestrator.SetTargetHeight(latestHeight - ethBlockConfirmationDelay)
+	l.Orchestrator.SetTargetHeight(latestHeight - uint64(ethBlockConfirmationDelay))
 
 	if targetHeight-l.lastObservedEthHeight == 0 {
 		l.Log().Infoln("No blocks to sync", "last_observed_eth_height", l.lastObservedEthHeight, "latest_height", latestHeight, "target_height", targetHeight)
@@ -441,6 +449,12 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			if len(msgs) >= 50 {
 				log.Infoln("sending bulk of ", len(msgs), "claims messages")
 				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+
+				err = l.helios.SyncBroadcastMsgsSimulate(ctx, msgs)
+				if err != nil {
+					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
+					return err
+				}
 				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 				if err != nil {
 					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
@@ -460,6 +474,11 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 		if len(msgs) > 0 {
 			log.Infoln("sending bulk of ", len(msgs), "claims messages")
 			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+			err = l.helios.SyncBroadcastMsgsSimulate(ctx, msgs)
+			if err != nil {
+				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
+				return err
+			}
 			resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
 				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"

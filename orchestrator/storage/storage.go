@@ -504,6 +504,7 @@ var DefaultChainSettingsMap = map[string]interface{}{
 	"min_batch_fee_hls":                   0.1,
 	"min_tx_fee_hls":                      0.1,
 	"oracle_eth_default_blocks_to_search": float64(2000),
+	"oracle_block_confirmation_delay":     float64(4),
 	"gas_limit":                           float64(5000000),
 }
 

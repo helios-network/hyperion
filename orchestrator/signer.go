@@ -159,6 +159,13 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 	if err != nil {
 		return false, 0, errors.Wrap(err, "failed to send batch confirm message")
 	}
+
+	err = l.helios.SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+	if err != nil {
+		l.Log().WithError(err).Warningln("failed to simulate batch confirm message")
+		return false, 0, err
+	}
+
 	_, err = l.helios.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return false, 0, errors.Wrap(err, "failed to broadcast batch confirm message")

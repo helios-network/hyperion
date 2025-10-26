@@ -404,6 +404,18 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, response, nil)
 		return
+	case "update-chain-logo":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Logo    string `json:"logo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response := queries.UpdateChainLogo(r.Context(), global, params.ChainID, params.Logo)
+		sendSuccess(w, response, nil)
+		return
 	case "run-hyperion":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`
