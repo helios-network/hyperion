@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
@@ -154,13 +155,22 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 
 	l.Orchestrator.HyperionState.SignerStatus = "signing batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol
 
-	err := l.helios.SendBatchConfirmSync(ctx,
-		l.cfg.HyperionId,
-		l.cfg.EthereumAddr,
-		l.hyperionID,
-		l.ethereum.GetPersonalSignFn(),
-		oldestUnsignedBatch,
-	)
+	msg, err := l.helios.SendBatchConfirmMsg(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, l.ethereum.GetPersonalSignFn(), oldestUnsignedBatch)
+	if err != nil {
+		return false, 0, errors.Wrap(err, "failed to send batch confirm message")
+	}
+	_, err = l.helios.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	if err != nil {
+		return false, 0, errors.Wrap(err, "failed to broadcast batch confirm message")
+	}
+
+	// err := l.helios.SendBatchConfirmSync(ctx,
+	// 	l.cfg.HyperionId,
+	// 	l.cfg.EthereumAddr,
+	// 	l.hyperionID,
+	// 	l.ethereum.GetPersonalSignFn(),
+	// 	oldestUnsignedBatch,
+	// )
 
 	if err != nil {
 		l.Orchestrator.HyperionState.SignerStatus = "error signing batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol

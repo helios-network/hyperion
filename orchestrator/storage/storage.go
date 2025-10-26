@@ -80,7 +80,13 @@ func UpdateFeesFile(feesTaken *big.Int, tokenContract string, cost *big.Int, txH
 		"chain_id":       chainId,
 		"timestamp":      time.Now().Unix(),
 	}
+
 	baseFileArray = append(baseFileArray, feesObject)
+
+	if len(baseFileArray) > 10 { // save only the last 100 txs
+		baseFileArray = baseFileArray[len(baseFileArray)-10:]
+	}
+
 	json, err := json.Marshal(baseFileArray)
 	if err != nil {
 		return

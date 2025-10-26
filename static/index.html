@@ -331,7 +331,6 @@
                                         { text: 'Transaction Hash', value: 'tx_hash' },
                                         { text: 'Block Height', value: 'block_height' },
                                         { text: 'Token Contract', value: 'token_contract' },
-                                        { text: 'Fees Taken', value: 'fees_taken' },
                                         { text: 'Cost', value: 'cost' },
                                         { text: 'Timestamp', value: 'timestamp' }
                                     ]"
@@ -1624,7 +1623,10 @@
 
                         const data = await response.json();
                         if (data.success && data.data.transactions) {
-                            this.transactions = data.data.transactions;
+                            this.transactions = data.data.transactions.map(transaction => ({
+                                ...transaction,
+                                timestamp: new Date(transaction.timestamp * 1000).toLocaleString(),
+                            }));
                             this.totalTransactions = data.data.total || this.transactions.length;
                         }
                     } catch (error) {

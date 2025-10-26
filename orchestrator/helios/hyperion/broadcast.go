@@ -10,7 +10,6 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 
-	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -25,29 +24,36 @@ import (
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
+type queuedMessage struct {
+	msgs     []sdk.Msg
+	respChan chan<- *sdk.TxResponse
+	errChan  chan<- error
+}
+
 type BroadcastClient interface {
 	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
 	SendBatchConfirmSync(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
+	SendBatchConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) (sdk.Msg, error)
 	SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error
-	SendRequestBatchMsg(ctx context.Context, hyperionId uint64, denom string) (cosmostypes.Msg, error)
-	SendRequestBatchWithMinimumFeeMsg(ctx context.Context, hyperionId uint64, denom string, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int, txIds []uint64) (cosmostypes.Msg, error)
-	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error
+	SendRequestBatchMsg(ctx context.Context, hyperionId uint64, denom string) (sdk.Msg, error)
+	SendRequestBatchWithMinimumFeeMsg(ctx context.Context, hyperionId uint64, denom string, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int, txIds []uint64) (sdk.Msg, error)
+	SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee sdk.Coin) error
 
-	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
-	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
-	SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
-	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
-	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error)
+	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
+	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
+	SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*sdk.TxResponse, error)
+	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
+	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
 
-	SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
-	SendWithdrawalClaimMsg(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
-	SendExternalDataClaimMsg(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (cosmostypes.Msg, error)
-	SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
-	SendERC20DeployedClaimMsg(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error)
+	SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (sdk.Msg, error)
+	SendWithdrawalClaimMsg(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (sdk.Msg, error)
+	SendExternalDataClaimMsg(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (sdk.Msg, error)
+	SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (sdk.Msg, error)
+	SendERC20DeployedClaimMsg(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (sdk.Msg, error)
 
-	SyncBroadcastMsgs(ctx context.Context, msgs []cosmostypes.Msg) (*cosmostypes.TxResponse, error)
+	SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error)
 
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
@@ -65,16 +71,99 @@ type broadcastClient struct {
 	chain.ChainClient
 
 	svcTags metrics.Tags
+
+	messageQueue chan queuedMessage // Unbuffered channel for messages to be broadcast
 }
 
 func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
-	return broadcastClient{
-		ChainClient: client,
-		svcTags:     metrics.Tags{"svc": "hyperion_broadcast"},
+	broadcastClient := &broadcastClient{
+		ChainClient:  client,
+		svcTags:      metrics.Tags{"svc": "hyperion_broadcast"},
+		messageQueue: make(chan queuedMessage),
+	}
+
+	go broadcastClient.runBroadcastLoop()
+
+	return broadcastClient
+}
+
+func (c *broadcastClient) runBroadcastLoop() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	queuedMessages := make([]queuedMessage, 0)
+	for {
+		select {
+		case <-ticker.C:
+			if len(queuedMessages) > 0 {
+				fmt.Println("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
+				log.Debugln("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
+				c.processBatch(context.Background(), queuedMessages)
+				queuedMessages = make([]queuedMessage, 0)
+			} else {
+				fmt.Println("runBroadcastLoop: no messages to process (ticker)")
+				log.Debugln("runBroadcastLoop: no messages to process (ticker)")
+			}
+		case qMsg := <-c.messageQueue:
+			fmt.Println("runBroadcastLoop: message received, adding to queue", qMsg)
+			log.Debugln("runBroadcastLoop: message received, adding to queue")
+			queuedMessages = append(queuedMessages, qMsg)
+		}
 	}
 }
 
-func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error {
+func (c *broadcastClient) processBatch(ctx context.Context, batch []queuedMessage) {
+	if len(batch) == 0 {
+		return
+	}
+
+	// Collect all messages from the batch
+	allMsgs := make([]sdk.Msg, 0)
+	allRespChans := make([]chan<- *sdk.TxResponse, 0)
+	allErrChans := make([]chan<- error, 0)
+
+	for _, qMsg := range batch {
+		allMsgs = append(allMsgs, qMsg.msgs...)
+		allRespChans = append(allRespChans, qMsg.respChan)
+		allErrChans = append(allErrChans, qMsg.errChan)
+	}
+
+	log.WithFields(log.Fields{
+		"num_msgs": len(allMsgs),
+	}).Infoln("runBroadcastLoop before broadcasting messages")
+
+	start := time.Now()
+
+	// Broadcast the collected messages
+	resp, err := c.ChainClient.SyncBroadcastMsg(allMsgs...)
+
+	// Send responses back to all waiting callers
+	for i := 0; i < len(allRespChans); i++ {
+		if err != nil {
+			allErrChans[i] <- errors.Wrap(err, "runBroadcastLoop batched Msgs failed")
+		} else {
+			allRespChans[i] <- resp.TxResponse
+		}
+		close(allRespChans[i])
+		close(allErrChans[i])
+	}
+
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		log.WithError(err).Errorln("runBroadcastLoop batched messages failed")
+		return
+	}
+	duration := time.Since(start)
+
+	log.WithFields(log.Fields{
+		"tx_hash":  resp.TxResponse.TxHash,
+		"code":     resp.TxResponse.Code,
+		"duration": duration,
+		"num_msgs": len(allMsgs),
+	}).Infoln("runBroadcastLoop messages broadcasted successfully")
+}
+
+func (c *broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -119,23 +208,7 @@ func (c broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64,
 	return nil
 }
 
-func sigToVRS(sigHex string) (v uint8, r, s gethcommon.Hash) {
-	signatureBytes := gethcommon.FromHex(sigHex)
-	vParam := signatureBytes[64]
-	if vParam == byte(0) {
-		vParam = byte(27)
-	} else if vParam == byte(1) {
-		vParam = byte(28)
-	}
-
-	v = vParam
-	r = gethcommon.BytesToHash(signatureBytes[0:32])
-	s = gethcommon.BytesToHash(signatureBytes[32:64])
-
-	return
-}
-
-func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
+func (c *broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -178,7 +251,7 @@ func (c broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, 
 	return nil
 }
 
-func (c broadcastClient) SendBatchConfirmSync(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
+func (c *broadcastClient) SendBatchConfirmSync(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -231,7 +304,7 @@ func (c broadcastClient) SendBatchConfirmSync(_ context.Context, hyperionId uint
 	return nil
 }
 
-func (c broadcastClient) SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee cosmostypes.Coin) error {
+func (c *broadcastClient) SendToChain(ctx context.Context, chainId uint64, destination gethcommon.Address, amount, fee sdk.Coin) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -265,7 +338,7 @@ func (c broadcastClient) SendToChain(ctx context.Context, chainId uint64, destin
 	return nil
 }
 
-func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error {
+func (c *broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64, denom string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -292,7 +365,7 @@ func (c broadcastClient) SendRequestBatch(ctx context.Context, hyperionId uint64
 	return nil
 }
 
-func (c broadcastClient) SendRequestBatchMsg(ctx context.Context, hyperionId uint64, denom string) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendRequestBatchMsg(ctx context.Context, hyperionId uint64, denom string) (sdk.Msg, error) {
 	msg := &hyperiontypes.MsgRequestBatch{
 		HyperionId:   hyperionId,
 		Denom:        denom,
@@ -301,7 +374,7 @@ func (c broadcastClient) SendRequestBatchMsg(ctx context.Context, hyperionId uin
 	return msg, nil
 }
 
-func (c broadcastClient) SendRequestBatchWithMinimumFeeMsg(ctx context.Context, hyperionId uint64, denom string, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int, txIds []uint64) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendRequestBatchWithMinimumFeeMsg(ctx context.Context, hyperionId uint64, denom string, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int, txIds []uint64) (sdk.Msg, error) {
 	msg := &hyperiontypes.MsgRequestBatchWithMinimumFee{
 		HyperionId:      hyperionId,
 		Denom:           denom,
@@ -313,7 +386,7 @@ func (c broadcastClient) SendRequestBatchWithMinimumFeeMsg(ctx context.Context, 
 	return msg, nil
 }
 
-func (c broadcastClient) GetTxCost(ctx context.Context, txHash string) (*big.Int, error) {
+func (c *broadcastClient) GetTxCost(ctx context.Context, txHash string) (*big.Int, error) {
 	tx, err := c.ChainClient.GetTx(ctx, txHash)
 	if err != nil {
 		return nil, err
@@ -321,7 +394,7 @@ func (c broadcastClient) GetTxCost(ctx context.Context, txHash string) (*big.Int
 	return tx.Tx.AuthInfo.Fee.Amount[0].Amount.BigInt(), nil
 }
 
-func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
+func (c *broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -357,7 +430,7 @@ func (c broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hyper
 	return nil
 }
 
-func (c broadcastClient) SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
+func (c *broadcastClient) SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -404,7 +477,7 @@ func (c broadcastClient) SendSetOrchestratorAddressesWithFee(ctx context.Context
 	return nil
 }
 
-func (c broadcastClient) SendUpdateOrchestratorAddressesFee(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
+func (c *broadcastClient) SendUpdateOrchestratorAddressesFee(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -440,7 +513,7 @@ func (c broadcastClient) SendUpdateOrchestratorAddressesFee(ctx context.Context,
 	return nil
 }
 
-func (c broadcastClient) SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
+func (c *broadcastClient) SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -473,7 +546,7 @@ func (c broadcastClient) SendUnSetOrchestratorAddresses(ctx context.Context, hyp
 	return nil
 }
 
-func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
+func (c *broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*sdk.TxResponse, error) {
 	// EthereumBridgeDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
@@ -485,7 +558,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 
 	log.WithFields(log.Fields{
 		"sender":         deposit.Sender.Hex(),
-		"destination":    cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
+		"destination":    sdk.AccAddress(deposit.Destination[12:32]).String(),
 		"amount":         deposit.Amount.String(),
 		"data":           deposit.Data,
 		"token_contract": deposit.TokenContract.Hex(),
@@ -503,7 +576,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 		TokenContract:  deposit.TokenContract.Hex(),
 		Amount:         sdkmath.NewIntFromBigInt(deposit.Amount),
 		EthereumSender: deposit.Sender.Hex(),
-		CosmosReceiver: cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
+		CosmosReceiver: sdk.AccAddress(deposit.Destination[12:32]).String(),
 		Orchestrator:   c.ChainClient.FromAddress().String(),
 		Data:           deposit.Data,
 		TxHash:         deposit.Raw.TxHash.Hex(),
@@ -554,7 +627,7 @@ func (c broadcastClient) SendDepositClaim(ctx context.Context, hyperionId uint64
 	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
+func (c *broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -598,7 +671,7 @@ func (c broadcastClient) SendWithdrawalClaim(_ context.Context, hyperionId uint6
 	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
+func (c *broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*sdk.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -644,7 +717,7 @@ func (c broadcastClient) SendExternalDataClaim(ctx context.Context, hyperionId u
 	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
+func (c *broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -715,7 +788,7 @@ func (c broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64,
 	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*cosmostypes.TxResponse, error) {
+func (c *broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -765,7 +838,7 @@ func (c broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId ui
 	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error {
+func (c *broadcastClient) SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -793,7 +866,7 @@ func (c broadcastClient) SendForceSetValsetAndLastObservedEventNonce(ctx context
 	return nil
 }
 
-func (c broadcastClient) SendCancelAllPendingOutTx(ctx context.Context, chainId uint64) error {
+func (c *broadcastClient) SendCancelAllPendingOutTx(ctx context.Context, chainId uint64) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -816,7 +889,7 @@ func (c broadcastClient) SendCancelAllPendingOutTx(ctx context.Context, chainId 
 	return nil
 }
 
-func (c broadcastClient) SendCancelPendingOutTxs(ctx context.Context, chainId uint64, count uint64) error {
+func (c *broadcastClient) SendCancelPendingOutTxs(ctx context.Context, chainId uint64, count uint64) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -841,7 +914,7 @@ func (c broadcastClient) SendCancelPendingOutTxs(ctx context.Context, chainId ui
 }
 
 // / Potential use for wait observed state of specifical claim
-func (c broadcastClient) WaitForAttestation(ctx context.Context, eventNonce uint64, claimHash []byte, timeout time.Duration) error {
+func (c *broadcastClient) WaitForAttestation(ctx context.Context, eventNonce uint64, claimHash []byte, timeout time.Duration) error {
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
 
@@ -873,7 +946,7 @@ func (c broadcastClient) WaitForAttestation(ctx context.Context, eventNonce uint
 	}
 }
 
-func (c broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (sdk.Msg, error) {
 	// EthereumBridgeDepositClaim
 	// When more than 66% of the active validator set has
 	// claimed to have seen the deposit enter the ethereum blockchain coins are
@@ -885,7 +958,7 @@ func (c broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uin
 
 	log.WithFields(log.Fields{
 		"sender":         deposit.Sender.Hex(),
-		"destination":    cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
+		"destination":    sdk.AccAddress(deposit.Destination[12:32]).String(),
 		"amount":         deposit.Amount.String(),
 		"data":           deposit.Data,
 		"token_contract": deposit.TokenContract.Hex(),
@@ -903,7 +976,7 @@ func (c broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uin
 		TokenContract:  deposit.TokenContract.Hex(),
 		Amount:         sdkmath.NewIntFromBigInt(deposit.Amount),
 		EthereumSender: deposit.Sender.Hex(),
-		CosmosReceiver: cosmostypes.AccAddress(deposit.Destination[12:32]).String(),
+		CosmosReceiver: sdk.AccAddress(deposit.Destination[12:32]).String(),
 		Orchestrator:   c.ChainClient.FromAddress().String(),
 		Data:           deposit.Data,
 		TxHash:         deposit.Raw.TxHash.Hex(),
@@ -913,7 +986,7 @@ func (c broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uin
 	return msg, nil
 }
 
-func (c broadcastClient) SendWithdrawalClaimMsg(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendWithdrawalClaimMsg(_ context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (sdk.Msg, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -940,7 +1013,7 @@ func (c broadcastClient) SendWithdrawalClaimMsg(_ context.Context, hyperionId ui
 	return msg, nil
 }
 
-func (c broadcastClient) SendExternalDataClaimMsg(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendExternalDataClaimMsg(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (sdk.Msg, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -968,7 +1041,7 @@ func (c broadcastClient) SendExternalDataClaimMsg(ctx context.Context, hyperionI
 	return msg, nil
 }
 
-func (c broadcastClient) SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (sdk.Msg, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -1007,7 +1080,7 @@ func (c broadcastClient) SendValsetClaimMsg(ctx context.Context, hyperionId uint
 	return msg, nil
 }
 
-func (c broadcastClient) SendERC20DeployedClaimMsg(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (cosmostypes.Msg, error) {
+func (c *broadcastClient) SendERC20DeployedClaimMsg(_ context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (sdk.Msg, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -1040,21 +1113,34 @@ func (c broadcastClient) SendERC20DeployedClaimMsg(_ context.Context, hyperionId
 	return msg, nil
 }
 
-func (c broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []cosmostypes.Msg) (*cosmostypes.TxResponse, error) {
+func (c *broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	resp, err := c.ChainClient.SyncBroadcastMsg(msgs...)
-	if err != nil {
+	respChan := make(chan *sdk.TxResponse, 1)
+	errChan := make(chan error, 1)
+
+	c.messageQueue <- queuedMessage{
+		msgs:     msgs,
+		respChan: respChan,
+		errChan:  errChan,
+	}
+	log.WithFields(log.Fields{"num_messages_enqueued": len(msgs)}).Debugln("Messages enqueued for broadcast")
+
+	select {
+	case resp := <-respChan:
+		return resp, nil
+	case err := <-errChan:
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "broadcasting Msgs failed")
+	case <-ctx.Done():
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(ctx.Err(), "context canceled while waiting for broadcast")
 	}
-
-	return resp.TxResponse, nil
 }
 
-func (c broadcastClient) UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error {
+func (c *broadcastClient) UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -1079,4 +1165,41 @@ func (c broadcastClient) UpdateChainSmartContract(ctx context.Context, chainId u
 	}).Infoln("Oracle sent MsgUpdateChainSmartContract")
 
 	return nil
+}
+
+func (c *broadcastClient) SendBatchConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	confirmHash := hyperion.EncodeTxBatchConfirm(hyperionID, batch)
+	// log.Info("confirmHash: ", confirmHash, "batch: ", batch, "hyperionID: ", hyperionID, "ethFrom: ", ethFrom.Hex())
+	// log.Info("confirmHashLength: ", len(confirmHash.Bytes()))
+	signature, err := signerFn(ethFrom, confirmHash.Bytes())
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.New("failed to sign validator address")
+	}
+
+	// sigV, sigR, sigS := sigToVRS(gethcommon.Bytes2Hex(signature))
+	// log.Info("sigV: ", sigV, "sigR: ", sigR, "sigS: ", sigS)
+
+	// MsgConfirmBatch
+	// When validators observe a MsgRequestBatch they form a batch by ordering
+	// transactions currently in the txqueue in order of highest to lowest fee,
+	// cutting off when the batch either reaches a hardcoded maximum size (to be
+	// decided, probably around 100) or when transactions stop being profitable
+	// (TODO determine this without nondeterminism) This message includes the batch
+	// as well as an Ethereum signature over this batch by the validator
+	// -------------
+	msg := &hyperiontypes.MsgConfirmBatch{
+		HyperionId:    hyperionId,
+		Orchestrator:  c.FromAddress().String(),
+		Nonce:         batch.BatchNonce,
+		Signature:     gethcommon.Bytes2Hex(signature),
+		EthSigner:     ethFrom.Hex(),
+		TokenContract: batch.TokenContract,
+	}
+
+	return msg, nil
 }
