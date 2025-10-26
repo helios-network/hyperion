@@ -195,12 +195,6 @@
                                                         Stop
                                                     </v-btn>
                                                     <v-btn
-                                                        color="primary"
-                                                        @click="openUpdateChainLogoDialog(chain.chainId)"
-                                                    >
-                                                        Update Logo
-                                                    </v-btn>
-                                                    <v-btn
                                                         v-if="chain.registered && !chain.running"
                                                         color="warning"
                                                         @click="unregisterHyperion(chain.chainId)"
@@ -309,6 +303,15 @@
                                             block
                                         >
                                             Propose Add Whitelisted Address
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="openUpdateChainLogoDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Update Logo
                                         </v-btn>
                                     </v-col>
                                 </v-row>
