@@ -7,10 +7,12 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/gov"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/hyperion"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/logos"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/slashing"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/staking"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios/tendermint"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
+	logostypes "github.com/Helios-Chain-Labs/sdk-go/chain/logos/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 	comethttp "github.com/cometbft/cometbft/rpc/client/http"
@@ -38,6 +40,7 @@ type NetworkWithoutBroadcast interface {
 	gov.QClient
 	tendermint.Client
 	staking.StakingQueryClient
+	logos.QLogosClient
 }
 
 type Network interface {
@@ -48,6 +51,8 @@ type Network interface {
 	tendermint.Client
 	staking.StakingQueryClient
 	slashing.SlashingBroadcastClient
+	logos.QLogosClient
+	logos.BLogosClient
 }
 
 func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWithoutBroadcast, error) {
@@ -101,11 +106,13 @@ func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWi
 		gov.QClient
 		tendermint.Client
 		staking.StakingQueryClient
+		logos.QLogosClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
 		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
+		logos.NewQueryClient(logostypes.NewQueryClient(conn)),
 	}
 
 	logger.Infoln("NET LOADED")
@@ -167,6 +174,8 @@ func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (Network, err
 		gov.BClient
 		staking.StakingQueryClient
 		slashing.SlashingBroadcastClient
+		logos.QLogosClient
+		logos.BLogosClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
 		hyperion.NewBroadcastClient(chainClient),
@@ -175,6 +184,8 @@ func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (Network, err
 		gov.NewBroadcastClient(chainClient),
 		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
 		slashing.NewBroadcastClient(chainClient),
+		logos.NewQueryClient(logostypes.NewQueryClient(conn)),
+		logos.NewBroadcastClient(chainClient),
 	}
 
 	logger.Infoln("NET LOADED")
