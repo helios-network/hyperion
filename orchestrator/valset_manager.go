@@ -239,7 +239,7 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 
 		if strings.Contains(err.Error(), "insuffficient funds for gas") {
 			l.Orchestrator.HyperionState.ValsetManagerStatus = "insufficient funds for gas"
-			return nil
+			return err
 		}
 		return err
 	}
