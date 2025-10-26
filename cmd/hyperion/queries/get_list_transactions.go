@@ -69,6 +69,12 @@ func GetListTransactions(ctx context.Context, global *global.Global, page int, s
 			}
 			fee["cost"] = formatBigStringToFloat64(fee["cost"].(string)) + " " + nativeCurrency
 		}
+
+		if fee["fees_taken"] != nil && fee["tx_type"].(string) == "BATCH" {
+			fee["fees_taken"] = formatBigStringToFloat64(fee["fees_taken"].(string)) + " HLS"
+		} else {
+			fee["fees_taken"] = "0 HLS"
+		}
 	}
 
 	return map[string]interface{}{
