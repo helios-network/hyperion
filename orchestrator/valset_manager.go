@@ -236,6 +236,11 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 
 	txHash, cost, err := l.ethereum.SendEthValsetUpdate(ctx, latestEthValset, latestConfirmedValset, confirmations)
 	if err != nil {
+
+		if strings.Contains(err.Error(), "insuffficient funds for gas") {
+			l.Orchestrator.HyperionState.ValsetManagerStatus = "insufficient funds for gas"
+			return nil
+		}
 		return err
 	}
 
