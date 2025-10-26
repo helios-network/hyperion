@@ -297,6 +297,15 @@
                                             Chain Settings
                                         </v-btn>
                                     </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="openProposeAddWhitelistedAddressDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Propose Add Whitelisted Address
+                                        </v-btn>
+                                    </v-col>
                                 </v-row>
                             </v-card-actions>
                         </v-card-text>
@@ -498,6 +507,49 @@
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
+
+                <!-- Propose Add Whitelisted Address Dialog -->
+                <v-dialog v-model="showProposeAddWhitelistedAddressDialog" max-width="600px">
+                    <v-card>
+                        <v-card-title>Propose Add Whitelisted Address</v-card-title>
+                        <v-card-text>
+                            <v-form ref="proposeAddWhitelistedAddressForm">
+                                <v-text-field
+                                    v-model="proposeAddWhitelistedAddressForm.title"
+                                    label="Title"
+                                    required
+                                    :rules="[v => !!v || 'Title is required']"
+                                ></v-text-field>
+                                <v-textarea
+                                    v-model="proposeAddWhitelistedAddressForm.description"
+                                    label="Description"
+                                    required
+                                    :rules="[v => !!v || 'Description is required']"
+                                ></v-textarea>
+                                <v-text-field
+                                    v-model="proposeAddWhitelistedAddressForm.chain_id"
+                                    label="Chain ID"
+                                    type="number"
+                                    disabled
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeAddWhitelistedAddressForm.address"
+                                    label="Address"
+                                    required
+                                    :rules="[v => !!v || 'Address is required']"
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showProposeAddWhitelistedAddressDialog = false">Cancel</v-btn>
+                            <v-btn color="primary" @click="proposeAddWhitelistedAddress" :loading="isProposingAddWhitelistedAddress">
+                                Propose
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
             </v-container>
 
             <!-- RPCs Page -->
@@ -946,6 +998,14 @@
                 currentProposalDetails: {},
                 hasVoted: {},
                 voteLoading: {},
+                showProposeAddWhitelistedAddressDialog: false,
+                isProposingAddWhitelistedAddress: false,
+                proposeAddWhitelistedAddressForm: {
+                    title: '',
+                    description: '',
+                    chain_id: null,
+                    address: '',
+                },
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -1849,6 +1909,49 @@
                         this.showNotification(error.message, 'error');
                     } finally {
                         this.$set(this.voteLoading, proposalId, false);
+                    }
+                },
+                openProposeAddWhitelistedAddressDialog(chainId) {
+                    this.proposeAddWhitelistedAddressForm = {
+                        title: '',
+                        description: '',
+                        chain_id: chainId,
+                        address: '',
+                    };
+                    this.showProposeAddWhitelistedAddressDialog = true;
+                },
+                async proposeAddWhitelistedAddress() {
+                    if (!this.$refs.proposeAddWhitelistedAddressForm.validate()) {
+                        return;
+                    }
+
+                    this.isProposingAddWhitelistedAddress = true;
+                    try {
+                        const response = await fetch('/api/query?type=propose-add-whitelisted-address', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                title: this.proposeAddWhitelistedAddressForm.title,
+                                description: this.proposeAddWhitelistedAddressForm.description,
+                                chain_id: Number(this.proposeAddWhitelistedAddressForm.chain_id),
+                                address: this.proposeAddWhitelistedAddressForm.address,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to propose add whitelisted address');
+                        }
+
+                        this.showProposeAddWhitelistedAddressDialog = false;
+                        this.showNotification('Whitelisted address proposed successfully');
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error proposing add whitelisted address:', error);
+                        this.showNotification(`Failed to propose add whitelisted address: ${error.message}`, 'error');
+                    } finally {
+                        this.isProposingAddWhitelistedAddress = false;
                     }
                 },
             },

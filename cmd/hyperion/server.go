@@ -385,6 +385,25 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, response, nil)
 		return
+
+	case "propose-add-whitelisted-address":
+		var params struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			ChainID     uint64 `json:"chain_id"`
+			Address     string `json:"address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.ProposeAddWhitelistedAddress(r.Context(), global, params.Title, params.Description, params.ChainID, params.Address)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
 	case "run-hyperion":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`
