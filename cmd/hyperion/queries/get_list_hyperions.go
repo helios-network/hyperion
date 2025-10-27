@@ -31,14 +31,18 @@ func GetListHyperions(ctx context.Context, global *global.Global) (map[string]in
 			running = true
 		}
 		hyperions[fmt.Sprintf("%d", counterpartyChainParam.BridgeChainId)] = map[string]interface{}{
-			"address":    counterpartyChainParam.BridgeCounterpartyAddress,
-			"chainId":    counterpartyChainParam.BridgeChainId,
-			"name":       counterpartyChainParam.BridgeChainName,
-			"registered": registered,
-			"running":    running,
-			"paused":     counterpartyChainParam.Paused,
-			"enabled":    true,
-			"proposed":   true,
+			"address":                 counterpartyChainParam.BridgeCounterpartyAddress,
+			"chainId":                 counterpartyChainParam.BridgeChainId,
+			"name":                    counterpartyChainParam.BridgeChainName,
+			"logo":                    counterpartyChainParam.BridgeChainLogo,
+			"targetBatchTimeout":      counterpartyChainParam.TargetBatchTimeout,
+			"targetOutgoingTxTimeout": counterpartyChainParam.TargetOutgoingTxTimeout,
+			"averageBlockTime":        counterpartyChainParam.AverageBlockTime,
+			"registered":              registered,
+			"running":                 running,
+			"paused":                  counterpartyChainParam.Paused,
+			"enabled":                 true,
+			"proposed":                true,
 		}
 	}
 
@@ -53,6 +57,10 @@ func GetListHyperions(ctx context.Context, global *global.Global) (map[string]in
 			if hyperionDeployedAddress["proposed"] != nil {
 				proposed = hyperionDeployedAddress["proposed"].(bool)
 			}
+			contractType := "new"
+			if hyperionDeployedAddress["type"] != nil && hyperionDeployedAddress["type"].(string) == "update" {
+				contractType = "update"
+			}
 
 			hyperions[fmt.Sprintf("%d", uint64(hyperionDeployedAddress["chainId"].(float64)))] = map[string]interface{}{
 				"address":    hyperionDeployedAddress["hyperionAddress"],
@@ -62,6 +70,22 @@ func GetListHyperions(ctx context.Context, global *global.Global) (map[string]in
 				"paused":     false,
 				"proposed":   proposed,
 				"enabled":    false,
+				"type":       contractType,
+			}
+		} else {
+			if hyperionDeployedAddress["hyperionAddress"] != hyperions[key].(map[string]interface{})["address"] {
+				proposed := false
+				if hyperionDeployedAddress["proposed"] != nil {
+					proposed = hyperionDeployedAddress["proposed"].(bool)
+				}
+				contractType := "new"
+				if hyperionDeployedAddress["type"] != nil && hyperionDeployedAddress["type"].(string) == "update" {
+					contractType = "update"
+				}
+				hyperions[key].(map[string]interface{})["type"] = contractType
+				hyperions[key].(map[string]interface{})["proposed"] = proposed
+				hyperions[key].(map[string]interface{})["oldAddress"] = hyperions[key].(map[string]interface{})["address"]
+				hyperions[key].(map[string]interface{})["address"] = hyperionDeployedAddress["hyperionAddress"]
 			}
 		}
 	}

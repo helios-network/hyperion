@@ -17,10 +17,11 @@ func CreateHyperionContract(ctx context.Context, global *global.Global, chainId 
 	}
 
 	counterpartyChainParams := hyperionParams.CounterpartyChainParams
-
+	contractType := "new"
 	for _, counterpartyChainParam := range counterpartyChainParams {
 		if counterpartyChainParam.BridgeChainId == chainId {
-			return nil, fmt.Errorf("chainId %d already exists", chainId)
+			contractType = "update"
+			break
 		}
 	}
 
@@ -35,22 +36,24 @@ func CreateHyperionContract(ctx context.Context, global *global.Global, chainId 
 		"createdAt":                time.Now().Format(time.RFC3339),
 		"atBlockNumber":            atBlockNumber,
 		"initializedAtBlockNumber": atBlockNumber + 1000,
+		"type":                     contractType,
+		"proposed":                 false,
 	}
 
 	fmt.Println("hyperionContractInfo: ", hyperionContractInfo)
 
-	err = storage.UpdateHyperionContractInfo(chainId, hyperionAddress.Hex(), hyperionContractInfo)
+	err = storage.UpdateHyperionContractInfo(chainId, hyperionContractInfo)
 	if err != nil {
 		return nil, err
 	}
 
 	blockNumber, err := global.InitializeHyperionContractWithDefaultValset(chainId)
 	if err != nil {
-		storage.RemoveHyperionContractInfo(chainId, hyperionAddress.Hex())
+		storage.RemoveHyperionContractInfo(chainId)
 		return nil, err
 	}
 	hyperionContractInfo["initializedAtBlockNumber"] = blockNumber
-	err = storage.UpdateHyperionContractInfo(chainId, hyperionAddress.Hex(), hyperionContractInfo)
+	err = storage.UpdateHyperionContractInfo(chainId, hyperionContractInfo)
 	if err != nil {
 		return nil, err
 	}

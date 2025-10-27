@@ -43,6 +43,8 @@ type Network interface {
 	GetHyperionID(ctx context.Context) (gethcommon.Hash, error)
 	GetGasPrice(ctx context.Context) (*big.Int, error)
 
+	GetHyperionContractAddress() gethcommon.Address
+
 	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
 	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
@@ -78,6 +80,7 @@ type Network interface {
 	GetLastValsetCheckpoint(ctx context.Context) (*gethcommon.Hash, error)
 	GetLastValsetUpdatedEventHeight(ctx context.Context) (*big.Int, error)
 	GetLastEventHeight(ctx context.Context) (*big.Int, error)
+	GetValsetUpdatedEventsWithIndexedNonce(nonce uint64, bridgeContractStartHeight uint64, lastestBlockHeight uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
 
 	GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error)
 	PrepareTransactionBatch(ctx context.Context,
@@ -105,12 +108,20 @@ type Network interface {
 	SendClaimTokensOfOldContract(ctx context.Context, hyperionId uint64, tokenContract string, amountInSdkMath *big.Int, ethFrom common.Address, signerFn keystore.PersonalSignFn) error
 }
 
+type cacheHeaderValue struct {
+	header    *gethtypes.Header
+	timestamp time.Time
+}
+
 type network struct {
 	hyperion.HyperionContract
 
 	FromAddr       gethcommon.Address
 	SignerFn       bind.SignerFn
 	PersonalSignFn keystore.PersonalSignFn
+
+	cachedHeader *cacheHeaderValue
+	CacheTTL     time.Duration
 }
 
 func DeployNewHyperionContract(
@@ -169,9 +180,15 @@ func NewNetwork(
 		FromAddr:         fromAddr,
 		SignerFn:         signerFn,
 		PersonalSignFn:   personalSignFn,
+		cachedHeader:     nil,
+		CacheTTL:         500 * time.Millisecond,
 	}
 
 	return n, nil
+}
+
+func (n *network) GetHyperionContractAddress() gethcommon.Address {
+	return n.HyperionContract.Address()
 }
 
 func (n *network) TokenDecimals(ctx context.Context, tokenContract gethcommon.Address) (uint8, error) {
@@ -222,6 +239,23 @@ func (n *network) GetGasPrice(ctx context.Context) (*big.Int, error) {
 }
 
 func (n *network) GetHeaderByNumber(ctx context.Context, number *big.Int) (*gethtypes.Header, error) {
+
+	if number == nil {
+		if n.cachedHeader != nil && time.Since(n.cachedHeader.timestamp) < n.CacheTTL {
+			return n.cachedHeader.header, nil
+		}
+		// add caching:
+		header, err := n.Provider().HeaderByNumber(ctx, number)
+		if err != nil {
+			return nil, err
+		}
+		n.cachedHeader = &cacheHeaderValue{
+			header:    header,
+			timestamp: time.Now(),
+		}
+		return header, nil
+	}
+
 	return n.Provider().HeaderByNumber(ctx, number)
 }
 
@@ -351,6 +385,34 @@ func (n *network) GetValsetUpdatedEventsAtSpecificBlock(block uint64) ([]*hyperi
 		Start: block,
 		End:   &block,
 	}, nil)
+	if err != nil {
+		if !isUnknownBlockErr(err) {
+			return nil, errors.Wrap(err, "failed to scan past ValsetUpdatedEvent events from Ethereum")
+		} else if iter == nil {
+			return nil, errors.New("no iterator returned")
+		}
+	}
+
+	defer iter.Close()
+
+	var valsetUpdatedEvents []*hyperionevents.HyperionValsetUpdatedEvent
+	for iter.Next() {
+		valsetUpdatedEvents = append(valsetUpdatedEvents, iter.Event)
+	}
+
+	return valsetUpdatedEvents, nil
+}
+
+func (n *network) GetValsetUpdatedEventsWithIndexedNonce(nonce uint64, bridgeContractStartHeight uint64, lastestBlockHeight uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error) {
+	hyperionFilterer, err := hyperionevents.NewHyperionFilterer(n.Address(), n.Provider())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to init Hyperion events filterer")
+	}
+
+	iter, err := hyperionFilterer.FilterValsetUpdatedEvent(&bind.FilterOpts{
+		Start: bridgeContractStartHeight,
+		End:   &lastestBlockHeight,
+	}, []*big.Int{big.NewInt(int64(nonce))})
 	if err != nil {
 		if !isUnknownBlockErr(err) {
 			return nil, errors.Wrap(err, "failed to scan past ValsetUpdatedEvent events from Ethereum")

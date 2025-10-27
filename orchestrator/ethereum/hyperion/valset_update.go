@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -34,7 +35,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 
 	if newValset.Nonce <= oldValset.Nonce {
 		metrics.ReportFuncError(s.svcTags)
-		err := errors.New("new valset nonce should be greater than old valset nonce")
+		err := errors.New("new valset nonce should be greater than old valset nonce newValset=" + strconv.FormatUint(newValset.Nonce, 10) + " <= oldValset=" + strconv.FormatUint(oldValset.Nonce, 10))
 		return nil, big.NewInt(0), err
 	}
 
@@ -42,6 +43,8 @@ func (s *hyperionContract) SendEthValsetUpdate(
 		"valset_nonce":  newValset.Nonce,
 		"validators":    len(newValset.Members),
 		"confirmations": len(confirms),
+		"members":       newValset.Members,
+		"confirms":      confirms,
 	}).Infoln("checking signatures and submitting valset update")
 
 	newValidators, newPowers := validatorsAndPowers(newValset)
@@ -88,6 +91,12 @@ func (s *hyperionContract) SendEthValsetUpdate(
 	// 		bytes32[] memory _r,
 	// 		bytes32[] memory _s
 	// )
+
+	log.WithFields(log.Fields{
+		"newValset": newValsetArgs,
+		"oldValset": currentValsetArgs,
+		"confirms":  len(confirms),
+	}).Infoln("Sending valset update")
 
 	txData, err := hyperionABI.Pack("updateValset",
 		newValsetArgs,

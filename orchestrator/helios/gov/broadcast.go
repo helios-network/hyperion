@@ -20,6 +20,8 @@ import (
 type BClient interface {
 	SendProposal(ctx context.Context, title, description, msgContent string, accountAddress sdk.AccAddress, initialDeposit math.Int) (uint64, error)
 	VoteOnProposal(ctx context.Context, proposalId uint64, accountAddress sdk.AccAddress) error
+	VoteOnProposalWithOption(ctx context.Context, proposalId uint64, accountAddress sdk.AccAddress, voteOption govtypes.VoteOption) error
+	VoteOnProposalWithOptionMsg(ctx context.Context, proposalId uint64, accountAddress sdk.AccAddress, voteOption govtypes.VoteOption) (sdk.Msg, error)
 }
 
 type broadcastClient struct {
@@ -114,4 +116,41 @@ func (c broadcastClient) VoteOnProposal(ctx context.Context, proposalId uint64, 
 	}
 
 	return nil
+}
+
+func (c broadcastClient) VoteOnProposalWithOption(ctx context.Context, proposalId uint64, accountAddress sdk.AccAddress, voteOption govtypes.VoteOption) error {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &govtypes.MsgVote{
+		ProposalId: proposalId,
+		Voter:      accountAddress.String(),
+		Option:     voteOption,
+	}
+
+	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return fmt.Errorf("broadcasting MsgVote failed: %w", err)
+	}
+
+	if resp.TxResponse.Code == 13 {
+		return fmt.Errorf("code 13 - insufficient fee")
+	}
+
+	return nil
+}
+
+func (c broadcastClient) VoteOnProposalWithOptionMsg(ctx context.Context, proposalId uint64, accountAddress sdk.AccAddress, voteOption govtypes.VoteOption) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &govtypes.MsgVote{
+		ProposalId: proposalId,
+		Voter:      accountAddress.String(),
+		Option:     voteOption,
+	}
+	return msg, nil
 }

@@ -21,12 +21,12 @@ import (
 
 const (
 	// Minimum number of confirmations for an Ethereum block to be considered valid
-	ethBlockConfirmationDelay uint64 = 4
+	// ethBlockConfirmationDelay uint64 = 4
 
 	// Maximum block range for Ethereum event query. If the orchestrator has been offline for a long time,
 	// the oracle loop can potentially run longer than defaultLoopDur due to a surge of events. This usually happens
 	// when there are more than ~50 events to claim in a single run.
-	defaultBlocksToSearch uint64 = 2000
+	// defaultBlocksToSearch uint64 = 2000
 
 	// Auto re-sync to catch up the validator's last observed event nonce. Reasons why event nonce fall behind:
 	// 1. It takes some time for events to be indexed on Ethereum. So if hyperion queried events immediately as block produced, there is a chance the event is missed.
@@ -52,9 +52,9 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	defer ticker.Stop()
 
 	// Run first iteration immediately
-	if err := oracle.observeEthEvents(ctx); err != nil {
-		s.logger.WithError(err).Errorln("oracle function returned an error")
-	}
+	// if err := oracle.observeEthEvents(ctx); err != nil {
+	// 	s.logger.WithError(err).Errorln("oracle function returned an error")
+	// }
 
 	for {
 		select {
@@ -100,13 +100,34 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	// Sélectionner le meilleur RPC basé sur la réputation
-	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	// if bestRpcURL != "" {
-	// 	l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for oracle")
-	// 	// Ajouter le meilleur RPC au contexte
-	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	// }
+	settings, err := storage.GetChainSettings(l.cfg.ChainId)
+	if err != nil {
+		return errors.Wrap(err, "failed to get chain settings")
+	}
+	defaultBlocksToSearch, ok := settings["oracle_eth_default_blocks_to_search"].(float64)
+
+	if !ok {
+		l.Log().Infoln("oracle_eth_default_blocks_to_search not found in chain settings, using default value 2000")
+		defaultBlocksToSearch = 2000
+	} else {
+		l.Log().Infoln("oracle_eth_default_blocks_to_search found in chain settings, using value", defaultBlocksToSearch)
+	}
+
+	ethBlockConfirmationDelay, ok := settings["oracle_block_confirmation_delay"].(float64)
+	if !ok {
+		l.Log().Infoln("oracle_block_confirmation_delay not found in chain settings, using default value 4")
+		ethBlockConfirmationDelay = 4
+	} else {
+		l.Log().Infoln("oracle_block_confirmation_delay found in chain settings, using value", ethBlockConfirmationDelay)
+	}
+
+	maxClaimsMsgPerBulk, ok := settings["oracle_max_claims_msg_per_bulk"].(float64)
+	if !ok {
+		l.Log().Infoln("oracle_max_claims_msg_per_bulk not found in chain settings, using default value 50")
+		maxClaimsMsgPerBulk = 50
+	} else {
+		l.Log().Infoln("oracle_max_claims_msg_per_bulk found in chain settings, using value", maxClaimsMsgPerBulk)
+	}
 
 	// check if validator is in the active set since claims will fail otherwise
 	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
@@ -179,18 +200,18 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	// state
 	l.HyperionState.Height = latestHeight
-	l.HyperionState.TargetHeight = latestHeight - ethBlockConfirmationDelay
+	l.HyperionState.TargetHeight = latestHeight - uint64(ethBlockConfirmationDelay)
 
 	targetHeight := latestHeight
 
 	// not enough blocks on ethereum yet
-	if targetHeight <= ethBlockConfirmationDelay {
+	if targetHeight <= uint64(ethBlockConfirmationDelay) {
 		l.Log().Debugln("not enough blocks on " + l.cfg.ChainName)
 		return nil
 	}
 
 	// ensure that latest block has minimum confirmations
-	targetHeight = targetHeight - ethBlockConfirmationDelay
+	targetHeight = targetHeight - uint64(ethBlockConfirmationDelay)
 	if targetHeight <= l.lastObservedEthHeight {
 		l.Log().Infoln("Synced", l.lastObservedEthHeight, "to", targetHeight)
 		return nil
@@ -198,13 +219,13 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 
 	targetHeightForSync := targetHeight
 	for i := 0; i < 100 && latestHeight > targetHeightForSync; i++ {
-		if targetHeightForSync > l.lastObservedEthHeight+defaultBlocksToSearch {
-			targetHeightForSync = l.lastObservedEthHeight + defaultBlocksToSearch
+		if targetHeightForSync > l.lastObservedEthHeight+uint64(defaultBlocksToSearch) {
+			targetHeightForSync = l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
 		}
-		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync); err != nil {
+		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk)); err != nil {
 			return err
 		}
-		targetHeightForSync = targetHeightForSync + defaultBlocksToSearch
+		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
 	}
 
 	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
@@ -216,12 +237,15 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	return nil
 }
 
-func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64) error {
+func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64, ethBlockConfirmationDelay uint64, maxClaimsMsgPerBulk int) error {
 
 	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
-	l.Orchestrator.SetTargetHeight(latestHeight - ethBlockConfirmationDelay)
+	l.Orchestrator.SetTargetHeight(latestHeight - uint64(ethBlockConfirmationDelay))
 
-	l.Log().Infoln("Sync", strconv.FormatUint(targetHeight-l.lastObservedEthHeight, 10), "Blocks", strconv.FormatUint(l.lastObservedEthHeight, 10)+"("+strconv.FormatUint(((l.lastObservedEthHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%) to", strconv.FormatUint(targetHeight, 10)+"("+strconv.FormatUint(((targetHeight*100)/(latestHeight-ethBlockConfirmationDelay)), 10)+"%)")
+	if targetHeight-l.lastObservedEthHeight == 0 {
+		l.Log().Infoln("No blocks to sync", "last_observed_eth_height", l.lastObservedEthHeight, "latest_height", latestHeight, "target_height", targetHeight)
+		return nil
+	}
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
 	if err != nil {
@@ -229,14 +253,17 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return err
 	}
 
-	lastObservedEventNonce, err := l.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
+	lastObservedEventNonce, err := l.Orchestrator.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
-		l.Log().WithError(err).Errorln("failed to get last observed event nonce on " + l.cfg.ChainName)
+		l.Log().WithError(err).Errorln("failed to get last observed event nonce for " + l.cfg.ChainName + " on helios network")
 		return err
 	}
 
-	lastEventNonce, err := l.ethereum.GetLastEventNonce(ctx)
+	lastEventNonce, err := l.Orchestrator.ethereum.GetLastEventNonce(ctx)
 	if err != nil {
+		if strings.Contains(err.Error(), "no contract code at given address") {
+			l.Orchestrator.RotateRpc()
+		}
 		l.Log().WithError(err).Errorln("failed to get last event nonce on " + l.cfg.ChainName)
 		return err
 	}
@@ -283,7 +310,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return nil
 	}
 
-	if err := l.sendNewEventClaims(ctx, newEvents); err != nil {
+	if err := l.sendNewEventClaims(ctx, newEvents, maxClaimsMsgPerBulk); err != nil {
 		log.Info("err: ", err)
 		return err
 	}
@@ -397,7 +424,7 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClai
 	return claim, nil
 }
 
-func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
+func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClaimsMsgPerBulk int) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
 		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
@@ -407,6 +434,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 
 		newEvents := filterEvents(events, lastClaim.EthereumEventNonce)
 		if len(newEvents) == 0 {
+			log.Infoln("No new events to send lastClaimNonce on Helios: ", lastClaim.EthereumEventNonce)
 			return nil
 		}
 
@@ -418,12 +446,19 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			}
 			msgs = append(msgs, msg)
 
-			if len(msgs) >= 50 {
+			if len(msgs) >= maxClaimsMsgPerBulk {
 				log.Infoln("sending bulk of ", len(msgs), "claims messages")
 				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+
+				err = l.helios.SyncBroadcastMsgsSimulate(ctx, msgs)
+				if err != nil {
+					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
+					return err
+				}
 				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 				if err != nil {
 					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
 					return err
 				}
 				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
@@ -439,8 +474,15 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 		if len(msgs) > 0 {
 			log.Infoln("sending bulk of ", len(msgs), "claims messages")
 			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+			err = l.helios.SyncBroadcastMsgsSimulate(ctx, msgs)
+			if err != nil {
+				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
+				return err
+			}
 			resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
+				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
 				return err
 			}
 			cost, err := l.helios.GetTxCost(ctx, resp.TxHash)

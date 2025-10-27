@@ -14,6 +14,7 @@ import (
 	globaltypes "github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/version"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/gorilla/mux"
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
@@ -256,6 +257,24 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, stats, nil)
 		return
+	case "get-list-proposals":
+		page, err := strconv.ParseInt(query.Get("page"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid page", http.StatusBadRequest)
+			return
+		}
+		size, err := strconv.ParseInt(query.Get("size"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid size", http.StatusBadRequest)
+			return
+		}
+		proposals, err := queries.GetListProposals(r.Context(), global, int(page), int(size))
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, proposals, nil)
+		return
 	}
 	sendSuccess(w, "404", nil)
 }
@@ -344,6 +363,84 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		sendSuccess(w, response, nil)
+		return
+	case "propose-hyperion-update":
+		var params struct {
+			Title                        string `json:"title"`
+			Description                  string `json:"description"`
+			BridgeChainId                uint64 `json:"bridge_chain_id"`
+			BridgeChainName              string `json:"bridge_chain_name"`
+			AverageCounterpartyBlockTime uint64 `json:"average_counterparty_block_time"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.ProposeHyperionUpdate(r.Context(), global, params.Title, params.Description, params.BridgeChainId, params.BridgeChainName, params.AverageCounterpartyBlockTime)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
+
+	case "propose-add-whitelisted-address":
+		var params struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			ChainID     uint64 `json:"chain_id"`
+			Address     string `json:"address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.ProposeAddWhitelistedAddress(r.Context(), global, params.Title, params.Description, params.ChainID, params.Address)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
+	case "update-chain-logo":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Logo    string `json:"logo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response := queries.UpdateChainLogo(r.Context(), global, params.ChainID, params.Logo)
+		sendSuccess(w, response, nil)
+		return
+	case "add-whitelisted-address":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Address string `json:"address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.AddWhitelistedAddress(r.Context(), global, params.ChainID, params.Address)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
+	case "upload-logo":
+		var params struct {
+			Logo string `json:"logo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response := queries.UploadLogo(r.Context(), global, params.Logo)
 		sendSuccess(w, response, nil)
 		return
 	case "run-hyperion":
@@ -509,6 +606,35 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response := queries.ClaimTokensOfOldContract(r.Context(), global, params.ChainID, params.Contract, params.TokenContract, params.AmountInt)
+		sendSuccess(w, response, nil)
+		return
+
+	case "vote-for-proposal":
+		var params struct {
+			ProposalID uint64 `json:"proposal_id"`
+			VoteOption string `json:"vote_option"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		var voteOption govtypes.VoteOption
+		switch params.VoteOption {
+		case "yes":
+			voteOption = govtypes.OptionYes
+		case "no":
+			voteOption = govtypes.OptionNo
+		case "abstain":
+			voteOption = govtypes.OptionAbstain
+		default:
+			sendError(w, "Invalid vote option", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.VoteForProposal(r.Context(), global, params.ProposalID, voteOption)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		sendSuccess(w, response, nil)
 		return
 	}

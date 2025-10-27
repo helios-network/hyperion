@@ -80,7 +80,13 @@ func UpdateFeesFile(feesTaken *big.Int, tokenContract string, cost *big.Int, txH
 		"chain_id":       chainId,
 		"timestamp":      time.Now().Unix(),
 	}
+
 	baseFileArray = append(baseFileArray, feesObject)
+
+	if len(baseFileArray) > 10 { // save only the last 100 txs
+		baseFileArray = baseFileArray[len(baseFileArray)-10:]
+	}
+
 	json, err := json.Marshal(baseFileArray)
 	if err != nil {
 		return
@@ -248,29 +254,35 @@ func GetMyHyperionsDeployedAddresses() ([]map[string]interface{}, error) {
 	return baseFileArray, nil
 }
 
-func UpdateHyperionContractInfo(chainId uint64, contractAddress string, info map[string]interface{}) error {
+func UpdateHyperionContractInfo(chainId uint64, info map[string]interface{}) error {
 	hyperions, err := GetMyHyperionsDeployedAddresses()
 	if err != nil {
 		return err
 	}
+	replaced := false
 	for _, hyperion := range hyperions {
-		if uint64(hyperion["chainId"].(float64)) == chainId && (hyperion["hyperionAddress"].(string) == contractAddress || hyperion["hyperionAddress"].(string) == "0x0000000000000000000000000000000000000000") {
+		if uint64(hyperion["chainId"].(float64)) == chainId {
 			for key, value := range info {
 				hyperion[key] = value
 			}
+			replaced = true
+			break
 		}
+	}
+	if !replaced {
+		hyperions = append(hyperions, info)
 	}
 	return UpdateMyHyperionsDeployedAddresses(hyperions)
 }
 
-func RemoveHyperionContractInfo(chainId uint64, contractAddress string) error {
+func RemoveHyperionContractInfo(chainId uint64) error {
 	hyperions, err := GetMyHyperionsDeployedAddresses()
 	if err != nil {
 		return err
 	}
 	index := -1
 	for i, hyperion := range hyperions {
-		if uint64(hyperion["chainId"].(float64)) == chainId && hyperion["hyperionAddress"].(string) == contractAddress {
+		if uint64(hyperion["chainId"].(float64)) == chainId {
 			index = i
 			break
 		}
@@ -479,7 +491,25 @@ func SetChainSettings(chainId uint64, settings map[string]interface{}) error {
 	return nil
 }
 
-func GetChainSettings(chainId uint64, defaultSettings map[string]interface{}) (map[string]interface{}, error) {
+var DefaultChainSettingsMap = map[string]interface{}{
+	"min_batch_fee_usd":                   0,
+	"eth_gas_price_adjustment":            1.3,
+	"eth_max_gas_price":                   "100gwei",
+	"estimate_gas":                        true,
+	"eth_gas_price":                       "10gwei",
+	"valset_offset_dur":                   "5m",
+	"batch_offset_dur":                    "2m",
+	"static_rpc_anonymous":                true,
+	"static_rpc_only":                     false,
+	"min_batch_fee_hls":                   0.1,
+	"min_tx_fee_hls":                      0.1,
+	"oracle_eth_default_blocks_to_search": float64(2000),
+	"oracle_block_confirmation_delay":     float64(4),
+	"gas_limit":                           float64(5000000),
+	"oracle_max_claims_msg_per_bulk":      float64(50),
+}
+
+func GetChainSettings(chainId uint64) (map[string]interface{}, error) {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -499,7 +529,7 @@ func GetChainSettings(chainId uint64, defaultSettings map[string]interface{}) (m
 	var baseFileMap map[string]interface{}
 	json.Unmarshal(baseFile, &baseFileMap)
 	if _, ok := baseFileMap[strconv.FormatUint(chainId, 10)]; !ok {
-		return defaultSettings, nil
+		return DefaultChainSettingsMap, nil
 	}
 	return baseFileMap[strconv.FormatUint(chainId, 10)].(map[string]interface{}), nil
 }

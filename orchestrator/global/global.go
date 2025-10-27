@@ -77,7 +77,7 @@ func (g *Global) GetCosmosAddress() cosmostypes.AccAddress {
 }
 
 func (g *Global) GetMinBatchFeeHLS(chainId uint64) float64 {
-	hyperionSettings, err := storage.GetChainSettings(chainId, map[string]interface{}{})
+	hyperionSettings, err := storage.GetChainSettings(chainId)
 	if err != nil {
 		return 0.0
 	}
@@ -88,7 +88,7 @@ func (g *Global) GetMinBatchFeeHLS(chainId uint64) float64 {
 }
 
 func (g *Global) GetMinTxFeeHLS(chainId uint64) float64 {
-	hyperionSettings, err := storage.GetChainSettings(chainId, map[string]interface{}{})
+	hyperionSettings, err := storage.GetChainSettings(chainId)
 	if err != nil {
 		return 0.0
 	}
@@ -212,7 +212,7 @@ func (g *Global) GetAnonymousEVMNetworks(chainId uint64, rpcs []*rpcs.Rpc) ([]*e
 func (g *Global) GetEVMNetwork(counterpartyChainParams *hyperiontypes.CounterpartyChainParams, rpc *rpcs.Rpc) (*ethereum.Network, error) {
 	hyperionContractAddr := gethcommon.HexToAddress(counterpartyChainParams.BridgeCounterpartyAddress)
 
-	settings, err := storage.GetChainSettings(counterpartyChainParams.BridgeChainId, map[string]interface{}{})
+	settings, err := storage.GetChainSettings(counterpartyChainParams.BridgeChainId)
 	if err != nil {
 		return nil, err
 	}
@@ -224,16 +224,21 @@ func (g *Global) GetEVMNetwork(counterpartyChainParams *hyperiontypes.Counterpar
 	}
 
 	options := make([]committer.EVMCommitterOption, 0)
+	gasLimit := 5000000
+
+	if settings["gas_limit"] != nil {
+		gasLimit = int(settings["gas_limit"].(float64))
+	}
 
 	if settings["estimate_gas"] != nil && !settings["estimate_gas"].(bool) {
 		gasPrice := strconv.FormatInt(committer.ParseGasPrice(settings["eth_gas_price"].(string)), 10)
 		options = append(options, committer.OptionGasPriceFromString(gasPrice))
-		options = append(options, committer.OptionGasLimit(5000000))
+		options = append(options, committer.OptionGasLimit(uint64(gasLimit)))
 		options = append(options, committer.OptionEstimateGas(false))
 	} else {
 		gasPrice := g.GetGasPrice(counterpartyChainParams.BridgeChainId)
 		options = append(options, committer.OptionGasPriceFromString(gasPrice))
-		options = append(options, committer.OptionGasLimit(5000000))
+		options = append(options, committer.OptionGasLimit(uint64(gasLimit)))
 	}
 
 	ethNetwork, err := ethereum.NewNetwork(hyperionContractAddr, ethKeyFromAddress, signerFn, personalSignFn, ethereum.NetworkConfig{
@@ -490,6 +495,52 @@ func (g *Global) InitTargetNetworks(counterpartyChainParams *hyperiontypes.Count
 // 	return provider.NewEVMProvider(rpcs), nil
 // }
 
+func (g *Global) ProposeHyperionUpdate(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
+	heliosNetwork := g.GetHeliosNetwork()
+
+	if heliosNetwork == nil {
+		return 0, fmt.Errorf("helios network not initialized")
+	}
+
+	hash := sha256.Sum256([]byte(wrappers.HyperionBin))
+	hashString := hex.EncodeToString(hash[:])
+
+	contentI := map[string]interface{}{
+		"@type":                        "/helios.hyperion.v1.MsgUpdateChainSmartContract",
+		"chain_id":                     counterpartyChainParams.BridgeChainId,
+		"bridge_contract_address":      counterpartyChainParams.BridgeCounterpartyAddress,
+		"bridge_contract_start_height": counterpartyChainParams.BridgeContractStartHeight,
+		"contract_source_hash":         hashString,
+		"first_orchestrator_address":   g.ethKeyFromAddress.Hex(),
+	}
+	content, _ := json.Marshal(contentI)
+	proposalId, err := (*g.heliosNetwork).SendProposal(context.Background(), title, description, string(content), g.accAddress, math.NewInt(1000000000000000000))
+	if err != nil {
+		return 0, err
+	}
+	return proposalId, nil
+}
+
+func (g *Global) ProposeMsgAddOneWhitelistedAddress(title string, description string, hyperionId uint64, address string) (uint64, error) {
+	heliosNetwork := g.GetHeliosNetwork()
+
+	if heliosNetwork == nil {
+		return 0, fmt.Errorf("helios network not initialized")
+	}
+
+	contentI := map[string]interface{}{
+		"@type":       "/helios.hyperion.v1.MsgAddOneWhitelistedAddress",
+		"hyperion_id": hyperionId,
+		"address":     address,
+	}
+	content, _ := json.Marshal(contentI)
+	proposalId, err := (*g.heliosNetwork).SendProposal(context.Background(), title, description, string(content), g.accAddress, math.NewInt(1000000000000000000))
+	if err != nil {
+		return 0, err
+	}
+	return proposalId, nil
+}
+
 func (g *Global) CreateNewBlockchainProposal(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
 	heliosNetwork := g.GetHeliosNetwork()
 
@@ -559,6 +610,7 @@ func (g *Global) CreateNewBlockchainProposal(title string, description string, c
 			"paused":                     false,
 		},
 	}
+	fmt.Println("contentI: ", contentI)
 	content, _ := json.Marshal(contentI)
 	proposalId, err := (*g.heliosNetwork).SendProposal(context.Background(), title, description, string(content), g.accAddress, math.NewInt(1000000000000000000))
 	if err != nil {
@@ -589,9 +641,19 @@ func (g *Global) DeployNewHyperionContract(chainId uint64) (gethcommon.Address, 
 	}
 
 	gasPrice := g.GetGasPrice(chainId)
+
+	gasLimit := 5000000
+	settings, err := storage.GetChainSettings(chainId)
+	if err != nil {
+		return gethcommon.Address{}, 0, false
+	}
+	if settings["gas_limit"] != nil {
+		gasLimit = int(settings["gas_limit"].(float64))
+	}
+	fmt.Println("gasLimit:", gasLimit)
 	options := []committer.EVMCommitterOption{
 		committer.OptionGasPriceFromString(gasPrice),
-		committer.OptionGasLimit(5000000),
+		committer.OptionGasLimit(uint64(gasLimit)),
 	}
 
 	fmt.Println("Deploying Hyperion contract...", ethKeyFromAddress.Hex())
@@ -660,7 +722,7 @@ func (g *Global) InitializeHyperionContractWithDefaultValset(chainId uint64) (ui
 		}
 	}
 
-	storage.UpdateHyperionContractInfo(chainId, hyperionContractInfo["hyperionAddress"].(string), map[string]interface{}{
+	storage.UpdateHyperionContractInfo(chainId, map[string]interface{}{
 		"initializedAtBlockNumber": blockNumber,
 	})
 
@@ -681,6 +743,18 @@ func (g *Global) VoteOnProposal(proposalId uint64) error {
 		return fmt.Errorf("helios network not initialized")
 	}
 	err := (*g.heliosNetwork).VoteOnProposal(context.Background(), proposalId, g.accAddress)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *Global) VoteOnProposalWithOption(proposalId uint64, voteOption govtypes.VoteOption) error {
+	heliosNetwork := g.GetHeliosNetwork()
+	if heliosNetwork == nil {
+		return fmt.Errorf("helios network not initialized")
+	}
+	err := (*g.heliosNetwork).VoteOnProposalWithOption(context.Background(), proposalId, g.accAddress, voteOption)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
 
-func ProposeHyperion(ctx context.Context, global *global.Global, title string, description string, bridgeChainId uint64, bridgeChainName string, averageCounterpartyBlockTime uint64) (map[string]interface{}, error) {
+func ProposeHyperionUpdate(ctx context.Context, global *global.Global, title string, description string, bridgeChainId uint64, bridgeChainName string, averageCounterpartyBlockTime uint64) (map[string]interface{}, error) {
 	network := *global.GetHeliosNetwork()
 	hyperionParams, err := network.HyperionParams(ctx)
 	if err != nil {
@@ -19,10 +19,16 @@ func ProposeHyperion(ctx context.Context, global *global.Global, title string, d
 
 	counterpartyChainParams := hyperionParams.CounterpartyChainParams
 
+	alreadyExists := false
 	for _, counterpartyChainParam := range counterpartyChainParams {
 		if counterpartyChainParam.BridgeChainId == bridgeChainId {
-			return nil, fmt.Errorf("chainId %d already exists", bridgeChainId)
+			alreadyExists = true
+			break
 		}
+	}
+
+	if !alreadyExists {
+		return nil, fmt.Errorf("chainId %d does not exist", bridgeChainId)
 	}
 
 	hyperionContractInfo, err := storage.GetHyperionContractInfo(bridgeChainId)
@@ -30,10 +36,14 @@ func ProposeHyperion(ctx context.Context, global *global.Global, title string, d
 		return nil, fmt.Errorf("please create hyperion contract for chainId %d before proposing", bridgeChainId)
 	}
 
+	if hyperionContractInfo["type"].(string) != "update" {
+		return nil, fmt.Errorf("chainId %d is not an update hyperion contract", bridgeChainId)
+	}
+
 	hyperionAddress := hyperionContractInfo["hyperionAddress"].(string)
 	startHeight := uint64(hyperionContractInfo["initializedAtBlockNumber"].(float64))
 
-	proposalId, err := global.CreateNewBlockchainProposal(title, description, &hyperiontypes.CounterpartyChainParams{
+	proposalId, err := global.ProposeHyperionUpdate(title, description, &hyperiontypes.CounterpartyChainParams{
 		HyperionId:                   bridgeChainId,
 		BridgeChainId:                bridgeChainId,
 		BridgeChainName:              bridgeChainName,

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 
@@ -335,8 +336,14 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 			}
 			l.Orchestrator.HyperionState.RelayerStatus = "batch sent " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol + " - block number: " + strconv.Itoa(int(blockNumber))
 			l.HyperionState.OutBridgedTxCount += len(batchAndSig.Batch.Transactions)
-			feesTaken := batchAndSig.Batch.GetFees().BigInt()
-			storage.UpdateFeesFile(feesTaken, batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
+			// feesTaken := batchAndSig.Batch.GetFees().BigInt()
+
+			totalFees := sdkmath.NewInt(0)
+			for _, tx := range batchAndSig.Batch.Transactions {
+				totalFees = totalFees.Add(tx.Fee.Amount)
+			}
+
+			storage.UpdateFeesFile(totalFees.BigInt(), batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
 			///////
 
 			usedRpc := l.ethereum.GetRpc().Url

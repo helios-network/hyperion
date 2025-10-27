@@ -2,6 +2,9 @@ package hyperion
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"time"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -52,13 +55,21 @@ type QueryClient interface {
 type queryClient struct {
 	hyperiontypes.QueryClient
 
-	svcTags metrics.Tags
+	svcTags                      metrics.Tags
+	cachedLastObservedEventNonce map[uint64]struct {
+		value     uint64
+		timestamp time.Time
+	}
 }
 
 func NewQueryClient(client hyperiontypes.QueryClient) QueryClient {
 	return queryClient{
 		QueryClient: client,
 		svcTags:     metrics.Tags{"svc": "hyperion_query"},
+		cachedLastObservedEventNonce: make(map[uint64]struct {
+			value     uint64
+			timestamp time.Time
+		}),
 	}
 }
 
@@ -419,7 +430,7 @@ func (c queryClient) GetValidatorAddress(ctx context.Context, hyperionId uint64,
 	resp, err := c.QueryClient.GetDelegateKeyByEth(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client "+addr.Hex()+" on hyperionId "+strconv.FormatUint(hyperionId, 10))
 	}
 
 	if resp == nil {
@@ -449,7 +460,7 @@ func (c queryClient) GetListOfNetworksWhereRegistered(ctx context.Context, addr 
 	resp, err := c.QueryClient.QueryGetDelegateKeysByAddress(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query QueryGetDelegateKeysByAddress from client")
 	}
 
 	if resp == nil {
@@ -472,7 +483,7 @@ func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context
 	resp, err := c.QueryClient.QueryGetLastObservedEthereumBlockHeight(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query QueryGetLastObservedEthereumBlockHeight from client")
 	}
 
 	if resp == nil {
@@ -484,6 +495,18 @@ func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context
 }
 
 func (c queryClient) QueryGetLastObservedEventNonce(ctx context.Context, hyperionId uint64) (uint64, error) {
+	if _, ok := c.cachedLastObservedEventNonce[hyperionId]; ok {
+		if time.Since(c.cachedLastObservedEventNonce[hyperionId].timestamp) > 1000*time.Millisecond {
+			fmt.Println("deleting cached last observed event nonce", c.cachedLastObservedEventNonce[hyperionId].value)
+			delete(c.cachedLastObservedEventNonce, hyperionId)
+		} else {
+			fmt.Println("returning cached last observed event nonce", c.cachedLastObservedEventNonce[hyperionId].value)
+			return c.cachedLastObservedEventNonce[hyperionId].value, nil
+		}
+	} else {
+		fmt.Println("no cached last observed event nonce found, querying from client")
+	}
+
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -495,13 +518,24 @@ func (c queryClient) QueryGetLastObservedEventNonce(ctx context.Context, hyperio
 	resp, err := c.QueryClient.QueryGetLastObservedEventNonce(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return 0, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return 0, errors.Wrap(err, "failed to query QueryGetLastObservedEventNonceRequest from client on hyperionId "+strconv.FormatUint(hyperionId, 10))
 	}
 
 	if resp == nil {
 		metrics.ReportFuncError(c.svcTags)
 		return 0, ErrNotFound
 	}
+
+	// cache the last observed event nonce
+	c.cachedLastObservedEventNonce[hyperionId] = struct {
+		value     uint64
+		timestamp time.Time
+	}{
+		value:     resp.LastObservedEventNonce,
+		timestamp: time.Now(),
+	}
+
+	fmt.Println("cached last observed event nonce", resp.LastObservedEventNonce)
 
 	return resp.LastObservedEventNonce, nil
 }
@@ -519,7 +553,7 @@ func (c queryClient) QueryDenomToTokenAddress(ctx context.Context, hyperionId ui
 	resp, err := c.QueryClient.DenomToTokenAddress(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return gethcommon.Address{}, false, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return gethcommon.Address{}, false, errors.Wrap(err, "failed to query DenomToTokenAddress from client")
 	}
 
 	if resp == nil {
@@ -591,7 +625,7 @@ func (c queryClient) QueryGetListOutgoingTxs(ctx context.Context, chainId uint64
 	resp, err := c.QueryClient.OutgoingTxBatches(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, errors.Wrap(err, "failed to query OutgoingTxBatches from client")
 	}
 
 	if resp == nil {
@@ -614,7 +648,7 @@ func (c queryClient) QueryGetAllPendingSendToChain(ctx context.Context, chainId 
 	resp, err := c.QueryClient.GetAllPendingSendToChain(ctx, req)
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return nil, nil, errors.Wrap(err, "failed to query GetDelegateKeyByEth from client")
+		return nil, nil, errors.Wrap(err, "failed to query GetAllPendingSendToChain from client")
 	}
 
 	if resp == nil {

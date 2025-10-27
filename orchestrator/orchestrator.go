@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -257,7 +258,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	}
 	hyperionID := hyperionIDHash.Big().Uint64()
 
-	s.logger.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex())
+	s.logger.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex(), "hyperionAddress", s.ethereum.GetHyperionContractAddress().Hex())
 
 	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
 	if err != nil {
@@ -359,7 +360,7 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 }
 
 func (s *Orchestrator) IsStaticRpcAnonymous() bool {
-	settings, err := storage.GetChainSettings(s.cfg.ChainId, map[string]interface{}{})
+	settings, err := storage.GetChainSettings(s.cfg.ChainId)
 	if err != nil {
 		return false
 	}
@@ -367,6 +368,24 @@ func (s *Orchestrator) IsStaticRpcAnonymous() bool {
 		return false
 	}
 	return settings["static_rpc_anonymous"].(bool)
+}
+
+func (s *Orchestrator) RotateRpc() {
+	usedRpc := s.ethereum.GetRpc().Url
+
+	lstOfclients := make([]*ethereum.Network, 0)
+
+	for _, eth := range s.ethereums {
+		if (*eth).GetRpc().Url != usedRpc {
+			lstOfclients = append(lstOfclients, eth)
+		}
+	}
+	if len(lstOfclients) == 0 {
+		s.logger.Warning("No other rpcs available, using the same rpc")
+		return
+	}
+	s.ethereum = *lstOfclients[rand.Intn(len(lstOfclients))]
+	s.logger.Info("Rotated rpc to rpc ", s.ethereum.GetRpc().Url, " / total rpcs ", len(lstOfclients))
 }
 
 // func (s *Orchestrator) UpdateRpcs() {
