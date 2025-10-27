@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+
 	"github.com/Helios-Chain-Labs/metrics"
 	logostypes "github.com/Helios-Chain-Labs/sdk-go/chain/logos/types"
 	"github.com/Helios-Chain-Labs/sdk-go/client/chain"
 )
 
 type BLogosClient interface {
-	StoreLogo(ctx context.Context, creator string, logo string) (string, error)
+	StoreLogo(ctx context.Context, logo string) (string, error)
+	StoreLogoMsg(ctx context.Context, logo string) (sdk.Msg, error)
 }
 
 type broadcastClient struct {
@@ -26,7 +29,7 @@ func NewBroadcastClient(client chain.ChainClient) BLogosClient {
 	}
 }
 
-func (c broadcastClient) StoreLogo(ctx context.Context, creator string, logo string) (string, error) {
+func (c broadcastClient) StoreLogo(ctx context.Context, logo string) (string, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
@@ -47,4 +50,16 @@ func (c broadcastClient) StoreLogo(ctx context.Context, creator string, logo str
 	}
 
 	return resp.TxResponse.TxHash, nil
+}
+
+func (c broadcastClient) StoreLogoMsg(ctx context.Context, logo string) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	msg := &logostypes.MsgStoreLogoRequest{
+		Creator: c.FromAddress().String(),
+		Data:    logo,
+	}
+	return msg, nil
 }

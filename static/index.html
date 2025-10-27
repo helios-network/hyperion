@@ -323,6 +323,15 @@
                                             Add Whitelisted Address
                                         </v-btn>
                                     </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="openUploadLogoDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Upload Logo
+                                        </v-btn>
+                                    </v-col>
                                 </v-row>
                             </v-card-actions>
                         </v-card-text>
@@ -435,6 +444,39 @@
                             <v-spacer></v-spacer>
                             <v-btn color="blue darken-1" text @click="showAddWhitelistedAddressDialog = false">Cancel</v-btn>
                             <v-btn color="blue darken-1" text @click="addWhitelistedAddress">Add</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Upload Logo Dialog -->
+                <v-dialog v-model="showUploadLogoDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Upload Logo for Chain ID: {{ selectedChainId }}</v-card-title>
+                        <v-card-text>
+                            <v-text-field
+                                v-model="uploadLogoBase64"
+                                label="Logo Base64"
+                                required
+                            ></v-text-field>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="blue darken-1" text @click="showUploadLogoDialog = false">Cancel</v-btn>
+                            <v-btn color="blue darken-1" text @click="uploadLogo">Upload</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Logo Hash Dialog -->
+                <v-dialog v-model="showLogoHashDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Logo Hash: {{ logoHash }}</v-card-title>
+                        <v-card-text>
+                            <v-img :src="'https://testnet1-cdn.helioschainlabs.org/hash/' + logoHash" alt="Logo" width="100px" height="100px"></v-img>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="blue darken-1" text @click="showLogoHashDialog = false">Close</v-btn>
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
@@ -1071,6 +1113,10 @@
                 showUpdateChainLogoDialog: false,
                 showAddWhitelistedAddressDialog: false,
                 updateChainLogoHash: '',
+                showUploadLogoDialog: false,
+                uploadLogoBase64: '',
+                showLogoHashDialog: false,
+                logoHash: '',
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -2036,6 +2082,57 @@
                     this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
                     this.datatAddWhitelistedAddress = ''; // Clear previous address
                     this.showAddWhitelistedAddressDialog = true;
+                },
+                openUploadLogoDialog(chainId) {
+                    this.selectedChainId = chainId;
+                    this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
+                    this.uploadLogoBase64 = ''; // Clear previous logo
+                    this.showUploadLogoDialog = true;
+                },
+                async uploadLogo() {
+                    if (!this.selectedChainId || !this.uploadLogoBase64) {
+                        this.showNotification('Please select a Chain ID and enter a Logo Base64', 'error');
+                        return;
+                    }
+                    try {
+                        const response = await fetch('/api/query?type=upload-logo', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                logo: this.uploadLogoBase64,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to upload logo');
+                        }
+
+                        const data = await response.json();
+                        if (data.data.logo_hash) {
+                            // open modal with the logo hash
+                            if (data.success) {
+                                this.showNotification('Logo uploaded successfully: ' + data.data.logo_hash);
+                            } else {
+                                this.showNotification('Logo upload failed ', data.error);
+                            }
+                            this.showLogoHashDialog = true;
+                            this.logoHash = data.data.logo_hash;
+                        } else {
+                            throw new Error(data.error || 'Failed to upload logo: ' + data.error);
+                        }
+
+                        this.showUploadLogoDialog = false;
+                        this.selectedChainId = null;
+                        this.uploadLogoBase64 = '';
+                        this.showNotification('Logo uploaded successfully');
+                        await this.fetchChains(); // Refresh chains to show updated logo
+                    } catch (error) {
+                        console.error('Error uploading logo:', error);
+                        this.showNotification(error.message, 'error');
+                    }
                 },
                 async updateChainLogo() {
                     if (!this.selectedChainId || !this.updateChainLogoHash) {
