@@ -506,6 +506,7 @@ var DefaultChainSettingsMap = map[string]interface{}{
 	"oracle_eth_default_blocks_to_search": float64(2000),
 	"oracle_block_confirmation_delay":     float64(4),
 	"gas_limit":                           float64(5000000),
+	"oracle_max_claims_msg_per_bulk":      float64(50),
 }
 
 func GetChainSettings(chainId uint64) (map[string]interface{}, error) {

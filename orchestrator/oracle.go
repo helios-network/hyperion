@@ -121,13 +121,13 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("oracle_block_confirmation_delay found in chain settings, using value", ethBlockConfirmationDelay)
 	}
 
-	// Sélectionner le meilleur RPC basé sur la réputation
-	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	// if bestRpcURL != "" {
-	// 	l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for oracle")
-	// 	// Ajouter le meilleur RPC au contexte
-	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	// }
+	maxClaimsMsgPerBulk, ok := settings["oracle_max_claims_msg_per_bulk"].(float64)
+	if !ok {
+		l.Log().Infoln("oracle_max_claims_msg_per_bulk not found in chain settings, using default value 50")
+		maxClaimsMsgPerBulk = 50
+	} else {
+		l.Log().Infoln("oracle_max_claims_msg_per_bulk found in chain settings, using value", maxClaimsMsgPerBulk)
+	}
 
 	// check if validator is in the active set since claims will fail otherwise
 	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
@@ -222,7 +222,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		if targetHeightForSync > l.lastObservedEthHeight+uint64(defaultBlocksToSearch) {
 			targetHeightForSync = l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
 		}
-		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync, uint64(ethBlockConfirmationDelay)); err != nil {
+		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk)); err != nil {
 			return err
 		}
 		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
@@ -237,7 +237,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	return nil
 }
 
-func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64, ethBlockConfirmationDelay uint64) error {
+func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64, ethBlockConfirmationDelay uint64, maxClaimsMsgPerBulk int) error {
 
 	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
 	l.Orchestrator.SetTargetHeight(latestHeight - uint64(ethBlockConfirmationDelay))
@@ -310,7 +310,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return nil
 	}
 
-	if err := l.sendNewEventClaims(ctx, newEvents); err != nil {
+	if err := l.sendNewEventClaims(ctx, newEvents, maxClaimsMsgPerBulk); err != nil {
 		log.Info("err: ", err)
 		return err
 	}
@@ -424,7 +424,7 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClai
 	return claim, nil
 }
 
-func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
+func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClaimsMsgPerBulk int) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
 		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
@@ -446,7 +446,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event) error {
 			}
 			msgs = append(msgs, msg)
 
-			if len(msgs) >= 50 {
+			if len(msgs) >= maxClaimsMsgPerBulk {
 				log.Infoln("sending bulk of ", len(msgs), "claims messages")
 				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 
