@@ -67,6 +67,7 @@ type BroadcastClient interface {
 
 	UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error
 	UpdateChainLogoMsg(ctx context.Context, chainId uint64, logo string) (sdk.Msg, error)
+	AddWhitelistedAddressMsg(ctx context.Context, chainId uint64, address string) (sdk.Msg, error)
 }
 
 type broadcastClient struct {
@@ -1234,5 +1235,17 @@ func (c *broadcastClient) SendBatchConfirmMsg(ctx context.Context, hyperionId ui
 		TokenContract: batch.TokenContract,
 	}
 
+	return msg, nil
+}
+
+func (c *broadcastClient) AddWhitelistedAddressMsg(ctx context.Context, chainId uint64, address string) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+	msg := &hyperiontypes.MsgAddOneWhitelistedAddress{
+		HyperionId: chainId,
+		Address:    address,
+		Signer:     c.FromAddress().String(),
+	}
 	return msg, nil
 }

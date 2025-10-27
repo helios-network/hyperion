@@ -314,6 +314,15 @@
                                             Update Logo
                                         </v-btn>
                                     </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="openAddWhitelistedAddressDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Add Whitelisted Address
+                                        </v-btn>
+                                    </v-col>
                                 </v-row>
                             </v-card-actions>
                         </v-card-text>
@@ -407,6 +416,25 @@
                             <v-spacer></v-spacer>
                             <v-btn color="blue darken-1" text @click="showUpdateChainLogoDialog = false">Cancel</v-btn>
                             <v-btn color="blue darken-1" text @click="updateChainLogo">Update</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Add Whitelisted Address Dialog -->
+                <v-dialog v-model="showAddWhitelistedAddressDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Add Whitelisted Address for Chain ID: {{ selectedChainId }}</v-card-title>
+                        <v-card-text>
+                            <v-text-field
+                                v-model="dataAddWhitelistedAddress"
+                                label="Whitelisted Address"
+                                required
+                            ></v-text-field>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="blue darken-1" text @click="showAddWhitelistedAddressDialog = false">Cancel</v-btn>
+                            <v-btn color="blue darken-1" text @click="addWhitelistedAddress">Add</v-btn>
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
@@ -1041,6 +1069,7 @@
                     address: '',
                 },
                 showUpdateChainLogoDialog: false,
+                showAddWhitelistedAddressDialog: false,
                 updateChainLogoHash: '',
             },
             mounted() {
@@ -1999,9 +2028,14 @@
                 openUpdateChainLogoDialog(chainId) {
                     this.selectedChainId = chainId;
                     this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
-                    console.log(this.selectedChain);
                     this.updateChainLogoHash = ''; // Clear previous hash
                     this.showUpdateChainLogoDialog = true;
+                },
+                openAddWhitelistedAddressDialog(chainId) {
+                    this.selectedChainId = chainId;
+                    this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
+                    this.datatAddWhitelistedAddress = ''; // Clear previous address
+                    this.showAddWhitelistedAddressDialog = true;
                 },
                 async updateChainLogo() {
                     if (!this.selectedChainId || !this.updateChainLogoHash) {
@@ -2033,6 +2067,37 @@
                         await this.fetchChains(); // Refresh chains to show updated logo
                     } catch (error) {
                         console.error('Error updating chain logo:', error);
+                        this.showNotification(error.message, 'error');
+                    }
+                },
+                async addWhitelistedAddress() {
+                    if (!this.selectedChainId || !this.datatAddWhitelistedAddress) {
+                        this.showNotification('Please select a Chain ID and enter a Whitelisted Address', 'error');
+                        return;
+                    }
+                    try {
+                        const response = await fetch('/api/query?type=add-whitelisted-address', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                address: this.datatAddWhitelistedAddress,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to add whitelisted address');
+                        }
+
+                        this.showAddWhitelistedAddressDialog = false;
+                        this.selectedChainId = null;
+                        this.datatAddWhitelistedAddress = '';
+                        this.showNotification('Whitelisted address added successfully');
+                        await this.fetchChains(); // Refresh chains to show updated whitelisted addresses
+                    } catch (error) {
+                        console.error('Error adding whitelisted address:', error);
                         this.showNotification(error.message, 'error');
                     }
                 },
