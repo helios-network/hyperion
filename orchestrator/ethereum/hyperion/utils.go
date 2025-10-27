@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -230,32 +231,33 @@ func (s *hyperionContract) SendInitializeBlockchainTx(
 }
 
 func (s *hyperionContract) WaitForTransaction(ctx context.Context, txHash common.Hash) (*gethtypes.Transaction, uint64, error) {
-	tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, txHash)
-	if err != nil {
-		fmt.Println("Error getting transaction by hash:", err)
-		return nil, 0, err
-	}
 
-	if isPending {
-		for isPending {
+	maxRetries := 50 // 50 * 5 seconds = 250 seconds = 4 minutes and 10 seconds
+	retryCount := 0
+	for retryCount < maxRetries {
+		tx, isPending, err := s.EVMCommitter.Provider().TransactionByHash(ctx, txHash)
+		if err != nil {
 			time.Sleep(5 * time.Second)
-			tx, isPending, err = s.EVMCommitter.Provider().TransactionByHash(ctx, tx.Hash())
-			if err != nil {
-				fmt.Println("Error getting transaction by hash:", err)
-				return nil, 0, err
-			}
+			retryCount++
+			continue
 		}
+		if isPending {
+			time.Sleep(5 * time.Second)
+			retryCount++
+			continue
+		}
+		receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, txHash)
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			retryCount++
+			continue
+		}
+		if receipt.Status != gethtypes.ReceiptStatusSuccessful {
+			return nil, 0, errors.New("transaction failed")
+		}
+		return tx, receipt.BlockNumber.Uint64(), nil
 	}
-
-	receipt, err := s.EVMCommitter.Provider().TransactionReceipt(ctx, tx.Hash())
-	if err != nil {
-		return nil, 0, err
-	}
-	if receipt.Status != gethtypes.ReceiptStatusSuccessful {
-		return nil, 0, errors.New("transaction failed")
-	}
-
-	return tx, receipt.BlockNumber.Uint64(), nil
+	return nil, 0, errors.New("transaction not found on the blockchain after " + strconv.Itoa(maxRetries) + " retries with tx hash: " + txHash.String())
 }
 
 func (s *hyperionContract) GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash common.Hash) (*big.Int, uint64, error) {
