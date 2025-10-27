@@ -392,10 +392,14 @@
                         <v-card-title>Update Chain Logo for Chain ID: {{ selectedChainId }}</v-card-title>
                         <!-- display the current logo hash if exists in data of the selected chain -->
                         <v-card-text>Current Logo Hash: {{ selectedChain?.logo ?? 'No logo found' }}</v-card-text>
+                        <!-- display picture of the current logo if exists -->
+                        <v-card-text v-if="selectedChain?.logo != undefined && selectedChain?.logo != ''">
+                            <v-img :src="'https://testnet1-cdn.helioschainlabs.org/hash/' + selectedChain?.logo" alt="Current Logo" width="100px" height="100px"></v-img>
+                        </v-card-text>
                         <v-card-text>
                             <v-text-field
                                 v-model="updateChainLogoHash"
-                                label="Logo Hash"
+                                label="New Logo Hash"
                                 required
                             ></v-text-field>
                         </v-card-text>
