@@ -390,6 +390,8 @@
                 <v-dialog v-model="showUpdateChainLogoDialog" max-width="500px">
                     <v-card>
                         <v-card-title>Update Chain Logo for Chain ID: {{ selectedChainId }}</v-card-title>
+                        <!-- display the current logo hash if exists in data of the selected chain -->
+                        <v-card-text>Current Logo Hash: {{ selectedChain?.logo ?? 'No logo found' }}</v-card-text>
                         <v-card-text>
                             <v-text-field
                                 v-model="updateChainLogoHash"
@@ -956,7 +958,7 @@
                 password: '',
                 showPassword: false,
                 error: null,
-                chains: {},
+                chains: [],
                 showAddChainDialog: false,
                 showProposeDialog: false,
                 showTokensPage: false,
@@ -965,6 +967,7 @@
                 showAddTokenDialog: false,
                 showAddRpcsDialog: false,
                 selectedChainId: null,
+                selectedChain: null,
                 newChainId: '',
                 isProposing: false,
                 isAddingChain: false,
@@ -1258,6 +1261,9 @@
                     }
                 },
                 updateChainsWithStats() {
+                    if (this.chains == undefined || this.chains.forEach == undefined) {
+                        return;
+                    }
                     this.chains.forEach(chain => {
                         const chainStats = this.stats[chain.chainId] || {};
                         const height = chainStats.height || 0;
@@ -1988,6 +1994,8 @@
                 },
                 openUpdateChainLogoDialog(chainId) {
                     this.selectedChainId = chainId;
+                    this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
+                    console.log(this.selectedChain);
                     this.updateChainLogoHash = ''; // Clear previous hash
                     this.showUpdateChainLogoDialog = true;
                 },

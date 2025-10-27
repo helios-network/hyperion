@@ -83,10 +83,9 @@
                                     Add Chain
                                 </v-btn>
                                 <span class="mr-2"></span>
-                                    <v-btn color="info" @click="showGovernancePage = true">
-                                        Governance
-                                    </v-btn>
-                                </span>
+                                <v-btn color="info" @click="showGovernancePage = true">
+                                    Governance
+                                </v-btn>
                             </v-card-title>
                             <v-card-text>
                                 <v-row>
@@ -306,6 +305,15 @@
                                             Propose Add Whitelisted Address
                                         </v-btn>
                                     </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="openUpdateChainLogoDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Update Logo
+                                        </v-btn>
+                                    </v-col>
                                 </v-row>
                             </v-card-actions>
                         </v-card-text>
@@ -377,6 +385,27 @@
                         </v-card>
                     </v-col>
                 </v-row>
+
+                <!-- Update Chain Logo Dialog -->
+                <v-dialog v-model="showUpdateChainLogoDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Update Chain Logo for Chain ID: {{ selectedChainId }}</v-card-title>
+                        <!-- display the current logo hash if exists in data of the selected chain -->
+                        <v-card-text>Current Logo Hash: {{ selectedChain?.logo ?? 'No logo found' }}</v-card-text>
+                        <v-card-text>
+                            <v-text-field
+                                v-model="updateChainLogoHash"
+                                label="Logo Hash"
+                                required
+                            ></v-text-field>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="blue darken-1" text @click="showUpdateChainLogoDialog = false">Cancel</v-btn>
+                            <v-btn color="blue darken-1" text @click="updateChainLogo">Update</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
 
                 <!-- Add Chain Dialog -->
                 <v-dialog v-model="showAddChainDialog" max-width="500px">
@@ -929,7 +958,7 @@
                 password: '',
                 showPassword: false,
                 error: null,
-                chains: {},
+                chains: [],
                 showAddChainDialog: false,
                 showProposeDialog: false,
                 showTokensPage: false,
@@ -938,6 +967,7 @@
                 showAddTokenDialog: false,
                 showAddRpcsDialog: false,
                 selectedChainId: null,
+                selectedChain: null,
                 newChainId: '',
                 isProposing: false,
                 isAddingChain: false,
@@ -1006,6 +1036,8 @@
                     chain_id: null,
                     address: '',
                 },
+                showUpdateChainLogoDialog: false,
+                updateChainLogoHash: '',
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -1229,6 +1261,9 @@
                     }
                 },
                 updateChainsWithStats() {
+                    if (this.chains == undefined || this.chains.forEach == undefined) {
+                        return;
+                    }
                     this.chains.forEach(chain => {
                         const chainStats = this.stats[chain.chainId] || {};
                         const height = chainStats.height || 0;
@@ -1955,6 +1990,46 @@
                         this.showNotification(`Failed to propose add whitelisted address: ${error.message}`, 'error');
                     } finally {
                         this.isProposingAddWhitelistedAddress = false;
+                    }
+                },
+                openUpdateChainLogoDialog(chainId) {
+                    this.selectedChainId = chainId;
+                    this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
+                    console.log(this.selectedChain);
+                    this.updateChainLogoHash = ''; // Clear previous hash
+                    this.showUpdateChainLogoDialog = true;
+                },
+                async updateChainLogo() {
+                    if (!this.selectedChainId || !this.updateChainLogoHash) {
+                        this.showNotification('Please select a Chain ID and enter a Logo Hash', 'error');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/query?type=update-chain-logo', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                logo: this.updateChainLogoHash,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to update chain logo');
+                        }
+
+                        this.showUpdateChainLogoDialog = false;
+                        this.selectedChainId = null;
+                        this.updateChainLogoHash = '';
+                        this.showNotification('Chain logo updated successfully');
+                        await this.fetchChains(); // Refresh chains to show updated logo
+                    } catch (error) {
+                        console.error('Error updating chain logo:', error);
+                        this.showNotification(error.message, 'error');
                     }
                 },
             },

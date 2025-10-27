@@ -34,6 +34,7 @@ func GetListHyperions(ctx context.Context, global *global.Global) (map[string]in
 			"address":    counterpartyChainParam.BridgeCounterpartyAddress,
 			"chainId":    counterpartyChainParam.BridgeChainId,
 			"name":       counterpartyChainParam.BridgeChainName,
+			"logo":       counterpartyChainParam.BridgeChainLogo,
 			"registered": registered,
 			"running":    running,
 			"paused":     counterpartyChainParam.Paused,
