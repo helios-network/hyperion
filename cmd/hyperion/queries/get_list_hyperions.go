@@ -31,15 +31,18 @@ func GetListHyperions(ctx context.Context, global *global.Global) (map[string]in
 			running = true
 		}
 		hyperions[fmt.Sprintf("%d", counterpartyChainParam.BridgeChainId)] = map[string]interface{}{
-			"address":    counterpartyChainParam.BridgeCounterpartyAddress,
-			"chainId":    counterpartyChainParam.BridgeChainId,
-			"name":       counterpartyChainParam.BridgeChainName,
-			"logo":       counterpartyChainParam.BridgeChainLogo,
-			"registered": registered,
-			"running":    running,
-			"paused":     counterpartyChainParam.Paused,
-			"enabled":    true,
-			"proposed":   true,
+			"address":                 counterpartyChainParam.BridgeCounterpartyAddress,
+			"chainId":                 counterpartyChainParam.BridgeChainId,
+			"name":                    counterpartyChainParam.BridgeChainName,
+			"logo":                    counterpartyChainParam.BridgeChainLogo,
+			"targetBatchTimeout":      counterpartyChainParam.TargetBatchTimeout,
+			"targetOutgoingTxTimeout": counterpartyChainParam.TargetOutgoingTxTimeout,
+			"averageBlockTime":        counterpartyChainParam.AverageBlockTime,
+			"registered":              registered,
+			"running":                 running,
+			"paused":                  counterpartyChainParam.Paused,
+			"enabled":                 true,
+			"proposed":                true,
 		}
 	}
 
