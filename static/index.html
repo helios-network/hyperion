@@ -270,6 +270,15 @@
                                     </v-col>
                                     <v-col cols="12">
                                         <v-btn
+                                            color="info"
+                                            @click="openPauseManagementDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Pause Management
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
                                             v-if="chains.find(chain => chain.chainId === selectedChainId)?.proposed"
                                             color="info"
                                             @click="viewTokens(selectedChainId); showOthersModal = false;"
@@ -403,6 +412,27 @@
                         </v-card>
                     </v-col>
                 </v-row>
+
+                <!-- Pause Management Dialog -->
+                <v-dialog v-model="showPauseManagementDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Pause Management for Chain: {{ selectedChainId }}</v-card-title>
+                        <v-card-text>
+                            <p>Deposit Paused: <span style="font-weight: bold;">{{ stats[selectedChainId]?.hyperionState?.IsDepositPaused ? 'Yes' : 'No' }}</span></p>
+                            <p>Withdrawal Paused: <span style="font-weight: bold;">{{ stats[selectedChainId]?.hyperionState?.IsWithdrawalPaused ? 'Yes' : 'No' }}</span></p>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="primary" @click="togglePause('pause-or-unpause-deposit')" :loading="isTogglingDepositOrWithdrawalPause">
+                                Toggle Deposit Pause
+                            </v-btn>
+                            <v-btn color="primary" @click="togglePause('pause-or-unpause-withdrawal')" :loading="isTogglingDepositOrWithdrawalPause">
+                                Toggle Withdrawal Pause
+                            </v-btn>
+                            <v-btn color="error" text @click="showPauseManagementDialog = false">Close</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
 
                 <!-- Update Chain Logo Dialog -->
                 <v-dialog v-model="showUpdateChainLogoDialog" max-width="500px">
@@ -1117,6 +1147,9 @@
                 uploadLogoBase64: '',
                 showLogoHashDialog: false,
                 logoHash: '',
+                datatAddWhitelistedAddress: '',
+                showPauseManagementDialog: false,
+                isTogglingDepositOrWithdrawalPause: false,
             },
             mounted() {
                 const storedPassword = localStorage.getItem('password');
@@ -2196,6 +2229,56 @@
                     } catch (error) {
                         console.error('Error adding whitelisted address:', error);
                         this.showNotification(error.message, 'error');
+                    }
+                },
+                openPauseManagementDialog(chainId) {
+                    this.selectedChainId = chainId;
+                    this.selectedChain = this.chains.find(chain => chain.chainId === chainId);
+                    this.showPauseManagementDialog = true;
+                },
+                togglePause(type) {
+                    this.isTogglingDepositOrWithdrawalPause = true;
+                    this.togglePauseHelper(type);
+                },
+                async togglePauseHelper(type) {
+                    try {
+
+                        let newStateOfPause = false;
+
+                        if (type === 'pause-or-unpause-deposit') {
+                            newStateOfPause = !this.stats[this.selectedChainId]?.hyperionState?.IsDepositPaused;
+                        } else {
+                            newStateOfPause = !this.stats[this.selectedChainId]?.hyperionState?.IsWithdrawalPaused;
+                        }
+
+                        const response = await fetch(`/api/query?type=${type}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                pause: newStateOfPause,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Failed to toggle ${type} pause`);
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.showNotification(`${type} pause toggled successfully for chain ${this.selectedChainId} with tx hash ${data.data.tx_hash}`);
+                        } else {
+                            throw new Error(data.error || `Failed to toggle ${type} pause`);
+                        }
+                        // Re-fetch stats to get the latest pause states
+                        await this.fetchStats();
+                        this.isTogglingDepositOrWithdrawalPause = false;
+                    } catch (error) {
+                        console.error(`Error toggling ${type} pause:`, error);
+                        this.showNotification(error.message, 'error');
+                        this.isTogglingDepositOrWithdrawalPause = false;
                     }
                 },
             },

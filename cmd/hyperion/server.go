@@ -443,6 +443,38 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		response := queries.UploadLogo(r.Context(), global, params.Logo)
 		sendSuccess(w, response, nil)
 		return
+	case "pause-or-unpause-deposit":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Pause   bool   `json:"pause"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.PauseOrUnpauseDeposit(r.Context(), global, params.ChainID, params.Pause)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
+	case "pause-or-unpause-withdrawal":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+			Pause   bool   `json:"pause"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.PauseOrUnpauseWithdrawal(r.Context(), global, params.ChainID, params.Pause)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
 	case "run-hyperion":
 		var params struct {
 			ChainID uint64 `json:"chain_id"`
