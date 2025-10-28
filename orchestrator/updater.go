@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 )
 
@@ -27,7 +28,7 @@ func (s *Orchestrator) runUpdater(ctx context.Context) error {
 
 		start := time.Now()
 		s.HyperionState.UpdaterStatus = "running"
-		err := updater.Update()
+		err := updater.Update(ctx)
 		s.HyperionState.UpdaterStatus = "idle"
 		s.HyperionState.UpdaterLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
 		s.HyperionState.UpdaterNextExecutionTimestamp = uint64(start.Add(defaultUpdaterLoopDur).Unix())
@@ -44,7 +45,27 @@ func (l *updater) Log() log.Logger {
 	return l.logger.WithField("loop", "Updater")
 }
 
-func (l *updater) Update() error {
+func (l *updater) Update(ctx context.Context) error {
+	l.logger.Info("Updating Updater...")
+	l.HyperionState.UpdaterStatus = "updating chain params"
+	// update params of cfg
+	counterpartyChainParams, err := l.helios.GetCounterpartyChainParamsByChainId(ctx, l.cfg.ChainId)
+	if err != nil {
+		return errors.Wrap(err, "unable to get counterparty chain params")
+	}
+	l.cfg.ChainParams = counterpartyChainParams
+
+	l.HyperionState.UpdaterStatus = "updating deposit pause status"
+	// update is deposit paused
+	isDepositPaused, err := l.ethereum.IsDepositPaused(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to get deposit pause status")
+	}
+	l.HyperionState.IsDepositPaused = isDepositPaused
+
+	l.HyperionState.UpdaterStatus = "updating withdrawal pause status"
+	// update is withdrawal paused
+	l.HyperionState.IsWithdrawalPaused = l.cfg.ChainParams.Paused
 	l.logger.Info("Updater updated")
 	return nil
 }

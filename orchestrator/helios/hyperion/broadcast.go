@@ -68,6 +68,8 @@ type BroadcastClient interface {
 	UpdateChainSmartContract(ctx context.Context, chainId uint64, ethFrom gethcommon.Address, bridgeContractAddress string, bridgeContractStartHeight uint64, contractSourceCodeHash string) error
 	UpdateChainLogoMsg(ctx context.Context, chainId uint64, logo string) (sdk.Msg, error)
 	AddWhitelistedAddressMsg(ctx context.Context, chainId uint64, address string) (sdk.Msg, error)
+
+	PauseOrUnpauseHyperionWithdrawalMsg(ctx context.Context, chainId uint64, pause bool) (sdk.Msg, error)
 }
 
 type broadcastClient struct {
@@ -1248,4 +1250,34 @@ func (c *broadcastClient) AddWhitelistedAddressMsg(ctx context.Context, chainId 
 		Signer:     c.FromAddress().String(),
 	}
 	return msg, nil
+}
+
+func (c *broadcastClient) PauseHyperionWithdrawalMsg(ctx context.Context, chainId uint64) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+	msg := &hyperiontypes.MsgPauseChain{
+		ChainId: chainId,
+		Signer:  c.FromAddress().String(),
+	}
+	return msg, nil
+}
+
+func (c *broadcastClient) UnpauseHyperionWithdrawalMsg(ctx context.Context, chainId uint64) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+	msg := &hyperiontypes.MsgUnpauseChain{
+		ChainId: chainId,
+		Signer:  c.FromAddress().String(),
+	}
+	return msg, nil
+}
+
+func (c *broadcastClient) PauseOrUnpauseHyperionWithdrawalMsg(ctx context.Context, chainId uint64, pause bool) (sdk.Msg, error) {
+	if pause {
+		return c.PauseHyperionWithdrawalMsg(ctx, chainId)
+	} else {
+		return c.UnpauseHyperionWithdrawalMsg(ctx, chainId)
+	}
 }

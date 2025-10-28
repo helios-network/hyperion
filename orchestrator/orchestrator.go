@@ -94,6 +94,9 @@ type HyperionState struct {
 	SignerLastExecutionFinishedTimestamp        uint64
 	UpdaterLastExecutionFinishedTimestamp       uint64
 	ValsetManagerLastExecutionFinishedTimestamp uint64
+
+	IsDepositPaused    bool
+	IsWithdrawalPaused bool
 }
 
 type Orchestrator struct {
@@ -179,6 +182,9 @@ func NewOrchestrator(
 			SignerLastExecutionFinishedTimestamp:        0,
 			UpdaterLastExecutionFinishedTimestamp:       0,
 			ValsetManagerLastExecutionFinishedTimestamp: 0,
+
+			IsDepositPaused:    false,
+			IsWithdrawalPaused: false,
 		},
 
 		CacheSymbol: make(map[gethcommon.Address]string),
@@ -289,6 +295,14 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 		// start from the next block after the last observed height
 		ethereumBlockHeightWhereStart = latestObservedHeight.EthereumBlockHeight + 1
 	}
+
+	// check if deposit is paused
+	isDepositPaused, err := s.ethereum.IsDepositPaused(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to query deposit pause status")
+	}
+	s.HyperionState.IsDepositPaused = isDepositPaused
+	s.HyperionState.IsWithdrawalPaused = s.cfg.ChainParams.Paused
 
 	var pg loops.ParanoidGroup
 

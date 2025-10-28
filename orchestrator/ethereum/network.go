@@ -106,6 +106,9 @@ type Network interface {
 	WaitForTransaction(ctx context.Context, txHash gethcommon.Hash) (*gethtypes.Transaction, uint64, error)
 	GetTransactionFeesUsedInNetworkNativeCurrency(ctx context.Context, txHash gethcommon.Hash) (*big.Int, uint64, error)
 	SendClaimTokensOfOldContract(ctx context.Context, hyperionId uint64, tokenContract string, amountInSdkMath *big.Int, ethFrom common.Address, signerFn keystore.PersonalSignFn) error
+
+	PauseOrUnpauseDeposit(ctx context.Context, pause bool) (*gethcommon.Hash, error)
+	IsDepositPaused(ctx context.Context) (bool, error)
 }
 
 type cacheHeaderValue struct {

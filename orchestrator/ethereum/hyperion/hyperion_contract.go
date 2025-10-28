@@ -49,6 +49,13 @@ type HyperionContract interface {
 		data string,
 	) (*common.Hash, error)
 
+	PauseOrUnpauseDeposit(
+		ctx context.Context,
+		pause bool,
+	) (*common.Hash, error)
+
+	IsDepositPaused(ctx context.Context) (bool, error)
+
 	PrepareTransactionBatch(
 		ctx context.Context,
 		currentValset *types.Valset,
