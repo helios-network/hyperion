@@ -137,6 +137,13 @@
                                                                 >
                                                                     {{ chain.isSynced ? 'Synced' : 'Out of Sync' }}
                                                                 </v-chip>
+                                                                <v-chip
+                                                                    v-if="stats[chain.chainId]?.hyperionState?.NativeBalance !== undefined"
+                                                                    :color="stats[chain.chainId]?.hyperionState?.NativeBalance > 0 ? 'success' : 'error'"
+                                                                    small
+                                                                >
+                                                                    Native Balance: {{ stats[chain.chainId]?.hyperionState?.NativeBalance }}
+                                                                </v-chip>
                                                             </v-list-item-subtitle>
                                                         </v-list-item-content>
                                                     </v-list-item>

@@ -66,6 +66,15 @@ func (l *updater) Update(ctx context.Context) error {
 	l.HyperionState.UpdaterStatus = "updating withdrawal pause status"
 	// update is withdrawal paused
 	l.HyperionState.IsWithdrawalPaused = l.cfg.ChainParams.Paused
+
+	// update native balance
+	l.HyperionState.UpdaterStatus = "updating native balance"
+	err = l.Orchestrator.UpdateNativeBalance(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to update native balance")
+	}
+	l.HyperionState.UpdaterStatus = "idle"
+
 	l.logger.Info("Updater updated")
 	return nil
 }

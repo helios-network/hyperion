@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"cosmossdk.io/errors"
@@ -100,7 +101,6 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			}
 
 			// Initialize new target network
-			// targetNetwork, err := global.InitTargetNetwork(counterpartyChainParams)
 			targetNetworks, err := global.InitTargetNetworks(counterpartyChainParams)
 			if err != nil {
 				fmt.Println("Error initializing target network:", err)
@@ -111,6 +111,9 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 				if consecutiveErrors > 5 {
 					fmt.Println("Too many consecutive errors, waiting for max delay")
 					time.Sleep(maxDelay)
+				}
+				if strings.Contains(err.Error(), "no rpcs found") {
+					return
 				}
 				continue
 			}

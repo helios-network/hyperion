@@ -18,6 +18,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/utils"
 	"github.com/Helios-Chain-Labs/metrics"
 )
 
@@ -57,6 +58,7 @@ type Config struct {
 }
 
 type HyperionState struct {
+	NativeBalance          string
 	HyperionID             uint64
 	Height                 uint64
 	TargetHeight           uint64
@@ -257,6 +259,12 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 
 	fmt.Println("startValidatorMode")
 
+	// update native balance
+	err := s.UpdateNativeBalance(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to update native balance")
+	}
+
 	// get hyperion ID from contract
 	hyperionIDHash, err := s.ethereum.GetHyperionID(ctx)
 	if err != nil {
@@ -402,12 +410,11 @@ func (s *Orchestrator) RotateRpc() {
 	s.logger.Info("Rotated rpc to rpc ", s.ethereum.GetRpc().Url, " / total rpcs ", len(lstOfclients))
 }
 
-// func (s *Orchestrator) UpdateRpcs() {
-
-// 	targetNetwork, err := s.global.InitTargetNetwork(s.cfg.ChainParams)
-// 	if err != nil {
-// 		s.logger.WithError(err).Warningf("failed to update rpcs")
-// 		return
-// 	}
-// 	s.ethereum = *targetNetwork
-// }
+func (s *Orchestrator) UpdateNativeBalance(ctx context.Context) error {
+	nativeBalance, err := s.ethereum.GetNativeBalance(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to get native balance")
+	}
+	s.HyperionState.NativeBalance = utils.FormatBigStringToFloat64(nativeBalance.String(), 18)
+	return nil
+}

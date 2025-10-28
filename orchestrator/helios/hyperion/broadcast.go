@@ -59,6 +59,7 @@ type BroadcastClient interface {
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
 	SendUpdateOrchestratorAddressesFee(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
+	SendUpdateOrchestratorAddressesFeeMsg(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) (sdk.Msg, error)
 
 	SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
 	SendForceSetValsetAndLastObservedEventNonce(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, valset *hyperiontypes.Valset) error
@@ -490,11 +491,9 @@ func (c *broadcastClient) SendUpdateOrchestratorAddressesFee(ctx context.Context
 	// MsgUpdateOrchestratorAddressesFee
 	// Permit to set the orchestrator address on the hyperion module
 	// -------------
-	msg := &hyperiontypes.MsgUpdateOrchestratorAddressesFee{
-		Sender:          c.FromAddress().String(),
-		HyperionId:      hyperionId,
-		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerTx),
-		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerBatch),
+	msg, err := c.SendUpdateOrchestratorAddressesFeeMsg(ctx, hyperionId, minimumfeePerTx, minimumfeePerBatch)
+	if err != nil {
+		return errors.Wrap(err, "broadcasting MsgUpdateOrchestratorAddressesFee failed")
 	}
 	resp, err := c.ChainClient.SyncBroadcastMsg(msg)
 	if err != nil {
@@ -516,6 +515,19 @@ func (c *broadcastClient) SendUpdateOrchestratorAddressesFee(ctx context.Context
 	time.Sleep(10 * time.Second)
 
 	return nil
+}
+
+func (c *broadcastClient) SendUpdateOrchestratorAddressesFeeMsg(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+	msg := &hyperiontypes.MsgUpdateOrchestratorAddressesFee{
+		Sender:          c.FromAddress().String(),
+		HyperionId:      hyperionId,
+		MinimumTxFee:    sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerTx),
+		MinimumBatchFee: sdk.NewCoin(sdk.DefaultBondDenom, minimumfeePerBatch),
+	}
+	return msg, nil
 }
 
 func (c *broadcastClient) SendUnSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error {

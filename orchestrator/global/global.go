@@ -114,7 +114,9 @@ func (g *Global) StartRunnersAtStartUp(runHyperion func(ctx context.Context, g *
 func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc, orchestrator *orchestrator.Orchestrator) {
 	storage.SetRunner(chainId)
 	g.runners[chainId] = cancel
-	g.orchestrators[chainId] = orchestrator
+	if orchestrator != nil {
+		g.orchestrators[chainId] = orchestrator
+	}
 }
 
 func (g *Global) GetRunner(chainId uint64) context.CancelFunc {

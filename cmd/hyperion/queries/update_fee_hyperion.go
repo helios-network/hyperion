@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+
 	sdkmath "cosmossdk.io/math"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
@@ -28,7 +30,15 @@ func UpdateFeeHyperion(ctx context.Context, global *global.Global, minTxFeeHLS f
 		minBatchFeeHLSMath = sdkmath.NewInt(int64(minBatchFeeHLS * 1000000000000000000))
 	}
 
-	err := network.SendUpdateOrchestratorAddressesFee(ctx, chainId, minTxFeeHLSMath, minBatchFeeHLSMath)
+	msg, err := network.SendUpdateOrchestratorAddressesFeeMsg(ctx, chainId, minTxFeeHLSMath, minBatchFeeHLSMath)
+	if err != nil {
+		return err
+	}
+	err = network.SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+	if err != nil {
+		return err
+	}
+	_, err = network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return err
 	}
