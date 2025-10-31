@@ -24,6 +24,7 @@ func GetListProposals(ctx context.Context, global *global.Global, page int, size
 	for _, proposal := range proposals {
 		formattedProposal, err := ParseProposal(proposal)
 		if err != nil {
+			fmt.Println("failed to parse proposal", err)
 			continue
 		}
 		proposalsResult = append(proposalsResult, formattedProposal)
