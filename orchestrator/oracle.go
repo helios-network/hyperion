@@ -129,14 +129,16 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("oracle_max_claims_msg_per_bulk found in chain settings, using value", maxClaimsMsgPerBulk)
 	}
 
+	l.HyperionState.OracleStatus = "getting CurrentValset on Helios"
 	// check if validator is in the active set since claims will fail otherwise
-	vs, err := l.helios.CurrentValset(ctx, l.cfg.HyperionId)
+	vs, err := l.GetHelios().CurrentValset(ctx, l.cfg.HyperionId)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to get active validator set on Helios")
 		return err
 	}
 
-	latestObservedHeight, err := l.helios.QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
+	l.HyperionState.OracleStatus = "getting LatestObservedHeight on Helios"
+	latestObservedHeight, err := l.GetHelios().QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest valsets on Helios")
 	}
@@ -144,6 +146,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	// state
 	l.HyperionState.LastObservedHeight = latestObservedHeight.EthereumBlockHeight
 
+	l.HyperionState.OracleStatus = "checking if first time sync is needed"
 	if latestObservedHeight.EthereumBlockHeight <= l.cfg.ChainParams.BridgeContractStartHeight && !l.firstTimeSync { // first time total sync needed
 		l.lastObservedEthHeight = l.cfg.ChainParams.BridgeContractStartHeight
 		l.Log().Info("First Time Hyperion total sync needed BridgeContractStartHeight: ", l.lastObservedEthHeight)
@@ -160,14 +163,16 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	}
 
 	if !bonded {
+		l.HyperionState.OracleStatus = "validator not in active set, cannot make claims..."
 		l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height}).Warningln("validator not in active set, cannot make claims...")
-		_, err := l.helios.GetLatestBlockHeight(ctx)
+		_, err := l.GetHelios().GetLatestBlockHeight(ctx)
 		if err != nil {
+			l.HyperionState.OracleStatus = "Connected node is down, cannot make claims..."
 			l.Log().WithError(err).Errorln("Connected node is down, cannot make claims...")
 			return err
 		}
 		//l.cfg.CosmosAddr.String()
-		validator, err := l.helios.GetValidator(ctx, l.cfg.ValidatorAddress.String())
+		validator, err := l.GetHelios().GetValidator(ctx, l.cfg.ValidatorAddress.String())
 		if err != nil {
 			l.Log().WithError(err).Errorln("failed to get validator on " + l.cfg.ChainName)
 			return err
@@ -175,7 +180,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		if validator.Jailed {
 			// todo try to unjail
 			l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height, "validator": validator.Description.Moniker}).Warningln("validator jailed, cannot make claims...")
-			err = l.helios.SendUnjail(ctx, l.cfg.ValidatorAddress.String())
+			err = l.GetHelios().SendUnjail(ctx, l.cfg.ValidatorAddress.String())
 			if err != nil {
 				l.Log().WithError(err).Errorln("failed to unjail validator on " + l.cfg.ChainName)
 				return err
@@ -185,7 +190,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			/// internal logic error: hrp does not match bech32 prefix: expected 'heliosvaloper' got 'helios'" loop=Oracle
 			return nil
 		}
-		err = l.helios.SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
+		err = l.GetHelios().SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
 		if err != nil {
 			return err
 		}
@@ -253,7 +258,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return err
 	}
 
-	lastObservedEventNonce, err := l.Orchestrator.helios.QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
+	lastObservedEventNonce, err := l.Orchestrator.GetHelios().QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
 		l.Log().WithError(err).Errorln("failed to get last observed event nonce for " + l.cfg.ChainName + " on helios network")
 		return err
@@ -300,7 +305,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 
 	if newEvents[0].Nonce() > lastObservedEventNonce+1 {
 		// we missed an event
-		lastObservedHeight, err := l.helios.QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
+		lastObservedHeight, err := l.GetHelios().QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
 		if err != nil {
 			return err
 		}
@@ -413,7 +418,7 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClaimEvent, error) {
 	var claim *hyperiontypes.LastClaimEvent
 	fn := func() (err error) {
-		claim, err = l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
+		claim, err = l.GetHelios().LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return
 	}
 
@@ -427,7 +432,7 @@ func (l *oracle) getLastClaimEvent(ctx context.Context) (*hyperiontypes.LastClai
 func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClaimsMsgPerBulk int) error {
 	sendEventsFn := func() error {
 		// in case sending one of more claims fails, we reload the latest claimed nonce to filter processed events
-		lastClaim, err := l.helios.LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
+		lastClaim, err := l.GetHelios().LastClaimEventByAddr(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		if err != nil {
 			return err
 		}
@@ -450,19 +455,19 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 				log.Infoln("sending bulk of ", len(msgs), "claims messages")
 				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 
-				err = l.helios.SyncBroadcastMsgsSimulate(ctx, msgs)
+				err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
 				if err != nil {
 					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 					return err
 				}
-				resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
+				resp, err := l.GetHelios().SyncBroadcastMsgs(ctx, msgs)
 				if err != nil {
 					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
 					return err
 				}
 				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
-				cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
+				cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
 				if err == nil {
 					storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
 				}
@@ -474,18 +479,18 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 		if len(msgs) > 0 {
 			log.Infoln("sending bulk of ", len(msgs), "claims messages")
 			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
-			err = l.helios.SyncBroadcastMsgsSimulate(ctx, msgs)
+			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
 			if err != nil {
 				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 				return err
 			}
-			resp, err := l.helios.SyncBroadcastMsgs(ctx, msgs)
+			resp, err := l.GetHelios().SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
 				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
 				return err
 			}
-			cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
+			cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
 			if err == nil {
 				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
 				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
@@ -521,7 +526,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 func (l *oracle) autoResync(ctx context.Context) error {
 	var height uint64
 	fn := func() (err error) {
-		height, err = l.getLastClaimBlockHeight(ctx, l.helios)
+		height, err = l.getLastClaimBlockHeight(ctx, l.GetHelios())
 		return
 	}
 
@@ -546,16 +551,16 @@ func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmos
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
 		l.HyperionState.InBridgedTxCount++
-		return l.helios.SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
+		return l.GetHelios().SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *valsetUpdate:
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-		return l.helios.SendValsetClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
+		return l.GetHelios().SendValsetClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *withdrawal:
 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-		return l.helios.SendWithdrawalClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
+		return l.GetHelios().SendWithdrawalClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *erc20Deployment:
 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-		return l.helios.SendERC20DeployedClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
+		return l.GetHelios().SendERC20DeployedClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	default:
 		panic(errors.Errorf("unknown ev type %T", e))
 	}

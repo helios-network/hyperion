@@ -68,6 +68,17 @@ func (g *Global) GetHeliosNetwork() *helios.Network {
 	return g.heliosNetwork
 }
 
+func (g *Global) ResetHeliosClient() {
+	if g.heliosNetwork != nil {
+		heliosNetwork := *g.heliosNetwork
+		heliosNetwork.Close()
+		_, err := g.InitHeliosNetwork()
+		if err != nil {
+			fmt.Println("Error resetting helios client:", err)
+		}
+	}
+}
+
 func (g *Global) GetAddress() gethcommon.Address {
 	return g.ethKeyFromAddress
 }

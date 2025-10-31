@@ -49,7 +49,7 @@ func (l *updater) Update(ctx context.Context) error {
 	l.logger.Info("Updating Updater...")
 	l.HyperionState.UpdaterStatus = "updating chain params"
 	// update params of cfg
-	counterpartyChainParams, err := l.helios.GetCounterpartyChainParamsByChainId(ctx, l.cfg.ChainId)
+	counterpartyChainParams, err := l.GetHelios().GetCounterpartyChainParamsByChainId(ctx, l.cfg.ChainId)
 	if err != nil {
 		return errors.Wrap(err, "unable to get counterparty chain params")
 	}

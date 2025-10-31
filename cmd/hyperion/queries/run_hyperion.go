@@ -86,20 +86,6 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 
 			fmt.Println("Starting orchestrator")
 
-			heliosNetwork := global.GetHeliosNetwork()
-			if heliosNetwork == nil { // should not happen
-				fmt.Println("Error initializing helios network:", err)
-				cancel()
-				time.Sleep(currentDelay)
-				currentDelay = min(currentDelay*2, maxDelay)
-				consecutiveErrors++
-				if consecutiveErrors > 5 {
-					fmt.Println("Too many consecutive errors, waiting for max delay")
-					time.Sleep(maxDelay)
-				}
-				continue
-			}
-
 			// Initialize new target network
 			targetNetworks, err := global.InitTargetNetworks(counterpartyChainParams)
 			if err != nil {
@@ -120,7 +106,6 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 
 			// Create new hyperion instance
 			hyperion, err := orchestrator.NewOrchestrator(
-				*heliosNetwork,
 				targetNetworks,
 				pricefeed.NewCoingeckoPriceFeed(100, &pricefeed.Config{BaseURL: "https://api.coingecko.com/api/v3"}),
 				orchestratorCfg,

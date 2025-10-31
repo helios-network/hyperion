@@ -36,6 +36,8 @@ type Global interface {
 	InitTargetNetworks(counterpartyChainParams *hyperiontypes.CounterpartyChainParams) ([]*ethereum.Network, error)
 	GetMinBatchFeeHLS(chainId uint64) float64
 	GetMinTxFeeHLS(chainId uint64) float64
+	ResetHeliosClient()
+	GetHeliosNetwork() *helios.Network
 }
 
 type Config struct {
@@ -80,6 +82,7 @@ type HyperionState struct {
 	SignerStatus        string
 	UpdaterStatus       string
 	ValsetManagerStatus string
+	ErrorStatus         string
 
 	BatchCreatorNextExecutionTimestamp  uint64
 	ExternalDataNextExecutionTimestamp  uint64
@@ -107,7 +110,6 @@ type Orchestrator struct {
 	cfg         Config
 	maxAttempts uint
 
-	helios        helios.Network
 	ethereum      ethereum.Network
 	ethereums     []*ethereum.Network
 	priceFeed     PriceFeed
@@ -124,7 +126,6 @@ type Orchestrator struct {
 }
 
 func NewOrchestrator(
-	helios helios.Network,
 	eths []*ethereum.Network,
 	priceFeed PriceFeed,
 	cfg Config,
@@ -135,7 +136,6 @@ func NewOrchestrator(
 			"chain": cfg.ChainName,
 		}),
 		svcTags:       metrics.Tags{"svc": "hyperion_orchestrator"},
-		helios:        helios,
 		ethereum:      *eths[0],
 		ethereums:     eths,
 		priceFeed:     priceFeed,
@@ -168,6 +168,7 @@ func NewOrchestrator(
 			SignerStatus:        "idle",
 			UpdaterStatus:       "idle",
 			ValsetManagerStatus: "idle",
+			ErrorStatus:         "okay",
 
 			BatchCreatorNextExecutionTimestamp:  0,
 			ExternalDataNextExecutionTimestamp:  0,
@@ -218,7 +219,7 @@ func (s *Orchestrator) GetEthereum() ethereum.Network {
 }
 
 func (s *Orchestrator) GetHelios() helios.Network {
-	return s.helios
+	return *s.global.GetHeliosNetwork()
 }
 
 func (s *Orchestrator) GetConfig() Config {
@@ -274,7 +275,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 
 	s.logger.Infoln("Our HyperionID", "is", hyperionID, "hash", hyperionIDHash.Hex(), "hyperionAddress", s.ethereum.GetHyperionContractAddress().Hex())
 
-	latestObservedHeight, err := s.helios.QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
+	latestObservedHeight, err := s.GetHelios().QueryGetLastObservedEthereumBlockHeight(ctx, s.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "unable to query hyperion module params, is heliades running?")
 	}
@@ -288,7 +289,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	// start from top of the blockchain
 	ethereumBlockHeightWhereStart := latestHeight
 
-	lastObservedEventNonce, err := s.helios.QueryGetLastObservedEventNonce(ctx, s.cfg.HyperionId)
+	lastObservedEventNonce, err := s.GetHelios().QueryGetLastObservedEventNonce(ctx, s.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "unable to query hyperion module params, is heliades running?")
 	}
@@ -417,4 +418,9 @@ func (s *Orchestrator) UpdateNativeBalance(ctx context.Context) error {
 	}
 	s.HyperionState.NativeBalance = utils.FormatBigStringToFloat64(nativeBalance.String(), 18)
 	return nil
+}
+
+func (s *Orchestrator) ResetHeliosClient() {
+	fmt.Println("ResetHeliosClient called")
+	s.global.ResetHeliosClient()
 }

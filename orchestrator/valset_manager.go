@@ -193,7 +193,7 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	latestHeliosValsets, err := l.helios.LatestValsets(ctx, l.cfg.HyperionId)
+	latestHeliosValsets, err := l.GetHelios().LatestValsets(ctx, l.cfg.HyperionId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest validator set from Helios")
 	}
@@ -204,7 +204,7 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 	)
 
 	for _, set := range latestHeliosValsets {
-		sigs, err := l.helios.AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
+		sigs, err := l.GetHelios().AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get validator set confirmations for nonce %d", set.Nonce)
 		}
@@ -281,14 +281,14 @@ func (l *valsetManager) shouldRelayValset(ctx context.Context, vs *hyperiontypes
 	}
 
 	// Check custom time delay offset for determine if we should relay the valset on chain respecting the offset
-	block, err := l.helios.GetBlock(ctx, int64(vs.Height))
+	block, err := l.GetHelios().GetBlock(ctx, int64(vs.Height))
 	if err != nil {
-		latestBlockHeight, err := l.helios.GetLatestBlockHeight(ctx)
+		latestBlockHeight, err := l.GetHelios().GetLatestBlockHeight(ctx)
 		if err != nil {
 			l.Log().WithError(err).Warningln("unable to get latest block from Helios")
 			return false
 		}
-		block, err = l.helios.GetBlock(ctx, int64(latestBlockHeight))
+		block, err = l.GetHelios().GetBlock(ctx, int64(latestBlockHeight))
 		if err != nil {
 			l.Log().WithError(err).Warningln("unable to get latest block from Helios (tryed block:", int64(vs.Height), ")")
 			return false
@@ -336,7 +336,7 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 
 	fmt.Println("latestEthereumValsetNonce", latestEthereumValsetNonce.Uint64())
 
-	cosmosValset, err := l.helios.ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
+	cosmosValset, err := l.GetHelios().ValsetAt(ctx, l.cfg.HyperionId, latestEthereumValsetNonce.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get Helios valset")
 	}

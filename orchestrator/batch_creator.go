@@ -83,12 +83,12 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 			paquetOfTenMsgs = append(paquetOfTenMsgs, msg)
 			if len(paquetOfTenMsgs) == 10 {
 				l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
-				err := l.helios.SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
+				err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
 				if err != nil {
 					l.Log().WithError(err).Warningln("failed to simulate token batches")
 					return err
 				}
-				_, err = l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+				_, err = l.GetHelios().SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
 				if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
 					l.Log().Infoln("no unbatched txs found, skipping")
 				} else if err != nil {
@@ -100,12 +100,12 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 		}
 		if len(paquetOfTenMsgs) > 0 {
 			l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
-			err := l.helios.SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
+			err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
 			if err != nil {
 				l.Log().WithError(err).Warningln("failed to simulate token batches")
 				return err
 			}
-			_, err = l.helios.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+			_, err = l.GetHelios().SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
 			if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
 				l.Log().Infoln("no unbatched txs found, skipping")
 			} else if err != nil {
@@ -121,7 +121,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) ([]*hyperiontypes.BatchFeesWithIds, error) {
 	var fees []*hyperiontypes.BatchFeesWithIds
 	fn := func() (err error) {
-		fees, err = l.helios.UnbatchedTokensWithMinimumFees(ctx, l.cfg.HyperionId, minimumBatchFee, minimumTxFee)
+		fees, err = l.GetHelios().UnbatchedTokensWithMinimumFees(ctx, l.cfg.HyperionId, minimumBatchFee, minimumTxFee)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (l *batchCreator) getUnbatchedTokenFees(ctx context.Context, minimumBatchFe
 
 func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes.BatchFeesWithIds, minimumBatchFee sdkmath.Int, minimumTxFee sdkmath.Int) (cosmostypes.Msg, error) {
 	tokenAddress := gethcommon.HexToAddress(fee.Token)
-	tokenDenom, _, err := l.helios.QueryTokenAddressToDenom(ctx, l.cfg.HyperionId, tokenAddress)
+	tokenDenom, _, err := l.GetHelios().QueryTokenAddressToDenom(ctx, l.cfg.HyperionId, tokenAddress)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to query token address to denom")
 		return nil, err
@@ -170,7 +170,7 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 		l.Log().WithFields(log.Fields{"token_denom": tokenDenom, "token_addr": tokenAddress.String()}).Infoln("requesting token batch on Helios")
 	}
 
-	msg, err := l.helios.SendRequestBatchWithMinimumFeeMsg(ctx, l.cfg.HyperionId, tokenDenom, minimumBatchFee, minimumTxFee, fee.Ids)
+	msg, err := l.GetHelios().SendRequestBatchWithMinimumFeeMsg(ctx, l.cfg.HyperionId, tokenDenom, minimumBatchFee, minimumTxFee, fee.Ids)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to send request batch msg")
 		return nil, err

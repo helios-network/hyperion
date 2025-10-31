@@ -152,7 +152,7 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 
 	maxHeightTimeout := uint64(latestEthHeight.Number.Uint64() + 10)
 
-	batchesInHelios, err := l.helios.LatestTransactionBatchesWithOptions(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr.String(), 0, maxHeightTimeout, "", true)
+	batchesInHelios, err := l.GetHelios().LatestTransactionBatchesWithOptions(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr.String(), 0, maxHeightTimeout, "", true)
 
 	if err != nil {
 		l.Log().Info("failed to get latest transaction batches", err)
@@ -224,9 +224,10 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 			if batch.BatchNonce > latestBatchNonce {
 				paquetsOfTokenContractBatchs[tokenContract] = append(paquetsOfTokenContractBatchs[tokenContract], batch)
 				mapLatestBatchNonce[tokenContract] = batch.BatchNonce
-			} else {
-				l.Log().Info("batch refused ", batch.BatchNonce, " for tokenContract: ", batch.TokenContract, " Nonce less than latestBatchNonce: ", latestBatchNonce)
 			}
+			// else {
+			// 	l.Log().Info("batch refused ", batch.BatchNonce, " for tokenContract: ", batch.TokenContract, " Nonce less than latestBatchNonce: ", latestBatchNonce)
+			// }
 		}
 	}
 
@@ -276,7 +277,7 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				continue
 			}
 			batchAndSig := batchAndSigs[0]
-			sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batchAndSig.Batch.BatchNonce, gethcommon.HexToAddress(batchAndSig.Batch.TokenContract))
+			sigs, err := l.GetHelios().TransactionBatchSignatures(ctx, l.cfg.HyperionId, batchAndSig.Batch.BatchNonce, gethcommon.HexToAddress(batchAndSig.Batch.TokenContract))
 			if err != nil {
 				l.Log().WithError(err).Warningln("failed to get transaction batch signatures")
 				continue
@@ -392,7 +393,7 @@ func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontype
 		return false, err
 	}
 
-	batchesInHelios, err := l.helios.LatestTransactionBatches(ctx, l.cfg.HyperionId)
+	batchesInHelios, err := l.GetHelios().LatestTransactionBatches(ctx, l.cfg.HyperionId)
 
 	if err != nil {
 		l.Log().Info("failed to get latest transaction batches", err)
@@ -481,7 +482,7 @@ func (l *relayer) relayBatchs(ctx context.Context, latestEthValset *hyperiontype
 		packSigned := make([]*BatchAndSigs, 0)
 
 		for _, batch := range batchs {
-			sigs, err := l.helios.TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
+			sigs, err := l.GetHelios().TransactionBatchSignatures(ctx, l.cfg.HyperionId, batch.BatchNonce, gethcommon.HexToAddress(batch.TokenContract))
 			if err != nil {
 				break // should be relayed later with signature
 			}

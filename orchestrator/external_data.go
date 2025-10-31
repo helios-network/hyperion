@@ -12,6 +12,7 @@ import (
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/metrics"
 	"github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 )
@@ -76,7 +77,7 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	txs, err := l.helios.LatestTransactionExternalCallDataTxs(ctx, l.cfg.HyperionId)
+	txs, err := l.GetHelios().LatestTransactionExternalCallDataTxs(ctx, l.cfg.HyperionId)
 	if l.logEnabled {
 		l.Log().Info("txs: ", txs)
 	}
@@ -124,11 +125,20 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 			continue
 		}
 
-		// todo: bulk send claims
-		_, err = l.helios.SendExternalDataClaim(ctx, l.cfg.HyperionId, tx.Nonce, latestEthHeight.Number.Uint64(), tx.ExternalContractAddress, callData, callErr, rpcUsed)
-
+		msg, err := l.GetHelios().SendExternalDataClaimMsg(ctx, l.cfg.HyperionId, tx.Nonce, latestEthHeight.Number.Uint64(), tx.ExternalContractAddress, callData, callErr, rpcUsed)
 		if err != nil {
-			l.Log().Info("failed to send external data claim", err)
+			l.Log().Info("failed to send external data claim message", err)
+			continue
+		}
+
+		err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+		if err != nil {
+			l.Log().Info("failed to simulate external data claim message", err)
+		}
+
+		_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+		if err != nil {
+			l.Log().Info("failed to broadcast external data claim message", err)
 			continue
 		}
 	}

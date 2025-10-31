@@ -98,7 +98,7 @@ func (l *signer) sign(ctx context.Context) error {
 func (l *signer) signValidatorSets(ctx context.Context) error {
 	var valsets []*hyperiontypes.Valset
 	fn := func() error {
-		valsets, _ = l.helios.OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
+		valsets, _ = l.GetHelios().OldestUnsignedValsets(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		return nil
 	}
 
@@ -113,7 +113,23 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 	for _, vs := range valsets {
 		if err := l.retry(ctx, func() error {
 			l.Log().Infoln("signing valset", vs.Nonce)
-			return l.helios.SendValsetConfirm(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, l.ethereum.GetPersonalSignFn(), vs)
+
+			msg, err := l.GetHelios().SendValsetConfirmMsg(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, l.ethereum.GetPersonalSignFn(), vs)
+			if err != nil {
+				return errors.Wrap(err, "failed to send valset confirm message")
+			}
+
+			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+			if err != nil {
+				return errors.Wrap(err, "failed to simulate valset confirm message")
+			}
+
+			_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+			if err != nil {
+				return errors.Wrap(err, "failed to broadcast valset confirm message")
+			}
+
+			return nil
 		}); err != nil {
 			l.Log().Infoln("signing valset failed", err)
 			return err
@@ -130,7 +146,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool, uint64, error) {
 	var oldestUnsignedBatch *hyperiontypes.OutgoingTxBatch
 	getBatchFn := func() error {
-		tmpOldestUnsignedBatch, _ := l.helios.OldestUnsignedTransactionBatch(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
+		tmpOldestUnsignedBatch, _ := l.GetHelios().OldestUnsignedTransactionBatch(ctx, l.cfg.HyperionId, l.cfg.CosmosAddr)
 		if tmpOldestUnsignedBatch != nil && tmpOldestUnsignedBatch.HyperionId == l.cfg.HyperionId && !slices.Contains(noncesPushed, tmpOldestUnsignedBatch.BatchNonce) {
 			oldestUnsignedBatch = tmpOldestUnsignedBatch
 		}
@@ -155,18 +171,24 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 
 	l.Orchestrator.HyperionState.SignerStatus = "signing batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol
 
-	msg, err := l.helios.SendBatchConfirmMsg(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, l.ethereum.GetPersonalSignFn(), oldestUnsignedBatch)
+	msg, err := l.GetHelios().SendBatchConfirmMsg(ctx, l.cfg.HyperionId, l.cfg.EthereumAddr, l.hyperionID, l.ethereum.GetPersonalSignFn(), oldestUnsignedBatch)
 	if err != nil {
 		return false, 0, errors.Wrap(err, "failed to send batch confirm message")
 	}
 
-	err = l.helios.SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+	err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 	if err != nil {
+		if strings.Contains(err.Error(), "account sequence mismatch") {
+			l.Orchestrator.HyperionState.ErrorStatus = "Error: Check Your Node - Maybe Jail or unsync"
+			l.Orchestrator.ResetHeliosClient()
+		}
 		l.Log().WithError(err).Warningln("failed to simulate batch confirm message")
 		return false, 0, err
+	} else {
+		l.Orchestrator.HyperionState.ErrorStatus = "okay"
 	}
 
-	_, err = l.helios.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return false, 0, errors.Wrap(err, "failed to broadcast batch confirm message")
 	}

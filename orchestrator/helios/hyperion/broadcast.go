@@ -31,8 +31,10 @@ type queuedMessage struct {
 }
 
 type BroadcastClient interface {
+	Close()
 	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error
+	SendValsetConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) (sdk.Msg, error)
 	SendBatchConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
 	SendBatchConfirmSync(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error
 	SendBatchConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) (sdk.Msg, error)
@@ -44,6 +46,7 @@ type BroadcastClient interface {
 	SendDepositClaim(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
 	SendWithdrawalClaim(ctx context.Context, hyperionId uint64, withdrawal *hyperionevents.HyperionTransactionBatchExecutedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
 	SendExternalDataClaim(ctx context.Context, hyperionId uint64, nonce uint64, blockHeight uint64, externalContractAddress string, callData []byte, callErr []byte, rpcUsedForObservation string) (*sdk.TxResponse, error)
+
 	SendValsetClaim(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
 	SendERC20DeployedClaim(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (*sdk.TxResponse, error)
 
@@ -93,6 +96,10 @@ func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
 	return broadcastClient
 }
 
+func (c *broadcastClient) Close() {
+	c.ChainClient.Close()
+}
+
 func (c *broadcastClient) runBroadcastLoop() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -104,7 +111,14 @@ func (c *broadcastClient) runBroadcastLoop() {
 			if len(queuedMessages) > 0 {
 				fmt.Println("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
 				log.Debugln("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
-				c.processBatch(context.Background(), queuedMessages)
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.WithField("error", r).Errorln("runBroadcastLoop: recovered from panic during processBatch")
+						}
+					}()
+					c.processBatch(context.Background(), queuedMessages)
+				}()
 				queuedMessages = make([]queuedMessage, 0)
 			} else {
 				fmt.Println("runBroadcastLoop: no messages to process (ticker)")
@@ -169,18 +183,31 @@ func (c *broadcastClient) processBatch(ctx context.Context, batch []queuedMessag
 	}).Infoln("runBroadcastLoop messages broadcasted successfully")
 }
 
-func (c *broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error {
+func (c *broadcastClient) SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error {
+	msg, err := c.SendValsetConfirmMsg(ctx, hyperionId, ethFrom, hyperionID, signerFn, valset)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgValsetConfirm failed")
+	}
+
+	if err = c.ChainClient.QueueBroadcastMsg(msg); err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return errors.Wrap(err, "broadcasting MsgValsetConfirm failed")
+	}
+
+	return nil
+}
+
+func (c *broadcastClient) SendValsetConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) (sdk.Msg, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
-
-	log.Infoln("sending valset confirm")
 
 	confirmHash := hyperion.EncodeValsetConfirm(hyperionID, valset)
 	signature, err := signerFn(ethFrom, confirmHash.Bytes())
 	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
-		return errors.New("failed to sign validator address")
+		return nil, errors.New("failed to sign validator address")
 	}
 
 	// MsgValsetConfirm
@@ -205,13 +232,7 @@ func (c *broadcastClient) SendValsetConfirm(_ context.Context, hyperionId uint64
 		Nonce:        valset.Nonce,
 		Signature:    gethcommon.Bytes2Hex(signature),
 	}
-
-	if err = c.ChainClient.QueueBroadcastMsg(msg); err != nil {
-		metrics.ReportFuncError(c.svcTags)
-		return errors.Wrap(err, "broadcasting MsgValsetConfirm failed")
-	}
-
-	return nil
+	return msg, nil
 }
 
 func (c *broadcastClient) SendBatchConfirm(_ context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, batch *hyperiontypes.OutgoingTxBatch) error {
