@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
@@ -85,6 +86,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 				l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
 				err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
 				if err != nil {
+					VerifyTxError(ctx, err.Error(), l.Orchestrator)
 					l.Log().WithError(err).Warningln("failed to simulate token batches")
 					return err
 				}
@@ -102,6 +104,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 			l.Log().Info("broadcasting token batches request ", "nb_msgs ", len(paquetOfTenMsgs))
 			err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, paquetOfTenMsgs)
 			if err != nil {
+				VerifyTxError(ctx, err.Error(), l.Orchestrator)
 				l.Log().WithError(err).Warningln("failed to simulate token batches")
 				return err
 			}
@@ -173,6 +176,13 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 	msg, err := l.GetHelios().SendRequestBatchWithMinimumFeeMsg(ctx, l.cfg.HyperionId, tokenDenom, minimumBatchFee, minimumTxFee, fee.Ids)
 	if err != nil {
 		l.Log().WithError(err).Warningln("failed to send request batch msg")
+		return nil, err
+	}
+	// simulate the message
+	err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+	if err != nil {
+		VerifyTxError(ctx, err.Error(), l.Orchestrator)
+		l.Log().WithError(err).Warningln("failed to simulate request batch message")
 		return nil, err
 	}
 	return msg, nil

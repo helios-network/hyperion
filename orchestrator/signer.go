@@ -121,6 +121,7 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 
 			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 			if err != nil {
+				VerifyTxError(ctx, err.Error(), l.Orchestrator)
 				return errors.Wrap(err, "failed to simulate valset confirm message")
 			}
 
@@ -178,10 +179,7 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 
 	err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 	if err != nil {
-		if strings.Contains(err.Error(), "account sequence mismatch") {
-			l.Orchestrator.HyperionState.ErrorStatus = "Error: Check Your Node - Maybe Jail or unsync"
-			l.Orchestrator.ResetHeliosClient()
-		}
+		VerifyTxError(ctx, err.Error(), l.Orchestrator)
 		l.Log().WithError(err).Warningln("failed to simulate batch confirm message")
 		return false, 0, err
 	} else {

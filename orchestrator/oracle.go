@@ -12,6 +12,7 @@ import (
 	log "github.com/xlab/suplog"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
@@ -180,18 +181,38 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		if validator.Jailed {
 			// todo try to unjail
 			l.Log().WithFields(log.Fields{"latest_helios_block": vs.Height, "validator": validator.Description.Moniker}).Warningln("validator jailed, cannot make claims...")
-			err = l.GetHelios().SendUnjail(ctx, l.cfg.ValidatorAddress.String())
+			msg, err := l.GetHelios().SendUnjailMsg(ctx, l.cfg.ValidatorAddress.String())
 			if err != nil {
-				l.Log().WithError(err).Errorln("failed to unjail validator on " + l.cfg.ChainName)
+				l.Log().WithError(err).Errorln("failed to send unjail message on " + l.cfg.ChainName)
 				return err
 			}
-			//failed to get validator on BSC Testnet
-			// chain="BSC Testnet" error="rpc error: code = Unknown desc = codespace sdk code 35:
-			/// internal logic error: hrp does not match bech32 prefix: expected 'heliosvaloper' got 'helios'" loop=Oracle
+			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+			if err != nil {
+				VerifyTxError(ctx, err.Error(), l.Orchestrator)
+				l.Log().WithError(err).Errorln("failed to simulate unjail message on " + l.cfg.ChainName)
+				return err
+			}
+			_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+			if err != nil {
+				l.Log().WithError(err).Errorln("failed to broadcast unjail message on " + l.cfg.ChainName)
+				return err
+			}
 			return nil
 		}
-		err = l.GetHelios().SendSetOrchestratorAddresses(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
+		msg, err := l.GetHelios().SendSetOrchestratorAddressesMsg(ctx, uint64(l.cfg.HyperionId), l.cfg.EthereumAddr.String())
 		if err != nil {
+			l.Log().WithError(err).Errorln("failed to send set orchestrator addresses message on " + l.cfg.ChainName)
+			return err
+		}
+		err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+		if err != nil {
+			VerifyTxError(ctx, err.Error(), l.Orchestrator)
+			l.Log().WithError(err).Errorln("failed to simulate set orchestrator addresses message on " + l.cfg.ChainName)
+			return err
+		}
+		_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+		if err != nil {
+			l.Log().WithError(err).Errorln("failed to broadcast set orchestrator addresses message on " + l.cfg.ChainName)
 			return err
 		}
 		return nil
@@ -457,6 +478,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 
 				err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
 				if err != nil {
+					VerifyTxError(ctx, err.Error(), l.Orchestrator)
 					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 					return err
 				}
@@ -481,6 +503,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
 			if err != nil {
+				VerifyTxError(ctx, err.Error(), l.Orchestrator)
 				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 				return err
 			}

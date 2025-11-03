@@ -46,12 +46,13 @@ type Global struct {
 	ethKeyFromAddress gethcommon.Address
 	accAddress        cosmostypes.AccAddress
 
-	runners       map[uint64]context.CancelFunc
-	orchestrators map[uint64]*orchestrator.Orchestrator
+	runners                   map[uint64]context.CancelFunc
+	orchestrators             map[uint64]*orchestrator.Orchestrator
+	lastTimeResetHeliosClient time.Time
 }
 
 func NewGlobal(cfg *Config) *Global {
-	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0)}
+	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now()}
 }
 
 func (g *Global) GetConfig() *Config {
@@ -70,12 +71,17 @@ func (g *Global) GetHeliosNetwork() *helios.Network {
 
 func (g *Global) ResetHeliosClient() {
 	if g.heliosNetwork != nil {
+		if time.Since(g.lastTimeResetHeliosClient) < 10*time.Second {
+			fmt.Println("Helios client already reset in the last 10 seconds")
+			return
+		}
 		heliosNetwork := *g.heliosNetwork
 		heliosNetwork.Close()
 		_, err := g.InitHeliosNetwork()
 		if err != nil {
 			fmt.Println("Error resetting helios client:", err)
 		}
+		g.lastTimeResetHeliosClient = time.Now()
 	}
 }
 

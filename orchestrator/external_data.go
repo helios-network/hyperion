@@ -133,6 +133,7 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 
 		err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 		if err != nil {
+			VerifyTxError(ctx, err.Error(), l.Orchestrator)
 			l.Log().Info("failed to simulate external data claim message", err)
 		}
 

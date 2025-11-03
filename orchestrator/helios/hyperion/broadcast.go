@@ -60,6 +60,7 @@ type BroadcastClient interface {
 	SyncBroadcastMsgsSimulate(ctx context.Context, msgs []sdk.Msg) error
 
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
+	SendSetOrchestratorAddressesMsg(ctx context.Context, hyperionId uint64, ethAddress string) (sdk.Msg, error)
 	SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
 	SendUpdateOrchestratorAddressesFee(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error
 	SendUpdateOrchestratorAddressesFeeMsg(ctx context.Context, hyperionId uint64, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) (sdk.Msg, error)
@@ -82,6 +83,7 @@ type broadcastClient struct {
 	svcTags metrics.Tags
 
 	messageQueue chan queuedMessage // Unbuffered channel for messages to be broadcast
+	ticker       *time.Ticker
 }
 
 func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
@@ -98,16 +100,18 @@ func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
 
 func (c *broadcastClient) Close() {
 	c.ChainClient.Close()
+	c.ticker.Stop()
+	close(c.messageQueue)
 }
 
 func (c *broadcastClient) runBroadcastLoop() {
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
+	c.ticker = time.NewTicker(15 * time.Second)
+	defer c.ticker.Stop()
 
 	queuedMessages := make([]queuedMessage, 0)
 	for {
 		select {
-		case <-ticker.C:
+		case <-c.ticker.C:
 			if len(queuedMessages) > 0 {
 				fmt.Println("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
 				log.Debugln("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
@@ -455,6 +459,16 @@ func (c *broadcastClient) SendSetOrchestratorAddresses(ctx context.Context, hype
 	time.Sleep(10 * time.Second)
 
 	return nil
+}
+
+func (c *broadcastClient) SendSetOrchestratorAddressesMsg(ctx context.Context, hyperionId uint64, ethAddress string) (sdk.Msg, error) {
+	msg := &hyperiontypes.MsgSetOrchestratorAddresses{
+		Sender:       c.FromAddress().String(),
+		HyperionId:   hyperionId,
+		EthAddress:   ethAddress,
+		Orchestrator: c.FromAddress().String(),
+	}
+	return msg, nil
 }
 
 func (c *broadcastClient) SendSetOrchestratorAddressesWithFee(ctx context.Context, hyperionId uint64, ethAddress string, minimumfeePerTx sdkmath.Int, minimumfeePerBatch sdkmath.Int) error {
