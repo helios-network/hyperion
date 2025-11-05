@@ -19,7 +19,7 @@ func PauseOrUnpauseWithdrawal(ctx context.Context, global *global.Global, chainI
 	if err != nil {
 		return nil, err
 	}
-	resp, err := network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	resp, err := global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return nil, err
 	}

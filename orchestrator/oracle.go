@@ -192,7 +192,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 				l.Log().WithError(err).Errorln("failed to simulate unjail message on " + l.cfg.ChainName)
 				return err
 			}
-			_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+			_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 			if err != nil {
 				l.Log().WithError(err).Errorln("failed to broadcast unjail message on " + l.cfg.ChainName)
 				return err
@@ -210,7 +210,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			l.Log().WithError(err).Errorln("failed to simulate set orchestrator addresses message on " + l.cfg.ChainName)
 			return err
 		}
-		_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+		_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 		if err != nil {
 			l.Log().WithError(err).Errorln("failed to broadcast set orchestrator addresses message on " + l.cfg.ChainName)
 			return err
@@ -482,7 +482,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 					return err
 				}
-				resp, err := l.GetHelios().SyncBroadcastMsgs(ctx, msgs)
+				resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
 				if err != nil {
 					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
@@ -507,7 +507,7 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 				return err
 			}
-			resp, err := l.GetHelios().SyncBroadcastMsgs(ctx, msgs)
+			resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
 				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
 				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)

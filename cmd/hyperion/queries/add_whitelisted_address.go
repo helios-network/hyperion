@@ -26,7 +26,7 @@ func AddWhitelistedAddress(ctx context.Context, global *global.Global, chainId u
 	if err != nil {
 		return nil, err
 	}
-	resp, err := network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	resp, err := global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return nil, err
 	}

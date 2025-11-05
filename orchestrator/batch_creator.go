@@ -90,7 +90,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 					l.Log().WithError(err).Warningln("failed to simulate token batches")
 					return err
 				}
-				_, err = l.GetHelios().SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+				_, err = l.global.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
 				if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
 					l.Log().Infoln("no unbatched txs found, skipping")
 				} else if err != nil {
@@ -108,7 +108,7 @@ func (l *batchCreator) requestTokenBatches(ctx context.Context) error {
 				l.Log().WithError(err).Warningln("failed to simulate token batches")
 				return err
 			}
-			_, err = l.GetHelios().SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
+			_, err = l.global.SyncBroadcastMsgs(ctx, paquetOfTenMsgs)
 			if err != nil && strings.Contains(err.Error(), "no unbatched txs found") {
 				l.Log().Infoln("no unbatched txs found, skipping")
 			} else if err != nil {

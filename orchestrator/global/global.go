@@ -20,8 +20,10 @@ import (
 	wrappers "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	keys "github.com/Helios-Chain-Labs/hyperion/orchestrator/keys"
 )
@@ -39,6 +41,17 @@ type Config struct {
 	PendingTxWaitDuration string
 }
 
+type queuedMessage struct {
+	msgs     []sdk.Msg
+	respChan chan<- *sdk.TxResponse
+	errChan  chan<- error
+}
+
+type HeliosBroadcastManager struct {
+	messageQueue chan queuedMessage // Unbuffered channel for messages to be broadcast
+	ticker       *time.Ticker
+}
+
 type Global struct {
 	cfg           *Config
 	heliosNetwork *helios.Network
@@ -49,6 +62,7 @@ type Global struct {
 	runners                   map[uint64]context.CancelFunc
 	orchestrators             map[uint64]*orchestrator.Orchestrator
 	lastTimeResetHeliosClient time.Time
+	heliosBroadcastManager    *HeliosBroadcastManager
 }
 
 func NewGlobal(cfg *Config) *Global {
@@ -65,8 +79,94 @@ func (g *Global) GetHeliosNetwork() *helios.Network {
 		if err != nil {
 			return nil
 		}
+		g.heliosBroadcastManager = &HeliosBroadcastManager{
+			messageQueue: make(chan queuedMessage),
+		}
+		go g.heliosBroadcastManager.runBroadcastLoop(g)
 	}
 	return g.heliosNetwork
+}
+
+func (h *HeliosBroadcastManager) runBroadcastLoop(g *Global) {
+	h.ticker = time.NewTicker(15 * time.Second)
+	defer h.ticker.Stop()
+
+	queuedMessages := make([]queuedMessage, 0)
+	for {
+		select {
+		case <-h.ticker.C:
+			if len(queuedMessages) > 0 {
+				fmt.Println("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							fmt.Println("runBroadcastLoop: recovered from panic during processBatch", r)
+						}
+					}()
+					h.processBatch(g, queuedMessages)
+				}()
+				queuedMessages = make([]queuedMessage, 0)
+			} else {
+				fmt.Println("runBroadcastLoop: no messages to process (ticker)")
+			}
+		case qMsg := <-h.messageQueue:
+			fmt.Println("runBroadcastLoop: message received, adding to queue", qMsg)
+			queuedMessages = append(queuedMessages, qMsg)
+		}
+	}
+}
+
+func (c *HeliosBroadcastManager) processBatch(g *Global, batch []queuedMessage) {
+	if len(batch) == 0 {
+		return
+	}
+
+	// Collect all messages from the batch
+	allMsgs := make([]sdk.Msg, 0)
+	allRespChans := make([]chan<- *sdk.TxResponse, 0)
+	allErrChans := make([]chan<- error, 0)
+
+	for _, qMsg := range batch {
+		allMsgs = append(allMsgs, qMsg.msgs...)
+		allRespChans = append(allRespChans, qMsg.respChan)
+		allErrChans = append(allErrChans, qMsg.errChan)
+	}
+
+	fmt.Println("processBatch: broadcasting messages", len(allMsgs), "messages")
+
+	start := time.Now()
+
+	if (*g.heliosNetwork) == nil {
+		fmt.Println("processBatch: helios network not initialized")
+		// wait for 1 second and try again
+		time.Sleep(1 * time.Second)
+		if (*g.heliosNetwork) == nil {
+			fmt.Println("processBatch: helios network not initialized after 1 second")
+			return
+		}
+	}
+
+	// Broadcast the collected messages
+	resp, err := (*g.heliosNetwork).SyncBroadcastMsg(allMsgs...)
+
+	// Send responses back to all waiting callers
+	for i := 0; i < len(allRespChans); i++ {
+		if err != nil {
+			allErrChans[i] <- errors.Wrap(err, "runBroadcastLoop batched Msgs failed")
+		} else {
+			allRespChans[i] <- resp
+		}
+		close(allRespChans[i])
+		close(allErrChans[i])
+	}
+
+	if err != nil {
+		fmt.Println("runBroadcastLoop batched messages failed", err)
+		return
+	}
+	duration := time.Since(start)
+
+	fmt.Println("runBroadcastLoop messages broadcasted successfully tx_hash:", resp.TxHash, "code:", resp.Code, "duration:", duration, "num_msgs:", len(allMsgs))
 }
 
 func (g *Global) ResetHeliosClient() {
@@ -82,6 +182,27 @@ func (g *Global) ResetHeliosClient() {
 			fmt.Println("Error resetting helios client:", err)
 		}
 		g.lastTimeResetHeliosClient = time.Now()
+	}
+}
+
+func (g *Global) SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error) {
+	respChan := make(chan *sdk.TxResponse, 1)
+	errChan := make(chan error, 1)
+
+	g.heliosBroadcastManager.messageQueue <- queuedMessage{
+		msgs:     msgs,
+		respChan: respChan,
+		errChan:  errChan,
+	}
+	fmt.Println("Messages queued for broadcast", len(msgs), "messages")
+
+	select {
+	case resp := <-respChan:
+		return resp, nil
+	case err := <-errChan:
+		return nil, errors.Wrap(err, "broadcasting Msgs failed")
+	case <-ctx.Done():
+		return nil, errors.Wrap(ctx.Err(), "context canceled while waiting for broadcast")
 	}
 }
 

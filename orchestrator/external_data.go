@@ -137,7 +137,7 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 			l.Log().Info("failed to simulate external data claim message", err)
 		}
 
-		_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+		_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 		if err != nil {
 			l.Log().Info("failed to broadcast external data claim message", err)
 			continue

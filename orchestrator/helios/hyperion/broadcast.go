@@ -56,7 +56,8 @@ type BroadcastClient interface {
 	SendValsetClaimMsg(ctx context.Context, hyperionId uint64, vs *hyperionevents.HyperionValsetUpdatedEvent, rpcUsedForObservation string) (sdk.Msg, error)
 	SendERC20DeployedClaimMsg(ctx context.Context, hyperionId uint64, erc20 *hyperionevents.HyperionERC20DeployedEvent, rpcUsedForObservation string) (sdk.Msg, error)
 
-	SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error)
+	SyncBroadcastMsg(msgs ...sdk.Msg) (*sdk.TxResponse, error)
+	// SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error)
 	SyncBroadcastMsgsSimulate(ctx context.Context, msgs []sdk.Msg) error
 
 	SendSetOrchestratorAddresses(ctx context.Context, hyperionId uint64, ethAddress string) error
@@ -82,110 +83,113 @@ type broadcastClient struct {
 
 	svcTags metrics.Tags
 
-	messageQueue chan queuedMessage // Unbuffered channel for messages to be broadcast
-	ticker       *time.Ticker
+	// messageQueue chan queuedMessage // Unbuffered channel for messages to be broadcast
+	// ticker       *time.Ticker
 }
 
 func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
 	broadcastClient := &broadcastClient{
-		ChainClient:  client,
-		svcTags:      metrics.Tags{"svc": "hyperion_broadcast"},
-		messageQueue: make(chan queuedMessage),
+		ChainClient: client,
+		svcTags:     metrics.Tags{"svc": "hyperion_broadcast"},
+		// messageQueue: make(chan queuedMessage),
 	}
 
-	go broadcastClient.runBroadcastLoop()
+	// go broadcastClient.runBroadcastLoop()
 
 	return broadcastClient
 }
 
 func (c *broadcastClient) Close() {
 	c.ChainClient.Close()
-	c.ticker.Stop()
-	close(c.messageQueue)
+	// c.ticker.Stop()
+	// close(c.messageQueue)
+	// // close all channels in the messageQueue
+	// for qMsg := range c.messageQueue {
+	// 	qMsg.errChan <- errors.New("broadcastClient closed")
+	// 	close(qMsg.respChan)
+	// 	close(qMsg.errChan)
+	// }
 }
 
-func (c *broadcastClient) runBroadcastLoop() {
-	c.ticker = time.NewTicker(15 * time.Second)
-	defer c.ticker.Stop()
+// func (c *broadcastClient) runBroadcastLoop() {
+// 	c.ticker = time.NewTicker(15 * time.Second)
+// 	defer c.ticker.Stop()
 
-	queuedMessages := make([]queuedMessage, 0)
-	for {
-		select {
-		case <-c.ticker.C:
-			if len(queuedMessages) > 0 {
-				fmt.Println("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
-				log.Debugln("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.WithField("error", r).Errorln("runBroadcastLoop: recovered from panic during processBatch")
-						}
-					}()
-					c.processBatch(context.Background(), queuedMessages)
-				}()
-				queuedMessages = make([]queuedMessage, 0)
-			} else {
-				fmt.Println("runBroadcastLoop: no messages to process (ticker)")
-				log.Debugln("runBroadcastLoop: no messages to process (ticker)")
-			}
-		case qMsg := <-c.messageQueue:
-			fmt.Println("runBroadcastLoop: message received, adding to queue", qMsg)
-			log.Debugln("runBroadcastLoop: message received, adding to queue")
-			queuedMessages = append(queuedMessages, qMsg)
-		}
-	}
-}
+// 	queuedMessages := make([]queuedMessage, 0)
+// 	for {
+// 		select {
+// 		case <-c.ticker.C:
+// 			if len(queuedMessages) > 0 {
+// 				fmt.Println("runBroadcastLoop: processing queue (ticker)", len(queuedMessages))
+// 				func() {
+// 					defer func() {
+// 						if r := recover(); r != nil {
+// 							log.WithField("error", r).Errorln("runBroadcastLoop: recovered from panic during processBatch")
+// 						}
+// 					}()
+// 					c.processBatch(context.Background(), queuedMessages)
+// 				}()
+// 				queuedMessages = make([]queuedMessage, 0)
+// 			} else {
+// 				fmt.Println("runBroadcastLoop: no messages to process (ticker)")
+// 			}
+// 		case qMsg := <-c.messageQueue:
+// 			fmt.Println("runBroadcastLoop: message received, adding to queue", qMsg)
+// 			queuedMessages = append(queuedMessages, qMsg)
+// 		}
+// 	}
+// }
 
-func (c *broadcastClient) processBatch(ctx context.Context, batch []queuedMessage) {
-	if len(batch) == 0 {
-		return
-	}
+// func (c *broadcastClient) processBatch(ctx context.Context, batch []queuedMessage) {
+// 	if len(batch) == 0 {
+// 		return
+// 	}
 
-	// Collect all messages from the batch
-	allMsgs := make([]sdk.Msg, 0)
-	allRespChans := make([]chan<- *sdk.TxResponse, 0)
-	allErrChans := make([]chan<- error, 0)
+// 	// Collect all messages from the batch
+// 	allMsgs := make([]sdk.Msg, 0)
+// 	allRespChans := make([]chan<- *sdk.TxResponse, 0)
+// 	allErrChans := make([]chan<- error, 0)
 
-	for _, qMsg := range batch {
-		allMsgs = append(allMsgs, qMsg.msgs...)
-		allRespChans = append(allRespChans, qMsg.respChan)
-		allErrChans = append(allErrChans, qMsg.errChan)
-	}
+// 	for _, qMsg := range batch {
+// 		allMsgs = append(allMsgs, qMsg.msgs...)
+// 		allRespChans = append(allRespChans, qMsg.respChan)
+// 		allErrChans = append(allErrChans, qMsg.errChan)
+// 	}
 
-	log.WithFields(log.Fields{
-		"num_msgs": len(allMsgs),
-	}).Infoln("runBroadcastLoop before broadcasting messages")
+// 	log.WithFields(log.Fields{
+// 		"num_msgs": len(allMsgs),
+// 	}).Infoln("runBroadcastLoop before broadcasting messages")
 
-	start := time.Now()
+// 	start := time.Now()
 
-	// Broadcast the collected messages
-	resp, err := c.ChainClient.SyncBroadcastMsg(allMsgs...)
+// 	// Broadcast the collected messages
+// 	resp, err := c.ChainClient.SyncBroadcastMsg(allMsgs...)
 
-	// Send responses back to all waiting callers
-	for i := 0; i < len(allRespChans); i++ {
-		if err != nil {
-			allErrChans[i] <- errors.Wrap(err, "runBroadcastLoop batched Msgs failed")
-		} else {
-			allRespChans[i] <- resp.TxResponse
-		}
-		close(allRespChans[i])
-		close(allErrChans[i])
-	}
+// 	// Send responses back to all waiting callers
+// 	for i := 0; i < len(allRespChans); i++ {
+// 		if err != nil {
+// 			allErrChans[i] <- errors.Wrap(err, "runBroadcastLoop batched Msgs failed")
+// 		} else {
+// 			allRespChans[i] <- resp.TxResponse
+// 		}
+// 		close(allRespChans[i])
+// 		close(allErrChans[i])
+// 	}
 
-	if err != nil {
-		metrics.ReportFuncError(c.svcTags)
-		log.WithError(err).Errorln("runBroadcastLoop batched messages failed")
-		return
-	}
-	duration := time.Since(start)
+// 	if err != nil {
+// 		metrics.ReportFuncError(c.svcTags)
+// 		log.WithError(err).Errorln("runBroadcastLoop batched messages failed")
+// 		return
+// 	}
+// 	duration := time.Since(start)
 
-	log.WithFields(log.Fields{
-		"tx_hash":  resp.TxResponse.TxHash,
-		"code":     resp.TxResponse.Code,
-		"duration": duration,
-		"num_msgs": len(allMsgs),
-	}).Infoln("runBroadcastLoop messages broadcasted successfully")
-}
+// 	log.WithFields(log.Fields{
+// 		"tx_hash":  resp.TxResponse.TxHash,
+// 		"code":     resp.TxResponse.Code,
+// 		"duration": duration,
+// 		"num_msgs": len(allMsgs),
+// 	}).Infoln("runBroadcastLoop messages broadcasted successfully")
+// }
 
 func (c *broadcastClient) SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signerFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error {
 	msg, err := c.SendValsetConfirmMsg(ctx, hyperionId, ethFrom, hyperionID, signerFn, valset)
@@ -1165,32 +1169,46 @@ func (c *broadcastClient) SendERC20DeployedClaimMsg(_ context.Context, hyperionI
 	return msg, nil
 }
 
-func (c *broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error) {
+func (c *broadcastClient) SyncBroadcastMsg(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	respChan := make(chan *sdk.TxResponse, 1)
-	errChan := make(chan error, 1)
-
-	c.messageQueue <- queuedMessage{
-		msgs:     msgs,
-		respChan: respChan,
-		errChan:  errChan,
-	}
-	log.WithFields(log.Fields{"num_messages_enqueued": len(msgs)}).Debugln("Messages enqueued for broadcast")
-
-	select {
-	case resp := <-respChan:
-		return resp, nil
-	case err := <-errChan:
+	resp, err := c.ChainClient.SyncBroadcastMsg(msgs...)
+	if err != nil {
 		metrics.ReportFuncError(c.svcTags)
 		return nil, errors.Wrap(err, "broadcasting Msgs failed")
-	case <-ctx.Done():
-		metrics.ReportFuncError(c.svcTags)
-		return nil, errors.Wrap(ctx.Err(), "context canceled while waiting for broadcast")
 	}
+
+	return resp.TxResponse, nil
 }
+
+// func (c *broadcastClient) SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error) {
+// 	metrics.ReportFuncCall(c.svcTags)
+// 	doneFn := metrics.ReportFuncTiming(c.svcTags)
+// 	defer doneFn()
+
+// 	respChan := make(chan *sdk.TxResponse, 1)
+// 	errChan := make(chan error, 1)
+
+// 	c.messageQueue <- queuedMessage{
+// 		msgs:     msgs,
+// 		respChan: respChan,
+// 		errChan:  errChan,
+// 	}
+// 	fmt.Println("Messages queued for broadcast", len(msgs), "messages")
+
+// 	select {
+// 	case resp := <-respChan:
+// 		return resp, nil
+// 	case err := <-errChan:
+// 		metrics.ReportFuncError(c.svcTags)
+// 		return nil, errors.Wrap(err, "broadcasting Msgs failed")
+// 	case <-ctx.Done():
+// 		metrics.ReportFuncError(c.svcTags)
+// 		return nil, errors.Wrap(ctx.Err(), "context canceled while waiting for broadcast")
+// 	}
+// }
 
 func (c *broadcastClient) SyncBroadcastMsgsSimulate(ctx context.Context, msgs []sdk.Msg) error {
 	metrics.ReportFuncCall(c.svcTags)

@@ -11,6 +11,7 @@ import (
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 	"github.com/avast/retry-go"
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	log "github.com/xlab/suplog"
 
@@ -38,6 +39,7 @@ type Global interface {
 	GetMinTxFeeHLS(chainId uint64) float64
 	ResetHeliosClient()
 	GetHeliosNetwork() *helios.Network
+	SyncBroadcastMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxResponse, error)
 }
 
 type Config struct {

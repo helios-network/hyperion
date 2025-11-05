@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -74,15 +75,19 @@ func (l *signer) sign(ctx context.Context) error {
 	defer doneFn()
 
 	l.Log().Debugln("signing")
+	l.Orchestrator.HyperionState.SignerStatus = "signing validator sets"
 	if err := l.signValidatorSets(ctx); err != nil {
+		l.Orchestrator.HyperionState.SignerStatus = "error signing validator sets"
 		return err
 	}
 	l.Log().Debugln("signing validator sets done")
 
 	noncesPushed := []uint64{}
 	for i := 0; i < 50; i++ {
+		l.Orchestrator.HyperionState.SignerStatus = "signing new batch"
 		hasPushedABatch, noncePushed, err := l.signNewBatch(ctx, noncesPushed)
 		if err != nil {
+			l.Orchestrator.HyperionState.SignerStatus = "error signing new batch"
 			return err
 		}
 		noncesPushed = append(noncesPushed, noncePushed)
@@ -122,17 +127,19 @@ func (l *signer) signValidatorSets(ctx context.Context) error {
 			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 			if err != nil {
 				VerifyTxError(ctx, err.Error(), l.Orchestrator)
+				fmt.Println("failed to simulate valset confirm message", err.Error())
 				return errors.Wrap(err, "failed to simulate valset confirm message")
 			}
 
-			_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+			_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 			if err != nil {
+				fmt.Println("failed to broadcast valset confirm message", err.Error())
 				return errors.Wrap(err, "failed to broadcast valset confirm message")
 			}
 
 			return nil
 		}); err != nil {
-			l.Log().Infoln("signing valset failed", err)
+			fmt.Println("signing valset failed", err.Error())
 			return err
 		}
 
@@ -180,14 +187,15 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 	err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 	if err != nil {
 		VerifyTxError(ctx, err.Error(), l.Orchestrator)
-		l.Log().WithError(err).Warningln("failed to simulate batch confirm message")
+		fmt.Println("failed to simulate sign batch confirm message", err.Error())
 		return false, 0, err
 	} else {
 		l.Orchestrator.HyperionState.ErrorStatus = "okay"
 	}
 
-	_, err = l.GetHelios().SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
+		fmt.Println("failed to sign batch confirm message", err.Error())
 		return false, 0, errors.Wrap(err, "failed to broadcast batch confirm message")
 	}
 

@@ -15,7 +15,13 @@ func UpdateChainLogo(ctx context.Context, global *global.Global, chainId uint64,
 			"error": err.Error(),
 		}
 	}
-	resp, err := network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	err = network.SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+	if err != nil {
+		return map[string]interface{}{
+			"error": err.Error(),
+		}
+	}
+	resp, err := global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return map[string]interface{}{
 			"error": err.Error(),

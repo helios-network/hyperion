@@ -31,7 +31,7 @@ func UploadLogo(ctx context.Context, global *global.Global, logobase64 string) m
 		}
 	}
 
-	resp, err := network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	resp, err := global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return map[string]interface{}{
 			"error":     err.Error(),

@@ -38,7 +38,7 @@ func UpdateFeeHyperion(ctx context.Context, global *global.Global, minTxFeeHLS f
 	if err != nil {
 		return err
 	}
-	_, err = network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	_, err = global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return err
 	}

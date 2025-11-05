@@ -28,7 +28,7 @@ func VoteForProposal(ctx context.Context, global *global.Global, proposalId uint
 			"error":      err.Error(),
 		}, nil
 	}
-	_, err = network.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+	_, err = global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return map[string]interface{}{
 			"proposalId": proposalId,
