@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
@@ -52,24 +53,25 @@ type QueryClient interface {
 	QueryGetAllPendingSendToChain(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTransferTx, []*hyperiontypes.OutgoingTransferTx, error)
 }
 
+type cacheEntry struct {
+	value     uint64
+	timestamp time.Time
+}
+
 type queryClient struct {
 	hyperiontypes.QueryClient
 
 	svcTags                      metrics.Tags
-	cachedLastObservedEventNonce map[uint64]struct {
-		value     uint64
-		timestamp time.Time
-	}
+	mu                           *sync.RWMutex
+	cachedLastObservedEventNonce map[uint64]cacheEntry
 }
 
 func NewQueryClient(client hyperiontypes.QueryClient) QueryClient {
 	return queryClient{
-		QueryClient: client,
-		svcTags:     metrics.Tags{"svc": "hyperion_query"},
-		cachedLastObservedEventNonce: make(map[uint64]struct {
-			value     uint64
-			timestamp time.Time
-		}),
+		QueryClient:                  client,
+		svcTags:                      metrics.Tags{"svc": "hyperion_query"},
+		mu:                           &sync.RWMutex{},
+		cachedLastObservedEventNonce: make(map[uint64]cacheEntry),
 	}
 }
 
@@ -495,48 +497,44 @@ func (c queryClient) QueryGetLastObservedEthereumBlockHeight(ctx context.Context
 }
 
 func (c queryClient) QueryGetLastObservedEventNonce(ctx context.Context, hyperionId uint64) (uint64, error) {
-	if _, ok := c.cachedLastObservedEventNonce[hyperionId]; ok {
-		if time.Since(c.cachedLastObservedEventNonce[hyperionId].timestamp) > 1000*time.Millisecond {
-			fmt.Println("deleting cached last observed event nonce", c.cachedLastObservedEventNonce[hyperionId].value)
-			delete(c.cachedLastObservedEventNonce, hyperionId)
-		} else {
-			fmt.Println("returning cached last observed event nonce", c.cachedLastObservedEventNonce[hyperionId].value)
-			return c.cachedLastObservedEventNonce[hyperionId].value, nil
-		}
-	} else {
-		fmt.Println("no cached last observed event nonce found, querying from client")
+	c.mu.RLock()
+	e, ok := c.cachedLastObservedEventNonce[hyperionId]
+	if ok && time.Since(e.timestamp) <= time.Second {
+		val := e.value
+		c.mu.RUnlock()
+		fmt.Println("returning cached last observed event nonce", val)
+		return val, nil
 	}
+	c.mu.RUnlock()
 
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 
-	req := &hyperiontypes.QueryGetLastObservedEventNonceRequest{
-		HyperionId: hyperionId,
-	}
-
+	req := &hyperiontypes.QueryGetLastObservedEventNonceRequest{HyperionId: hyperionId}
 	resp, err := c.QueryClient.QueryGetLastObservedEventNonce(ctx, req)
-	if err != nil {
+	if err != nil || resp == nil {
 		metrics.ReportFuncError(c.svcTags)
-		return 0, errors.Wrap(err, "failed to query QueryGetLastObservedEventNonceRequest from client on hyperionId "+strconv.FormatUint(hyperionId, 10))
+		if err == nil {
+			err = ErrNotFound
+		}
+		return 0, errors.Wrap(err, "failed QueryGetLastObservedEventNonceRequest on hyperionId "+strconv.FormatUint(hyperionId, 10))
 	}
 
-	if resp == nil {
-		metrics.ReportFuncError(c.svcTags)
-		return 0, ErrNotFound
+	c.mu.Lock()
+	if e2, ok := c.cachedLastObservedEventNonce[hyperionId]; ok && time.Since(e2.timestamp) <= time.Second {
+		val := e2.value
+		c.mu.Unlock()
+		fmt.Println("returning cached last observed event nonce (late-fast)", val)
+		return val, nil
 	}
-
-	// cache the last observed event nonce
-	c.cachedLastObservedEventNonce[hyperionId] = struct {
-		value     uint64
-		timestamp time.Time
-	}{
+	c.cachedLastObservedEventNonce[hyperionId] = cacheEntry{
 		value:     resp.LastObservedEventNonce,
 		timestamp: time.Now(),
 	}
+	c.mu.Unlock()
 
 	fmt.Println("cached last observed event nonce", resp.LastObservedEventNonce)
-
 	return resp.LastObservedEventNonce, nil
 }
 
