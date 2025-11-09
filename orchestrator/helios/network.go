@@ -178,7 +178,7 @@ func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (Network, err
 		logos.BLogosClient
 	}{
 		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
-		hyperion.NewBroadcastClient(chainClient),
+		hyperion.NewBroadcastClient(chainClient, cfg.GasPrice, cfg.Gas),
 		tendermint.NewRPCClient(clientCfg.TmEndpoint),
 		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
 		gov.NewBroadcastClient(chainClient),

@@ -71,7 +71,8 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 	fmt.Println("run Hyperion FUNC")
 
 	// Create a channel to signal when the runner is set
-	runnerSet := make(chan struct{})
+	runnerSet := make(chan struct{}, 1)
+	startErr := make(chan error, 1)
 
 	go func() {
 		fmt.Println("run orchestrator")
@@ -82,7 +83,7 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 
 		for {
 			// Create new cancellable context for each iteration
-			ctxCancellable, cancel := context.WithCancel(ctx)
+			ctxCancellable, cancel := context.WithCancelCause(ctx)
 
 			fmt.Println("Starting orchestrator")
 
@@ -90,15 +91,27 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			targetNetworks, err := global.InitTargetNetworks(counterpartyChainParams)
 			if err != nil {
 				fmt.Println("Error initializing target network:", err)
-				cancel()
-				time.Sleep(currentDelay)
+				cancel(errors.New("runner stopped", 1, "error initializing target network"))
+				if !sleepCtx(ctx, currentDelay) {
+					fmt.Println("Cancel during backoff")
+					cancel(errors.New("runner stopped", 1, "context cancelled during backoff"))
+					return
+				}
 				currentDelay = min(currentDelay*2, maxDelay)
 				consecutiveErrors++
 				if consecutiveErrors > 5 {
 					fmt.Println("Too many consecutive errors, waiting for max delay")
-					time.Sleep(maxDelay)
+					if !sleepCtx(ctx, maxDelay) {
+						fmt.Println("Cancel during max delay")
+						cancel(errors.New("runner stopped", 1, "context cancelled during max delay"))
+						return
+					}
 				}
 				if strings.Contains(err.Error(), "no rpcs found") {
+					select {
+					case startErr <- err:
+					default:
+					}
 					return
 				}
 				continue
@@ -113,13 +126,21 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			)
 			if err != nil {
 				fmt.Println("Error creating new orchestrator:", err)
-				cancel()
-				time.Sleep(currentDelay)
+				cancel(errors.New("runner stopped", 1, "error creating new orchestrator"))
+				if !sleepCtx(ctx, currentDelay) {
+					fmt.Println("Cancel during backoff")
+					cancel(errors.New("runner stopped", 1, "context cancelled during backoff"))
+					return
+				}
 				currentDelay = min(currentDelay*2, maxDelay)
 				consecutiveErrors++
 				if consecutiveErrors > 5 {
 					fmt.Println("Too many consecutive errors, waiting for max delay")
-					time.Sleep(maxDelay)
+					if !sleepCtx(ctx, maxDelay) {
+						fmt.Println("Cancel during max delay")
+						cancel(errors.New("runner stopped", 1, "context cancelled during max delay"))
+						return
+					}
 				}
 				continue
 			}
@@ -156,22 +177,30 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 			case err := <-errChan:
 				if err != nil {
 					fmt.Printf("Orchestrator error: %v, restarting after delay...\n", err)
-					cancel()
-					time.Sleep(currentDelay)
+					cancel(errors.New("runner stopped", 1, "error running orchestrator"))
+					if !sleepCtx(ctx, currentDelay) {
+						fmt.Println("Cancel during backoff")
+						cancel(errors.New("runner stopped", 1, "context cancelled during backoff"))
+						return
+					}
 					currentDelay = min(currentDelay*2, maxDelay)
 					consecutiveErrors++
 					if consecutiveErrors > 5 {
 						fmt.Println("Too many consecutive errors, waiting for max delay")
-						time.Sleep(maxDelay)
+						if !sleepCtx(ctx, maxDelay) {
+							fmt.Println("Cancel during max delay")
+							cancel(errors.New("runner stopped", 1, "context cancelled during max delay"))
+							return
+						}
 					}
 				} else {
 					fmt.Println("Orchestrator stopped normally, exiting...")
-					cancel()
+					cancel(errors.New("runner stopped", 1, "orchestrator stopped normally"))
 					return
 				}
 			case <-ctx.Done():
-				fmt.Println("Context cancelled, stopping orchestrator")
-				cancel()
+				fmt.Println("Context cancelled, stopping orchestrator, cause:", context.Cause(ctx))
+				cancel(errors.New("runner stopped", 1, "context cancelled"))
 				return
 			}
 		}
@@ -181,7 +210,21 @@ func RunHyperion(ctx context.Context, global *global.Global, chainId uint64) err
 	select {
 	case <-runnerSet:
 		return nil
+	case err := <-startErr:
+		fmt.Println("Error starting orchestrator, exiting...", err)
+		return err
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true // a dormi
+	case <-ctx.Done():
+		return false // annulé
 	}
 }

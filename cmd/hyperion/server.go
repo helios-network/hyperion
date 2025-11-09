@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries"
@@ -82,13 +84,16 @@ func startServer(cmd *cli.Cmd) {
 			log.Fatal("helios network not initialized")
 		}
 
-		ctx, cancelFn := context.WithCancel(context.Background())
-		closer.Bind(cancelFn)
+		// ctx, cancelFn := context.WithCancel(context.Background())
+		rootCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+		// never use rootStop, it will cause the server to hang when the context is cancelled
+		// closer.Bind(rootStop)
 
 		// API endpoints first
 		apiRouter := router.PathPrefix("/api").Subrouter()
-		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryGet, global, ctx)).Methods("GET")
-		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryPost, global, ctx)).Methods("POST")
+		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryGet, global, rootCtx)).Methods("GET")
+		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryPost, global, rootCtx)).Methods("POST")
 		apiRouter.HandleFunc("/version", handleVersion).Methods("GET")
 
 		// Create file servers for both physical and embedded files
@@ -135,8 +140,8 @@ func startServer(cmd *cli.Cmd) {
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
 	// Get version info
-	version := version.Version()
-	sendSuccess(w, version, nil)
+	ver := version.Version()
+	sendSuccess(w, ver, nil)
 }
 
 func handleQueryGet(w http.ResponseWriter, r *http.Request) {
@@ -525,9 +530,9 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		ctxGlobal := r.Context().Value(CtxKey).(context.Context)
+		rootCtx := r.Context().Value(CtxKey).(context.Context)
 
-		err := queries.RunHyperion(ctxGlobal, global, params.ChainID)
+		err := queries.RunHyperion(rootCtx, global, params.ChainID)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -634,6 +639,29 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sendSuccess(w, "RPCs removed successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "delete-chain":
+		var params struct {
+			ChainID uint64 `json:"chain_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		err := queries.DeleteChain(r.Context(), global, params.ChainID)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "Chain deleted successfully for chain "+strconv.FormatUint(params.ChainID, 10), nil)
+		return
+	case "reset-helios-client":
+		err := queries.ResetHeliosClient(r.Context(), global)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, "Helios client reset successfully", nil)
 		return
 	case "set-primary-rpc":
 		var params struct {

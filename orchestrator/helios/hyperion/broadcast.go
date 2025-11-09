@@ -10,6 +10,7 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 
+	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -32,6 +33,7 @@ type queuedMessage struct {
 
 type BroadcastClient interface {
 	Close()
+	Reconnect()
 	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error
 	SendValsetConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) (sdk.Msg, error)
@@ -85,18 +87,30 @@ type broadcastClient struct {
 
 	// messageQueue chan queuedMessage // Unbuffered channel for messages to be broadcast
 	// ticker       *time.Ticker
+
+	gasPrice string
+	gas      string
 }
 
-func NewBroadcastClient(client chain.ChainClient) BroadcastClient {
+func NewBroadcastClient(client chain.ChainClient, gasPrice string, gas string) BroadcastClient {
 	broadcastClient := &broadcastClient{
 		ChainClient: client,
 		svcTags:     metrics.Tags{"svc": "hyperion_broadcast"},
 		// messageQueue: make(chan queuedMessage),
+		gasPrice: gasPrice,
+		gas:      gas,
 	}
 
 	// go broadcastClient.runBroadcastLoop()
 
 	return broadcastClient
+}
+
+func (c *broadcastClient) Reconnect() {
+	err := c.ChainClient.Reconnect(clientcommon.OptionGasPrices(c.gasPrice), clientcommon.OptionGas(c.gas))
+	if err != nil {
+		log.WithError(err).Errorln("Reconnect failed")
+	}
 }
 
 func (c *broadcastClient) Close() {

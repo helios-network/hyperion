@@ -59,14 +59,14 @@ type Global struct {
 	ethKeyFromAddress gethcommon.Address
 	accAddress        cosmostypes.AccAddress
 
-	runners                   map[uint64]context.CancelFunc
+	runners                   map[uint64]context.CancelCauseFunc
 	orchestrators             map[uint64]*orchestrator.Orchestrator
 	lastTimeResetHeliosClient time.Time
 	heliosBroadcastManager    *HeliosBroadcastManager
 }
 
 func NewGlobal(cfg *Config) *Global {
-	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now()}
+	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelCauseFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now()}
 }
 
 func (g *Global) GetConfig() *Config {
@@ -171,17 +171,19 @@ func (c *HeliosBroadcastManager) processBatch(g *Global, batch []queuedMessage) 
 
 func (g *Global) ResetHeliosClient() {
 	if g.heliosNetwork != nil {
-		if time.Since(g.lastTimeResetHeliosClient) < 10*time.Second {
-			fmt.Println("Helios client already reset in the last 10 seconds")
-			return
-		}
-		heliosNetwork := *g.heliosNetwork
-		heliosNetwork.Close()
-		_, err := g.InitHeliosNetwork()
-		if err != nil {
-			fmt.Println("Error resetting helios client:", err)
-		}
-		g.lastTimeResetHeliosClient = time.Now()
+		// if time.Since(g.lastTimeResetHeliosClient) < 1*time.Minute {
+		// 	fmt.Println("Helios client already reset in the last 1 minute")
+		// 	return
+		// }
+		(*g.heliosNetwork).Reconnect()
+		// oldHeliosNetwork := *g.heliosNetwork
+		// g.heliosNetwork = nil
+		// oldHeliosNetwork.Close()
+		// _, err := g.InitHeliosNetwork()
+		// if err != nil {
+		// 	fmt.Println("Error resetting helios client:", err)
+		// }
+		// g.lastTimeResetHeliosClient = time.Now()
 	}
 }
 
@@ -249,7 +251,7 @@ func (g *Global) StartRunnersAtStartUp(runHyperion func(ctx context.Context, g *
 	}
 }
 
-func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc, orchestrator *orchestrator.Orchestrator) {
+func (g *Global) SetRunner(chainId uint64, cancel context.CancelCauseFunc, orchestrator *orchestrator.Orchestrator) {
 	storage.SetRunner(chainId)
 	g.runners[chainId] = cancel
 	if orchestrator != nil {
@@ -257,11 +259,11 @@ func (g *Global) SetRunner(chainId uint64, cancel context.CancelFunc, orchestrat
 	}
 }
 
-func (g *Global) GetRunner(chainId uint64) context.CancelFunc {
+func (g *Global) GetRunner(chainId uint64) context.CancelCauseFunc {
 	return g.runners[chainId]
 }
 
-func (g *Global) GetRunners() map[uint64]context.CancelFunc {
+func (g *Global) GetRunners() map[uint64]context.CancelCauseFunc {
 	return g.runners
 }
 
@@ -274,7 +276,7 @@ func (g *Global) GetOrchestrators() map[uint64]*orchestrator.Orchestrator {
 }
 
 func (g *Global) CancelRunner(chainId uint64) {
-	g.runners[chainId]()
+	g.runners[chainId](errors.New("runner stopped via CancelRunner function"))
 	delete(g.runners, chainId)
 	storage.RemoveRunner(chainId)
 	delete(g.orchestrators, chainId)
