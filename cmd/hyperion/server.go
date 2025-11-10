@@ -54,6 +54,42 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth check for login endpoint
+		if r.URL.Query().Get("type") == "login" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Get password from header
+		providedPassword := r.Header.Get("X-Password")
+		if providedPassword == "" {
+			sendError(w, "Missing authentication", http.StatusUnauthorized)
+			return
+		}
+
+		// Verify password
+		storedPassword, err := storage.GetHyperionPassword()
+		if err != nil {
+			sendError(w, "Failed to verify authentication", http.StatusInternalServerError)
+			return
+		}
+
+		if storedPassword == "" {
+			sendError(w, "No password configured", http.StatusUnauthorized)
+			return
+		}
+
+		if providedPassword != storedPassword {
+			sendError(w, "Invalid authentication", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
 func startServer(cmd *cli.Cmd) {
 	cmd.Before = func() {
 		initMetrics(cmd)
@@ -92,8 +128,8 @@ func startServer(cmd *cli.Cmd) {
 
 		// API endpoints first
 		apiRouter := router.PathPrefix("/api").Subrouter()
-		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryGet, global, rootCtx)).Methods("GET")
-		apiRouter.HandleFunc("/query", injectGlobalMiddleware(handleQueryPost, global, rootCtx)).Methods("POST")
+		apiRouter.HandleFunc("/query", authMiddleware(injectGlobalMiddleware(handleQueryGet, global, rootCtx))).Methods("GET")
+		apiRouter.HandleFunc("/query", authMiddleware(injectGlobalMiddleware(handleQueryPost, global, rootCtx))).Methods("POST")
 		apiRouter.HandleFunc("/version", handleVersion).Methods("GET")
 
 		// Create file servers for both physical and embedded files
@@ -352,6 +388,11 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			sendSuccess(w, "Login successful", nil)
 			return
 		}
+		if time.Since(global.LastTryAuthTime) < 10*time.Second {
+			sendError(w, "Too many login attempts", http.StatusTooManyRequests)
+			return
+		}
+		global.LastTryAuthTime = time.Now()
 		if params.Password != password {
 			sendError(w, "Invalid password", http.StatusUnauthorized)
 			return

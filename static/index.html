@@ -1205,6 +1205,13 @@
                 },
             },
             methods: {
+                getAuthHeaders() {
+                    const password = localStorage.getItem('password');
+                    return {
+                        'Content-Type': 'application/json',
+                        'X-Password': password || ''
+                    };
+                },
                 showNotification(text, color = 'success') {
                     this.snackbar.text = text;
                     this.snackbar.color = color;
@@ -1220,7 +1227,9 @@
                         const page = this.tableOptions.page || 1;
                         const itemsPerPage = this.tableOptions.itemsPerPage || 10;
                         
-                        const response = await fetch(`/api/query?type=get-list-tokens&chain_id=${chainId}&page=${page}&size=${itemsPerPage}`);
+                        const response = await fetch(`/api/query?type=get-list-tokens&chain_id=${chainId}&page=${page}&size=${itemsPerPage}`, {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch tokens');
                         }
@@ -1264,9 +1273,7 @@
                     try {
                         const response = await fetch('/api/query?type=deploy-erc20', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 name: this.newToken.name,
@@ -1308,7 +1315,9 @@
                         });
 
                         if (!response.ok) {
-                            throw new Error('Invalid password');
+                            const errorData = await response.json();
+                            console.error('Error logging in:', errorData);
+                            throw new Error(errorData.error || 'Invalid password');
                         }
 
                         localStorage.setItem('password', this.password);
@@ -1322,7 +1331,9 @@
                 },
                 async fetchChains() {
                     try {
-                        const response = await fetch('/api/query?type=get-list-hyperions');
+                        const response = await fetch('/api/query?type=get-list-hyperions', {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch chains');
                         }
@@ -1375,7 +1386,9 @@
                 },
                 async fetchStats() {
                     try {
-                        const statsResponse = await fetch('/api/query?type=get-stats');
+                        const statsResponse = await fetch('/api/query?type=get-stats', {
+                            headers: this.getAuthHeaders()
+                        });
                         if (statsResponse.ok) {
                             const statsData = await statsResponse.json();
                             if (statsData.success && statsData.data) {
@@ -1472,9 +1485,7 @@
 
                         const response = await fetch('/api/query?type=run-hyperion', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: chainId }),
                         });
 
@@ -1504,9 +1515,7 @@
 
                         const response = await fetch('/api/query?type=stop-hyperion', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: chainId }),
                         });
 
@@ -1539,9 +1548,7 @@
                     try {
                         const response = await fetch('/api/query?type=add-new-chain', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: Number(this.newChainId) }),
                         });
 
@@ -1580,9 +1587,7 @@
                     try {
                         const response = await fetch('/api/query?type=propose-hyperion', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 title: this.proposeForm.title,
                                 description: this.proposeForm.description,
@@ -1625,9 +1630,7 @@
                     try {
                         const response = await fetch('/api/query?type=propose-hyperion-update', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 title: this.proposeForm.title,
                                 description: this.proposeForm.description,
@@ -1661,9 +1664,7 @@
 
                         const response = await fetch('/api/query?type=unregister-hyperion', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: chainId }),
                         });
 
@@ -1694,9 +1695,7 @@
 
                         const response = await fetch('/api/query?type=register-hyperion', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: chainId }),
                         });
 
@@ -1729,7 +1728,9 @@
                     this.isLoadingRpcs = true;
 
                     try {
-                        const response = await fetch(`/api/query?type=get-list-rpcs&chain_id=${chainId}`);
+                        const response = await fetch(`/api/query?type=get-list-rpcs&chain_id=${chainId}`, {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch RPCs');
                         }
@@ -1750,9 +1751,7 @@
                     try {
                         const response = await fetch('/api/query?type=set-primary-rpc', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 rpc_url: rpcUrl,
@@ -1780,7 +1779,9 @@
                         const page = this.transactionTableOptions.page || 1;
                         const itemsPerPage = this.transactionTableOptions.itemsPerPage || 10;
                         
-                        const response = await fetch(`/api/query?type=get-list-transactions&page=${page}&size=${itemsPerPage}`);
+                        const response = await fetch(`/api/query?type=get-list-transactions&page=${page}&size=${itemsPerPage}`, {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch transactions');
                         }
@@ -1802,7 +1803,9 @@
                 },
                 async fetchWalletAddress() {
                     try {
-                        const response = await fetch('/api/query?type=get-wallet-address');
+                        const response = await fetch('/api/query?type=get-wallet-address', {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch wallet address');
                         }
@@ -1823,9 +1826,7 @@
                         const rpcsArray = this.newRpcs.split('\n').map(rpc => rpc.trim()).filter(rpc => rpc);
                         const response = await fetch('/api/query?type=add-rpcs', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 rpcs: rpcsArray.join(','),
@@ -1854,9 +1855,7 @@
                     try {
                         const response = await fetch('/api/query?type=remove-rpcs', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 rpcs: rpc
@@ -1881,9 +1880,7 @@
                     try {
                         const response = await fetch('/api/query?type=deploy-hyperion-contract', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: chainId }),
                         });
 
@@ -1909,7 +1906,9 @@
                     this.settingsError = '';
 
                     try {
-                        const response = await fetch(`/api/query?type=get-chain-settings&chain_id=${chainId}`);
+                        const response = await fetch(`/api/query?type=get-chain-settings&chain_id=${chainId}`, {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch chain settings');
                         }
@@ -1944,9 +1943,7 @@
                     try {
                         const response = await fetch('/api/query?type=update-chain-settings', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 settings: JSON.parse(this.chainSettings)
@@ -1968,7 +1965,9 @@
                 async fetchGovernanceProposals() {
                     this.isLoadingGovernanceProposals = true;
                     try {
-                        const response = await fetch(`/api/query?type=get-list-governance-proposals&chain_id=${this.selectedChainId}`);
+                        const response = await fetch(`/api/query?type=get-list-governance-proposals&chain_id=${this.selectedChainId}`, {
+                            headers: this.getAuthHeaders(),
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch governance proposals');
                         }
@@ -1998,7 +1997,9 @@
                     this.showProposalDetailsDialog = true;
                     this.currentProposalDetails = {};
                     try {
-                        const response = await fetch(`/api/query?type=get-governance-proposal-details&proposal_id=${proposalId}`);
+                        const response = await fetch(`/api/query?type=get-governance-proposal-details&proposal_id=${proposalId}`, {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch proposal details');
                         }
@@ -2016,7 +2017,9 @@
                     try {
                         const page = this.governanceTableOptions.page;
                         const itemsPerPage = this.governanceTableOptions.itemsPerPage;
-                        const response = await fetch(`/api/query?type=get-list-proposals&page=${page}&size=${itemsPerPage}`);
+                        const response = await fetch(`/api/query?type=get-list-proposals&page=${page}&size=${itemsPerPage}`, {
+                            headers: this.getAuthHeaders()
+                        });
                         if (!response.ok) {
                             throw new Error('Failed to fetch proposals');
                         }
@@ -2047,9 +2050,7 @@
                     try {
                         const response = await fetch('/api/query?type=vote-for-proposal', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 proposal_id: proposalId,
                                 vote_option: voteOption,
@@ -2095,9 +2096,7 @@
                     try {
                         const response = await fetch('/api/query?type=propose-add-whitelisted-address', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 title: this.proposeAddWhitelistedAddressForm.title,
                                 description: this.proposeAddWhitelistedAddressForm.description,
@@ -2151,9 +2150,7 @@
                     try {
                         const response = await fetch('/api/query?type=delete-chain', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ chain_id: chainId }),
                         });
                         if (!response.ok) {
@@ -2183,9 +2180,7 @@
                     try {
                         const response = await fetch('/api/query?type=upload-logo', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 logo: this.uploadLogoBase64,
@@ -2229,9 +2224,7 @@
                     try {
                         const response = await fetch('/api/query?type=update-chain-logo', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 logo: this.updateChainLogoHash,
@@ -2261,9 +2254,7 @@
                     try {
                         const response = await fetch('/api/query?type=add-whitelisted-address', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 address: this.datatAddWhitelistedAddress,
@@ -2306,9 +2297,7 @@
 
                         const response = await fetch(`/api/query?type=${type}`, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 chain_id: this.selectedChainId,
                                 pause: newStateOfPause,

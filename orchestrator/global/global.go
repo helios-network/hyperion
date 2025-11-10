@@ -63,10 +63,12 @@ type Global struct {
 	orchestrators             map[uint64]*orchestrator.Orchestrator
 	lastTimeResetHeliosClient time.Time
 	heliosBroadcastManager    *HeliosBroadcastManager
+
+	LastTryAuthTime time.Time
 }
 
 func NewGlobal(cfg *Config) *Global {
-	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelCauseFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now()}
+	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelCauseFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now(), LastTryAuthTime: time.Now()}
 }
 
 func (g *Global) GetConfig() *Config {
