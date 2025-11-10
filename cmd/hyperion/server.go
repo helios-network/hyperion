@@ -131,6 +131,8 @@ func startServer(cmd *cli.Cmd) {
 		apiRouter.HandleFunc("/query", authMiddleware(injectGlobalMiddleware(handleQueryGet, global, rootCtx))).Methods("GET")
 		apiRouter.HandleFunc("/query", authMiddleware(injectGlobalMiddleware(handleQueryPost, global, rootCtx))).Methods("POST")
 		apiRouter.HandleFunc("/version", handleVersion).Methods("GET")
+		apiRouter.HandleFunc("/debug-goroutines", handleDebugGoroutines).Methods("GET")
+		apiRouter.HandleFunc("/debug-goroutines-stats", handleDebugGoroutinesStats).Methods("GET")
 
 		// Create file servers for both physical and embedded files
 		// physicalFs := http.FileServer(http.Dir("static"))
@@ -178,6 +180,45 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	// Get version info
 	ver := version.Version()
 	sendSuccess(w, ver, nil)
+}
+
+func handleDebugGoroutines(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	pprof.Lookup("goroutine").WriteTo(w, 1)
+}
+
+func handleDebugGoroutinesStats(w http.ResponseWriter, r *http.Request) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	goroutineCount := runtime.NumGoroutine()
+
+	// Get detailed goroutine info
+	goroutineProfile := pprof.Lookup("goroutine")
+	var buf bytes.Buffer
+	goroutineProfile.WriteTo(&buf, 1)
+	goroutineInfo := buf.String()
+
+	// Count goroutines by function (basic analysis)
+	goroutineStats := analyzeGoroutines(goroutineInfo)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	stats := map[string]interface{}{
+		"goroutine_count": goroutineCount,
+		"memory_stats": map[string]interface{}{
+			"heap_alloc":     m.HeapAlloc,
+			"heap_sys":       m.HeapSys,
+			"heap_idle":      m.HeapIdle,
+			"heap_inuse":     m.HeapInuse,
+			"total_alloc":    m.TotalAlloc,
+			"gc_cycles":      m.NumGC,
+			"gc_pause_total": m.PauseTotalNs,
+		},
+		"goroutine_analysis": goroutineStats,
+		"timestamp":          time.Now().UTC().Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(stats)
 }
 
 func handleQueryGet(w http.ResponseWriter, r *http.Request) {
@@ -318,44 +359,6 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sendSuccess(w, proposals, nil)
-		return
-	case "debug-goroutines":
-		w.Header().Set("Content-Type", "text/plain")
-		pprof.Lookup("goroutine").WriteTo(w, 1)
-		return
-	case "debug-goroutines-stats":
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		goroutineCount := runtime.NumGoroutine()
-
-		// Get detailed goroutine info
-		goroutineProfile := pprof.Lookup("goroutine")
-		var buf bytes.Buffer
-		goroutineProfile.WriteTo(&buf, 1)
-		goroutineInfo := buf.String()
-
-		// Count goroutines by function (basic analysis)
-		goroutineStats := analyzeGoroutines(goroutineInfo)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		stats := map[string]interface{}{
-			"goroutine_count": goroutineCount,
-			"memory_stats": map[string]interface{}{
-				"heap_alloc":     m.HeapAlloc,
-				"heap_sys":       m.HeapSys,
-				"heap_idle":      m.HeapIdle,
-				"heap_inuse":     m.HeapInuse,
-				"total_alloc":    m.TotalAlloc,
-				"gc_cycles":      m.NumGC,
-				"gc_pause_total": m.PauseTotalNs,
-			},
-			"goroutine_analysis": goroutineStats,
-			"timestamp":          time.Now().UTC().Format(time.RFC3339),
-		}
-
-		json.NewEncoder(w).Encode(stats)
 		return
 	}
 	sendSuccess(w, "404", nil)
