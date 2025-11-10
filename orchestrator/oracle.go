@@ -275,12 +275,6 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return nil
 	}
 
-	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
-	if err != nil {
-		l.Log().WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
-		return err
-	}
-
 	lastObservedEventNonce, err := l.Orchestrator.GetHelios().QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
 	if err != nil {
 		l.Log().WithError(err).Errorln("failed to get last observed event nonce for " + l.cfg.ChainName + " on helios network")
@@ -293,6 +287,19 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 			l.Orchestrator.RotateRpc()
 		}
 		l.Log().WithError(err).Errorln("failed to get last event nonce on " + l.cfg.ChainName)
+		return err
+	}
+
+	if lastObservedEventNonce == lastEventNonce.Uint64() {
+		l.Log().Infoln("lastObservedEventNonce is equal to lastEventNonce, no new events to process")
+		l.lastObservedEthHeight = targetHeight
+		// permit to reduce the number of calls to the ethereum rpc
+		return nil
+	}
+
+	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
+	if err != nil {
+		l.Log().WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
 		return err
 	}
 
@@ -411,22 +418,8 @@ func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	fn := func() error {
 		h, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 		if err != nil {
-			// usedRpc := provider.GetCurrentRPCURL(ctx)
-			// Pénaliser le RPC utilisé pour cet échec
-			// if usedRpc != "" {
-			// 	l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
-			// 	l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed header request")
-			// }
 			return errors.Wrap(err, "failed to get latest ethereum header")
 		}
-
-		// Féliciter le RPC utilisé pour ce succès
-		// usedRpc := provider.GetCurrentRPCURL(ctx)
-		// if usedRpc != "" {
-		// 	l.ethereum.PraiseRpc(usedRpc, 1) // Récompense de 1 point
-		// 	l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful header request")
-		// }
-
 		latestHeight = h.Number.Uint64()
 		return nil
 	}
