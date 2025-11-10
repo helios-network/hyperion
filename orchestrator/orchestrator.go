@@ -83,6 +83,7 @@ type HyperionState struct {
 	RelayerStatus       string
 	SignerStatus        string
 	UpdaterStatus       string
+	SkippedStatus       string
 	ValsetManagerStatus string
 	ErrorStatus         string
 
@@ -92,6 +93,7 @@ type HyperionState struct {
 	RelayerNextExecutionTimestamp       uint64
 	SignerNextExecutionTimestamp        uint64
 	UpdaterNextExecutionTimestamp       uint64
+	SkippedNextExecutionTimestamp       uint64
 	ValsetManagerNextExecutionTimestamp uint64
 
 	BatchCreatorLastExecutionFinishedTimestamp  uint64
@@ -100,6 +102,7 @@ type HyperionState struct {
 	RelayerLastExecutionFinishedTimestamp       uint64
 	SignerLastExecutionFinishedTimestamp        uint64
 	UpdaterLastExecutionFinishedTimestamp       uint64
+	SkippedLastExecutionFinishedTimestamp       uint64
 	ValsetManagerLastExecutionFinishedTimestamp uint64
 
 	IsDepositPaused    bool
@@ -125,6 +128,8 @@ type Orchestrator struct {
 	HyperionState HyperionState
 
 	CacheSymbol map[gethcommon.Address]string
+
+	Oracle *oracle
 }
 
 func NewOrchestrator(
@@ -169,6 +174,7 @@ func NewOrchestrator(
 			RelayerStatus:       "idle",
 			SignerStatus:        "idle",
 			UpdaterStatus:       "idle",
+			SkippedStatus:       "idle",
 			ValsetManagerStatus: "idle",
 			ErrorStatus:         "okay",
 
@@ -178,6 +184,7 @@ func NewOrchestrator(
 			RelayerNextExecutionTimestamp:       0,
 			SignerNextExecutionTimestamp:        0,
 			UpdaterNextExecutionTimestamp:       0,
+			SkippedNextExecutionTimestamp:       0,
 			ValsetManagerNextExecutionTimestamp: 0,
 
 			BatchCreatorLastExecutionFinishedTimestamp:  0,
@@ -186,6 +193,7 @@ func NewOrchestrator(
 			RelayerLastExecutionFinishedTimestamp:       0,
 			SignerLastExecutionFinishedTimestamp:        0,
 			UpdaterLastExecutionFinishedTimestamp:       0,
+			SkippedLastExecutionFinishedTimestamp:       0,
 			ValsetManagerLastExecutionFinishedTimestamp: 0,
 
 			IsDepositPaused:    false,
@@ -193,6 +201,8 @@ func NewOrchestrator(
 		},
 
 		CacheSymbol: make(map[gethcommon.Address]string),
+
+		Oracle: nil,
 	}
 
 	return o, nil
@@ -318,6 +328,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error { return s.runOracle(ctx, ethereumBlockHeightWhereStart) })
+	pg.Go(func() error { return s.runSkipped(ctx) })
 	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })

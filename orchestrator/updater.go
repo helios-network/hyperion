@@ -7,7 +7,6 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/pkg/errors"
-	log "github.com/xlab/suplog"
 )
 
 const (
@@ -39,10 +38,6 @@ func (s *Orchestrator) runUpdater(ctx context.Context) error {
 type updater struct {
 	*Orchestrator
 	logEnabled bool
-}
-
-func (l *updater) Log() log.Logger {
-	return l.logger.WithField("loop", "Updater")
 }
 
 func (l *updater) Update(ctx context.Context) error {

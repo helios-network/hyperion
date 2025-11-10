@@ -51,6 +51,8 @@ type QueryClient interface {
 
 	QueryGetListOutgoingTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTxBatch, error)
 	QueryGetAllPendingSendToChain(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTransferTx, []*hyperiontypes.OutgoingTransferTx, error)
+
+	QueryGetAllSkippedTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.SkippedNonceFullInfo, error)
 }
 
 type cacheEntry struct {
@@ -655,4 +657,27 @@ func (c queryClient) QueryGetAllPendingSendToChain(ctx context.Context, chainId 
 	}
 
 	return resp.TransfersInBatches, resp.UnbatchedTransfers, nil
+}
+
+func (c queryClient) QueryGetAllSkippedTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.SkippedNonceFullInfo, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryGetSkippedNoncesRequest{
+		HyperionId: chainId,
+	}
+
+	resp, err := c.QueryClient.QueryGetSkippedNonces(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query QueryGetSkippedNonces from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.SkippedNonces, nil
 }

@@ -47,6 +47,8 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 		logEnabled:            strings.Contains(s.cfg.EnabledLogs, "oracle"),
 	}
 
+	s.Oracle = &oracle
+
 	s.logger.WithField("loop_duration", defaultLoopDur.String()).Debugln("starting Oracle...")
 
 	ticker := time.NewTicker(defaultLoopDur)
@@ -521,20 +523,82 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 			l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
 			time.Sleep(1100 * time.Millisecond)
 		}
-		// for _, event := range newEvents {
-		// 	resp, err := l.sendEthEventClaim(ctx, event)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	cost, err := l.helios.GetTxCost(ctx, resp.TxHash)
-		// 	if err == nil {
-		// 		storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
-		// 	}
 
-		// 	// Considering block time ~1s on Helios chain, adding Sleep to make sure new event is sent
-		// 	// only after previous event is executed successfully. Otherwise it will through `non contiguous event nonce` failing CheckTx.
-		// 	time.Sleep(1100 * time.Millisecond)
-		// }
+		return nil
+	}
+
+	if err := l.retry(ctx, sendEventsFn); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (l *oracle) sendNewEventClaimsWithoutFilter(ctx context.Context, newEvents []event, maxClaimsMsgPerBulk int) error {
+	sendEventsFn := func() error {
+
+		if len(newEvents) == 0 {
+			log.Infoln("No new events to send")
+			return nil
+		}
+
+		var msgs []cosmostypes.Msg
+		for _, event := range newEvents {
+			msg, err := l.prepareSendEthEventClaim(ctx, event)
+			if err != nil {
+				return err
+			}
+			msgs = append(msgs, msg)
+
+			if len(msgs) >= maxClaimsMsgPerBulk {
+				log.Infoln("sending bulk of ", len(msgs), "claims messages")
+				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+
+				err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
+				if err != nil {
+					VerifyTxError(ctx, err.Error(), l.Orchestrator)
+					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
+					return err
+				}
+				resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
+				if err != nil {
+					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
+					return err
+				}
+				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
+				cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
+				if err == nil {
+					storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
+				}
+				msgs = []cosmostypes.Msg{}
+				time.Sleep(1100 * time.Millisecond)
+			}
+		}
+
+		if len(msgs) > 0 {
+			log.Infoln("sending bulk of ", len(msgs), "claims messages")
+			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+			err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
+			if err != nil {
+				VerifyTxError(ctx, err.Error(), l.Orchestrator)
+				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
+				return err
+			}
+			resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
+			if err != nil {
+				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
+				return err
+			}
+			cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
+			if err == nil {
+				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
+				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
+			}
+			l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
+			time.Sleep(1100 * time.Millisecond)
+		}
 
 		return nil
 	}

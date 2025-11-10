@@ -33,3 +33,5 @@ func main() {
 
 	fmt.Printf("Log file '%s' with %d lines generated successfully.\n", logFileName, maxLines)
 }
+
+
