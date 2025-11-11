@@ -147,10 +147,10 @@
                                                             </v-list-item-subtitle>
                                                         </v-list-item-content>
                                                     </v-list-item>
-                                                    <v-list-item v-if="chain.height > 0">
+                                                    <v-list-item v-if="chain.running">
                                                         <v-list-item-content>
                                                             <v-list-item-title>Sync Status</v-list-item-title>
-                                                            <v-list-item-subtitle>
+                                                            <v-list-item-subtitle v-if="chain.height > 0">
                                                                 Height: {{ chain.height }} | Target: {{ chain.targetHeight }} | Diff: {{ chain.heightDiff }}
                                                             </v-list-item-subtitle>
                                                             <v-list-item-title>Stats</v-list-item-title>
@@ -166,6 +166,15 @@
                                                                 </v-chip>
                                                                 <v-chip color="primary" small>
                                                                     In Bridged Txs: {{ chain.inBridgedTxCount }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    Valset Update Count: {{ chain.valsetUpdateCount }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    ERC20 Deployment Count: {{ chain.erc20DeploymentCount }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    Skipped Retried Count: {{ chain.skippedRetriedCount }}
                                                                 </v-chip>
                                                             </v-list-item-subtitle>
                                                             <v-list-item-title>States</v-list-item-title>
@@ -1375,7 +1384,10 @@
                                 totalTxs: chainStats.totalTxs || 0,
                                 batches: chainStats.batches || 0,
                                 outBridgedTxCount: chainStats.outBridgedTxCount || 0,
-                                inBridgedTxCount: chainStats.inBridgedTxCount || 0
+                                inBridgedTxCount: chainStats.inBridgedTxCount || 0,
+                                valsetUpdateCount: chainStats.valsetUpdateCount || 0,
+                                erc20DeploymentCount: chainStats.erc20DeploymentCount || 0,
+                                skippedRetriedCount: chainStats.skippedRetriedCount || 0,
                             });
                         });
 

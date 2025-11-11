@@ -2,12 +2,14 @@ package orchestrator
 
 import (
 	"context"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
+	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 )
@@ -24,7 +26,7 @@ func (s *Orchestrator) runSkipped(ctx context.Context) error {
 	s.logger.WithField("loop_duration", defaultSkippedLoopDur.String()).Debugln("starting Skipped...")
 
 	return loops.RunLoop(ctx, s.ethereum, defaultSkippedLoopDur, func() error {
-		if s.HyperionState.SkippedStatus == "running" {
+		if s.HyperionState.SkippedStatus != "idle" {
 			return nil
 		}
 
@@ -88,7 +90,7 @@ func (l *skipped) Run(ctx context.Context) error {
 
 		l.HyperionState.SkippedStatus = "getting events for nonce " + strconv.FormatUint(skippedNonce.Nonce, 10)
 
-		events, err := l.Orchestrator.Oracle.getEthEvents(ctx, skippedNonce.StartHeight, skippedNonce.EndHeight)
+		events, err := l.Orchestrator.Oracle.getEthEvents(ctx, skippedNonce.StartHeight, skippedNonce.EndHeight, []uint64{skippedNonce.Nonce})
 		if err != nil {
 			log.WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
 			return err
@@ -109,12 +111,89 @@ func (l *skipped) Run(ctx context.Context) error {
 
 		l.HyperionState.SkippedStatus = "sending events for nonce " + strconv.FormatUint(skippedNonce.Nonce, 10)
 
-		if err := l.Orchestrator.Oracle.sendNewEventClaimsWithoutFilter(ctx, eventsToSend, int(maxClaimsMsgPerBulk)); err != nil {
+		if err := l.sendNewEventClaimsWithoutFilter(ctx, eventsToSend, int(maxClaimsMsgPerBulk)); err != nil {
 			log.Info("err: ", err)
 			return err
 		}
 
 		log.Infoln("sent events for nonce " + strconv.FormatUint(skippedNonce.Nonce, 10))
+	}
+
+	return nil
+}
+
+func (l *skipped) sendNewEventClaimsWithoutFilter(ctx context.Context, newEvents []event, maxClaimsMsgPerBulk int) error {
+	sendEventsFn := func() error {
+
+		if len(newEvents) == 0 {
+			log.Infoln("No new events to send")
+			return nil
+		}
+
+		var msgs []cosmostypes.Msg
+		for _, event := range newEvents {
+			msg, err := l.Orchestrator.Oracle.prepareSendEthEventClaim(ctx, event)
+			if err != nil {
+				return err
+			}
+			msgs = append(msgs, msg)
+
+			if len(msgs) >= maxClaimsMsgPerBulk {
+				log.Infoln("sending bulk of ", len(msgs), "claims messages")
+				l.Orchestrator.HyperionState.SkippedStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+
+				err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
+				if err != nil {
+					VerifyTxError(ctx, err.Error(), l.Orchestrator)
+					log.WithError(err).Warningln("failed to simulate bulk of claims messages")
+					return err
+				}
+				resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
+				if err != nil {
+					l.Orchestrator.HyperionState.SkippedStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
+					return err
+				}
+				l.Orchestrator.HyperionState.SkippedRetriedCount += len(msgs)
+				l.Orchestrator.HyperionState.SkippedStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
+				cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
+				if err == nil {
+					storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
+				}
+				msgs = []cosmostypes.Msg{}
+				time.Sleep(1100 * time.Millisecond)
+			}
+		}
+
+		if len(msgs) > 0 {
+			log.Infoln("sending bulk of ", len(msgs), "claims messages")
+			l.Orchestrator.HyperionState.SkippedStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+			err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
+			if err != nil {
+				VerifyTxError(ctx, err.Error(), l.Orchestrator)
+				log.WithError(err).Warningln("failed to simulate bulk of claims messages")
+				return err
+			}
+			resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
+			if err != nil {
+				l.Orchestrator.HyperionState.SkippedStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
+				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
+				return err
+			}
+			cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
+			if err == nil {
+				l.Orchestrator.HyperionState.SkippedStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
+				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
+			}
+			l.Orchestrator.HyperionState.SkippedStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
+			time.Sleep(1100 * time.Millisecond)
+		}
+
+		return nil
+	}
+
+	if err := l.retry(ctx, sendEventsFn); err != nil {
+		return err
 	}
 
 	return nil

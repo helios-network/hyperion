@@ -72,10 +72,13 @@ type HyperionState struct {
 	LastClaimBlockHeight   uint64
 	LastClaimEventNonce    uint64
 
-	BatchCount        int
-	TxCount           int
-	OutBridgedTxCount int
-	InBridgedTxCount  int
+	BatchCount           int
+	TxCount              int
+	OutBridgedTxCount    int
+	InBridgedTxCount     int
+	ValsetUpdateCount    int
+	ERC20DeploymentCount int
+	SkippedRetriedCount  int
 
 	BatchCreatorStatus  string
 	ExternalDataStatus  string
@@ -164,9 +167,12 @@ func NewOrchestrator(
 			LastClaimBlockHeight:   0,
 			LastClaimEventNonce:    0,
 
-			BatchCount:        0,
-			OutBridgedTxCount: 0,
-			InBridgedTxCount:  0,
+			BatchCount:           0,
+			OutBridgedTxCount:    0,
+			InBridgedTxCount:     0,
+			ValsetUpdateCount:    0,
+			ERC20DeploymentCount: 0,
+			SkippedRetriedCount:  0,
 
 			BatchCreatorStatus:  "idle",
 			ExternalDataStatus:  "idle",

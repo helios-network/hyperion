@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	log "github.com/xlab/suplog"
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
@@ -188,13 +188,13 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 				l.Log().WithError(err).Errorln("failed to send unjail message on " + l.cfg.ChainName)
 				return err
 			}
-			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+			err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []cosmostypes.Msg{msg})
 			if err != nil {
 				VerifyTxError(ctx, err.Error(), l.Orchestrator)
 				l.Log().WithError(err).Errorln("failed to simulate unjail message on " + l.cfg.ChainName)
 				return err
 			}
-			_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+			_, err = l.global.SyncBroadcastMsgs(ctx, []cosmostypes.Msg{msg})
 			if err != nil {
 				l.Log().WithError(err).Errorln("failed to broadcast unjail message on " + l.cfg.ChainName)
 				return err
@@ -206,13 +206,13 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			l.Log().WithError(err).Errorln("failed to send set orchestrator addresses message on " + l.cfg.ChainName)
 			return err
 		}
-		err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
+		err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, []cosmostypes.Msg{msg})
 		if err != nil {
 			VerifyTxError(ctx, err.Error(), l.Orchestrator)
 			l.Log().WithError(err).Errorln("failed to simulate set orchestrator addresses message on " + l.cfg.ChainName)
 			return err
 		}
-		_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
+		_, err = l.global.SyncBroadcastMsgs(ctx, []cosmostypes.Msg{msg})
 		if err != nil {
 			l.Log().WithError(err).Errorln("failed to broadcast set orchestrator addresses message on " + l.cfg.ChainName)
 			return err
@@ -297,7 +297,13 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return nil
 	}
 
-	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
+	// get all nonces between lastObservedEventNonce and lastEventNonce to optimize the number of calls to the ethereum rpc
+	noncesResearched := []uint64{}
+	for i := lastObservedEventNonce + 1; i <= lastEventNonce.Uint64(); i++ {
+		noncesResearched = append(noncesResearched, i)
+	}
+
+	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight, noncesResearched)
 	if err != nil {
 		l.Log().WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
 		return err
@@ -358,14 +364,29 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 	return nil
 }
 
-func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) ([]event, error) {
+func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, noncesResearched []uint64) ([]event, error) {
 	var events []event
 	scanEthEventsFn := func() error {
 		events = nil // clear previous result in case a retry occurred
+		noncesFound := []uint64{}
 
 		depositEvents, err := l.ethereum.GetSendToHeliosEvents(startBlock, endBlock)
 		if err != nil {
 			return errors.Wrap(err, "failed to get SendToHelios events")
+		}
+
+		for _, e := range depositEvents {
+			ev := deposit(*e)
+			events = append(events, &ev)
+
+			if slices.Contains(noncesResearched, ev.Nonce()) {
+				noncesFound = append(noncesFound, ev.Nonce())
+			}
+		}
+
+		if len(noncesFound) == len(depositEvents) { // all nonces have been found
+			l.Log().Infoln("all nonces have been found for events - gain of 3 calls eth_logs to the ethereum rpc")
+			return nil
 		}
 
 		withdrawalEvents, err := l.ethereum.GetTransactionBatchExecutedEvents(startBlock, endBlock)
@@ -373,9 +394,18 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get TransactionBatchExecuted events")
 		}
 
-		erc20DeploymentEvents, err := l.ethereum.GetHyperionERC20DeployedEvents(startBlock, endBlock)
-		if err != nil {
-			return errors.Wrap(err, "failed to get ERC20Deployed events")
+		for _, e := range withdrawalEvents {
+			ev := withdrawal(*e)
+			events = append(events, &ev)
+
+			if slices.Contains(noncesResearched, ev.Nonce()) {
+				noncesFound = append(noncesFound, ev.Nonce())
+			}
+		}
+
+		if len(noncesFound) == len(withdrawalEvents) { // all nonces have been found
+			l.Log().Infoln("all nonces have been found for events - gain of 2 calls eth_logs to the ethereum rpc")
+			return nil
 		}
 
 		valsetUpdateEvents, err := l.ethereum.GetValsetUpdatedEvents(startBlock, endBlock)
@@ -383,19 +413,23 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) 
 			return errors.Wrap(err, "failed to get ValsetUpdated events")
 		}
 
-		for _, e := range depositEvents {
-			ev := deposit(*e)
-			events = append(events, &ev)
-		}
-
-		for _, e := range withdrawalEvents {
-			ev := withdrawal(*e)
-			events = append(events, &ev)
-		}
-
 		for _, e := range valsetUpdateEvents {
 			ev := valsetUpdate(*e)
 			events = append(events, &ev)
+
+			if slices.Contains(noncesResearched, ev.Nonce()) {
+				noncesFound = append(noncesFound, ev.Nonce())
+			}
+		}
+
+		if len(noncesFound) == len(valsetUpdateEvents) { // all nonces have been found
+			l.Log().Infoln("all nonces have been found for events - gain of 1 call eth_logs to the ethereum rpc")
+			return nil
+		}
+
+		erc20DeploymentEvents, err := l.ethereum.GetHyperionERC20DeployedEvents(startBlock, endBlock)
+		if err != nil {
+			return errors.Wrap(err, "failed to get ERC20Deployed events")
 		}
 
 		for _, e := range erc20DeploymentEvents {
@@ -527,82 +561,6 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 	return nil
 }
 
-func (l *oracle) sendNewEventClaimsWithoutFilter(ctx context.Context, newEvents []event, maxClaimsMsgPerBulk int) error {
-	sendEventsFn := func() error {
-
-		if len(newEvents) == 0 {
-			log.Infoln("No new events to send")
-			return nil
-		}
-
-		var msgs []cosmostypes.Msg
-		for _, event := range newEvents {
-			msg, err := l.prepareSendEthEventClaim(ctx, event)
-			if err != nil {
-				return err
-			}
-			msgs = append(msgs, msg)
-
-			if len(msgs) >= maxClaimsMsgPerBulk {
-				log.Infoln("sending bulk of ", len(msgs), "claims messages")
-				l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
-
-				err = l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
-				if err != nil {
-					VerifyTxError(ctx, err.Error(), l.Orchestrator)
-					l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
-					return err
-				}
-				resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
-				if err != nil {
-					l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
-					log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
-					return err
-				}
-				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
-				cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
-				if err == nil {
-					storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
-				}
-				msgs = []cosmostypes.Msg{}
-				time.Sleep(1100 * time.Millisecond)
-			}
-		}
-
-		if len(msgs) > 0 {
-			log.Infoln("sending bulk of ", len(msgs), "claims messages")
-			l.Orchestrator.HyperionState.OracleStatus = "sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
-			err := l.GetHelios().SyncBroadcastMsgsSimulate(ctx, msgs)
-			if err != nil {
-				VerifyTxError(ctx, err.Error(), l.Orchestrator)
-				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
-				return err
-			}
-			resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
-			if err != nil {
-				l.Orchestrator.HyperionState.OracleStatus = "error sending bulk of " + strconv.Itoa(len(msgs)) + " claims messages"
-				log.Errorln("error sending bulk of ", len(msgs), "claims messages", err)
-				return err
-			}
-			cost, err := l.GetHelios().GetTxCost(ctx, resp.TxHash)
-			if err == nil {
-				l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
-				storage.UpdateFeesFile(big.NewInt(0), "", cost, resp.TxHash, uint64(resp.Height), uint64(42000), "CLAIM")
-			}
-			l.Orchestrator.HyperionState.OracleStatus = "bulk of " + strconv.Itoa(len(msgs)) + " claims messages sent"
-			time.Sleep(1100 * time.Millisecond)
-		}
-
-		return nil
-	}
-
-	if err := l.retry(ctx, sendEventsFn); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (l *oracle) autoResync(ctx context.Context) error {
 	var height uint64
 	fn := func() (err error) {
@@ -624,21 +582,20 @@ func (l *oracle) autoResync(ctx context.Context) error {
 
 func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmostypes.Msg, error) {
 	rpc := ""
-	if !l.IsStaticRpcAnonymous() {
-		rpc = l.ethereum.GetRpc().Url
-	}
 	switch e := ev.(type) {
 	case *deposit:
 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
 		l.HyperionState.InBridgedTxCount++
 		return l.GetHelios().SendDepositClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *valsetUpdate:
+		l.HyperionState.ValsetUpdateCount++
 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
 		return l.GetHelios().SendValsetClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *withdrawal:
 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
 		return l.GetHelios().SendWithdrawalClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	case *erc20Deployment:
+		l.HyperionState.ERC20DeploymentCount++
 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
 		return l.GetHelios().SendERC20DeployedClaimMsg(ctx, l.cfg.HyperionId, &ev, rpc)
 	default:
