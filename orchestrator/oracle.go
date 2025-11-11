@@ -302,10 +302,10 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 			// blockTimeOnTheChain is in milliseconds
 			blockTimeOnTheChain := l.cfg.ChainParams.AverageCounterpartyBlockTime // 12000ms (12s)
 
-			// compute number of blocks in 5 minutes
-			const fiveMinutesMs = 5 * 60 * 1000 // 300000 ms
+			// compute number of blocks in 2 minutes
+			const twoMinutesMs = 2 * 60 * 1000 // 300000 ms
 
-			nbBlocksToRewind := fiveMinutesMs / blockTimeOnTheChain
+			nbBlocksToRewind := twoMinutesMs / blockTimeOnTheChain
 
 			l.Log().Infoln("rewinding the last observed height by ", nbBlocksToRewind, " blocks")
 			// rewind the last observed height

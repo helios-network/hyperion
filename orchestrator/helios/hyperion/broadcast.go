@@ -1368,6 +1368,7 @@ func (c *broadcastClient) MintTokensMsg(ctx context.Context, chainId uint64, tok
 	doneFn := metrics.ReportFuncTiming(c.svcTags)
 	defer doneFn()
 	msg := &hyperiontypes.MsgMintToken{
+		Signer:          c.FromAddress().String(),
 		ChainId:         chainId,
 		TokenAddress:    gethcommon.HexToAddress(tokenAddress).Hex(),
 		Amount:          amount,

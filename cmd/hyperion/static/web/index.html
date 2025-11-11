@@ -839,7 +839,8 @@
                                         { text: 'Decimals', value: 'decimals' },
                                         { text: 'Contract Address', value: 'contract_address' },
                                         { text: 'Chain Contract Address', value: 'chain_contract_address' },
-                                        { text: 'Origin ChainId', value: 'origin_chain_id' }
+                                        { text: 'Origin ChainId', value: 'origin_chain_id' },
+                                        { text: 'Actions', value: 'actions', sortable: false }
                                     ]"
                                     :items="tokens"
                                     :loading="isLoadingTokens"
@@ -850,6 +851,15 @@
                                         showFirstLastPage: true
                                     }"
                                 >
+                                    <template v-slot:item.actions="{ item }">
+                                        <v-btn
+                                            color="success"
+                                            small
+                                            @click="openMintTokenDialog(item)"
+                                        >
+                                            Mint
+                                        </v-btn>
+                                    </template>
                                 </v-data-table>
                             </v-card-text>
                         </v-card>
@@ -901,6 +911,57 @@
                                 :loading="isDeployingToken"
                             >
                                 Deploy
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Mint Token Dialog -->
+                <v-dialog v-model="showMintTokenDialog" max-width="500px">
+                    <v-card>
+                        <v-card-title>Mint Token: {{ selectedToken.name }}</v-card-title>
+                        <v-card-text>
+                            <v-form ref="mintTokenForm">
+                                <v-text-field
+                                    v-model="mintTokenForm.token_address"
+                                    label="Token Address (Contract Address)"
+                                    required
+                                    :rules="[v => !!v || 'Token Address is required']"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model.number="mintTokenForm.decimals"
+                                    label="Decimals"
+                                    type="number"
+                                    disabled
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model.number="mintTokenForm.amount"
+                                    label="Amount"
+                                    type="number"
+                                    step="0.000001"
+                                    required
+                                    :rules="[
+                                        v => !!v || 'Amount is required',
+                                        v => v > 0 || 'Amount must be positive'
+                                    ]"
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="mintTokenForm.receiver_address"
+                                    label="Receiver Address"
+                                    required
+                                    :rules="[v => !!v || 'Receiver Address is required']"
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showMintTokenDialog = false">Cancel</v-btn>
+                            <v-btn 
+                                color="success" 
+                                @click="mintToken"
+                                :loading="isMintingToken"
+                            >
+                                Mint
                             </v-btn>
                         </v-card-actions>
                     </v-card>
@@ -1095,12 +1156,15 @@
                 showSettingsPage: false,
                 showAddTokenDialog: false,
                 showAddRpcsDialog: false,
+                showMintTokenDialog: false,
                 selectedChainId: null,
                 selectedChain: null,
+                selectedToken: {},
                 newChainId: '',
                 isProposing: false,
                 isAddingChain: false,
                 isDeployingToken: false,
+                isMintingToken: false,
                 isLoadingTokens: false,
                 isLoadingRpcs: false,
                 isAddingRpcs: false,
@@ -1129,6 +1193,12 @@
                     bridge_chain_id: null,
                     bridge_chain_name: '',
                     average_counterparty_block_time: 12000
+                },
+                mintTokenForm: {
+                    token_address: '',
+                    decimals: 18,
+                    amount: 0.1,
+                    receiver_address: ''
                 },
                 showProposeUpdateDialog: false,
                 isProposingUpdate: false,
@@ -1311,6 +1381,56 @@
                         this.showNotification(error.message, 'error');
                     } finally {
                         this.isDeployingToken = false;
+                    }
+                },
+                openMintTokenDialog(token) {
+                    this.selectedToken = token;
+                    this.mintTokenForm = {
+                        token_address: token.chain_contract_address || '',
+                        decimals: token.decimals || 18,
+                        amount: 0.1,
+                        receiver_address: ''
+                    };
+                    this.showMintTokenDialog = true;
+                },
+                async mintToken() {
+                    if (!this.$refs.mintTokenForm.validate()) {
+                        return;
+                    }
+
+                    this.isMintingToken = true;
+                    try {
+                        const response = await fetch('/api/query?type=mint-token', {
+                            method: 'POST',
+                            headers: this.getAuthHeaders(),
+                            body: JSON.stringify({
+                                chain_id: this.selectedChainId,
+                                token_address: this.mintTokenForm.token_address,
+                                decimals: this.mintTokenForm.decimals,
+                                amount: this.mintTokenForm.amount,
+                                receiver_address: this.mintTokenForm.receiver_address
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to mint token');
+                        }
+
+                        this.showMintTokenDialog = false;
+                        this.mintTokenForm = {
+                            token_address: '',
+                            decimals: 18,
+                            amount: 0.1,
+                            receiver_address: ''
+                        };
+                        this.showNotification('Token minted successfully');
+                        await this.viewTokens(this.selectedChainId);
+                    } catch (error) {
+                        console.error('Error minting token:', error);
+                        this.showNotification(error.message, 'error');
+                    } finally {
+                        this.isMintingToken = false;
                     }
                 },
                 async login() {

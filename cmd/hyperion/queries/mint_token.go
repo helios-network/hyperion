@@ -3,16 +3,17 @@ package queries
 import (
 	"context"
 	"fmt"
+	"math"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func MintToken(ctx context.Context, global *global.Global, chainId uint64, tokenAddress string, amount float64, receiverAddress string) (map[string]interface{}, error) {
+func MintToken(ctx context.Context, global *global.Global, chainId uint64, tokenAddress string, decimals uint64, amount float64, receiverAddress string) (map[string]interface{}, error) {
 	network := *global.GetHeliosNetwork()
 
-	amountMath := sdkmath.NewInt(int64(amount * 1000000000000000000)) // 10^18
+	amountMath := sdkmath.NewInt(int64(amount * math.Pow10(int(decimals))))
 	if amountMath.IsNegative() {
 		return nil, fmt.Errorf("amount is negative")
 	}
@@ -20,6 +21,7 @@ func MintToken(ctx context.Context, global *global.Global, chainId uint64, token
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("msg: ", msg)
 	err = network.SyncBroadcastMsgsSimulate(ctx, []sdk.Msg{msg})
 	if err != nil {
 		return nil, err

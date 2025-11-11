@@ -788,12 +788,13 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 			TokenAddress    string  `json:"token_address"`
 			Amount          float64 `json:"amount"`
 			ReceiverAddress string  `json:"receiver_address"`
+			Decimals        uint64  `json:"decimals"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 			sendError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		response, err := queries.MintToken(r.Context(), global, params.ChainID, params.TokenAddress, params.Amount, params.ReceiverAddress)
+		response, err := queries.MintToken(r.Context(), global, params.ChainID, params.TokenAddress, params.Decimals, params.Amount, params.ReceiverAddress)
 		if err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
