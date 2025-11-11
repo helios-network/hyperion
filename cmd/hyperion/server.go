@@ -782,6 +782,24 @@ func handleQueryPost(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, response, nil)
 		return
+	case "mint-token":
+		var params struct {
+			ChainID         uint64  `json:"chain_id"`
+			TokenAddress    string  `json:"token_address"`
+			Amount          float64 `json:"amount"`
+			ReceiverAddress string  `json:"receiver_address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			sendError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		response, err := queries.MintToken(r.Context(), global, params.ChainID, params.TokenAddress, params.Amount, params.ReceiverAddress)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, response, nil)
+		return
 	}
 	sendError(w, "Unknown query type", http.StatusBadRequest)
 }

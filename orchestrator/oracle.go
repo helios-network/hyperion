@@ -41,10 +41,11 @@ const (
 // and ferried over to Cosmos where they will be used to issue tokens or process batches.
 func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) error {
 	oracle := oracle{
-		Orchestrator:          s,
-		lastObservedEthHeight: lastObservedBlock,
-		lastResyncWithHelios:  time.Now(),
-		logEnabled:            strings.Contains(s.cfg.EnabledLogs, "oracle"),
+		Orchestrator:            s,
+		lastObservedEthHeight:   lastObservedBlock,
+		lastResyncWithHelios:    time.Now(),
+		logEnabled:              strings.Contains(s.cfg.EnabledLogs, "oracle"),
+		missedEventsBlockHeight: 0,
 	}
 
 	s.Oracle = &oracle
@@ -89,9 +90,10 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 
 type oracle struct {
 	*Orchestrator
-	lastResyncWithHelios  time.Time
-	lastObservedEthHeight uint64
-	logEnabled            bool
+	lastResyncWithHelios    time.Time
+	lastObservedEthHeight   uint64
+	logEnabled              bool
+	missedEventsBlockHeight uint64
 }
 
 func (l *oracle) Log() log.Logger {
@@ -290,11 +292,25 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		return err
 	}
 
-	if lastObservedEventNonce == lastEventNonce.Uint64() {
-		l.Log().Infoln("lastObservedEventNonce is equal to lastEventNonce, no new events to process")
-		l.lastObservedEthHeight = targetHeight
-		// permit to reduce the number of calls to the ethereum rpc
-		return nil
+	if l.missedEventsBlockHeight == 0 {
+		if lastObservedEventNonce == lastEventNonce.Uint64() {
+			l.Log().Infoln("lastObservedEventNonce is equal to lastEventNonce, no new events to process")
+			l.lastObservedEthHeight = targetHeight
+			// permit to reduce the number of calls to the ethereum rpc
+			return nil
+		} else { // special case to reduce the number of calls to the ethereum rpc cause we can miss events if we don't rewind few minutes
+			// blockTimeOnTheChain is in milliseconds
+			blockTimeOnTheChain := l.cfg.ChainParams.AverageCounterpartyBlockTime // 12000ms (12s)
+
+			// compute number of blocks in 5 minutes
+			const fiveMinutesMs = 5 * 60 * 1000 // 300000 ms
+
+			nbBlocksToRewind := fiveMinutesMs / blockTimeOnTheChain
+
+			l.Log().Infoln("rewinding the last observed height by ", nbBlocksToRewind, " blocks")
+			// rewind the last observed height
+			l.lastObservedEthHeight = l.lastObservedEthHeight - nbBlocksToRewind
+		}
 	}
 
 	// get all nonces between lastObservedEventNonce and lastEventNonce to optimize the number of calls to the ethereum rpc
@@ -302,6 +318,8 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 	for i := lastObservedEventNonce + 1; i <= lastEventNonce.Uint64(); i++ {
 		noncesResearched = append(noncesResearched, i)
 	}
+
+	l.Log().Infoln("noncesResearched: ", noncesResearched)
 
 	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight, noncesResearched)
 	if err != nil {
@@ -345,11 +363,28 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		if err != nil {
 			return err
 		}
-		l.lastObservedEthHeight = lastObservedHeight.EthereumBlockHeight
+
+		// if we missed an event, we need to rewind the last observed height by 5 minutes and continue from there
+		if l.missedEventsBlockHeight == 0 {
+			l.missedEventsBlockHeight = lastObservedHeight.EthereumBlockHeight
+		} else {
+			// blockTimeOnTheChain is in milliseconds
+			blockTimeOnTheChain := l.cfg.ChainParams.AverageCounterpartyBlockTime // 12000ms (12s)
+
+			// compute number of blocks in 5 minutes
+			const fiveMinutesMs = 5 * 60 * 1000 // 300000 ms
+
+			nbBlocksToRewind := fiveMinutesMs / blockTimeOnTheChain
+
+			l.missedEventsBlockHeight = l.missedEventsBlockHeight - nbBlocksToRewind
+		}
+		l.lastObservedEthHeight = l.missedEventsBlockHeight
 		// move back to the last observed event height
 		l.Log().WithFields(log.Fields{"current_helios_nonce": lastObservedEventNonce, "wanted_nonce": lastObservedEventNonce + 1, "actual_ethereum_nonce": newEvents[0].Nonce()}).Infoln("orchestrator missed an " + l.cfg.ChainName + " event. Restarting block search from last observed claim...")
-		return nil
+		return errors.New("missed an event")
 	}
+
+	l.missedEventsBlockHeight = 0
 
 	if err := l.sendNewEventClaims(ctx, newEvents, maxClaimsMsgPerBulk); err != nil {
 		log.Info("err: ", err)
@@ -384,7 +419,7 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, 
 			}
 		}
 
-		if len(noncesFound) == len(depositEvents) { // all nonces have been found
+		if len(noncesFound) == len(noncesResearched) { // all nonces have been found
 			l.Log().Infoln("all nonces have been found for events - gain of 3 calls eth_logs to the ethereum rpc")
 			return nil
 		}
@@ -403,7 +438,7 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, 
 			}
 		}
 
-		if len(noncesFound) == len(withdrawalEvents) { // all nonces have been found
+		if len(noncesFound) == len(noncesResearched) { // all nonces have been found
 			l.Log().Infoln("all nonces have been found for events - gain of 2 calls eth_logs to the ethereum rpc")
 			return nil
 		}
@@ -422,7 +457,7 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, 
 			}
 		}
 
-		if len(noncesFound) == len(valsetUpdateEvents) { // all nonces have been found
+		if len(noncesFound) == len(noncesResearched) { // all nonces have been found
 			l.Log().Infoln("all nonces have been found for events - gain of 1 call eth_logs to the ethereum rpc")
 			return nil
 		}

@@ -334,7 +334,7 @@ func (s *Orchestrator) startValidatorMode(ctx context.Context) error {
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error { return s.runOracle(ctx, ethereumBlockHeightWhereStart) })
-	pg.Go(func() error { return s.runSkipped(ctx) })
+	// pg.Go(func() error { return s.runSkipped(ctx) })
 	pg.Go(func() error { return s.runSigner(ctx, hyperionIDHash) })
 	pg.Go(func() error { return s.runBatchCreator(ctx) })
 	pg.Go(func() error { return s.runRelayer(ctx) })
@@ -379,22 +379,8 @@ func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
 		retry.Delay(200*time.Millisecond),
 		retry.Attempts(s.maxAttempts),
 		retry.OnRetry(func(n uint, err error) {
-			if strings.Contains(err.Error(), "unavailable on our public API") || strings.Contains(err.Error(), "no contract code at given address") || strings.Contains(err.Error(), "History has been pruned for this block") || strings.Contains(err.Error(), "public API") {
-				usedRpc := s.ethereum.GetRpc().Url
-				if usedRpc != "" {
-					// s.ethereum.PenalizeRpc(usedRpc, 1)
-					s.logger.WithField("rpc", usedRpc).Debug("Penalized RPC for unavailable on our public API")
-				}
-				return
-			}
 			if strings.Contains(err.Error(), "no RPC clients available") {
 				s.logger.Warningf("no RPC clients available, refreshing rpcs... (#%d)", n+1)
-				// rpcs, err := s.global.GetRpcs(s.cfg.ChainId)
-				// if err != nil {
-				// 	s.logger.WithError(err).Warningf("failed to get rpcs")
-				// 	return
-				// }
-				// s.ethereum.SetRpcs(rpcs)
 				return
 			}
 			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)

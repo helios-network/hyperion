@@ -88,6 +88,10 @@ func (l *skipped) Run(ctx context.Context) error {
 			continue
 		}
 
+		if skippedNonce.Nonce == 0 {
+			continue
+		}
+
 		l.HyperionState.SkippedStatus = "getting events for nonce " + strconv.FormatUint(skippedNonce.Nonce, 10)
 
 		events, err := l.Orchestrator.Oracle.getEthEvents(ctx, skippedNonce.StartHeight, skippedNonce.EndHeight, []uint64{skippedNonce.Nonce})

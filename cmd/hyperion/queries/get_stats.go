@@ -12,13 +12,16 @@ func GetStats(ctx context.Context, global *global.Global) (map[string]interface{
 	stats := make(map[string]interface{})
 	for chainId, orchestrator := range orchestrators {
 		stats[fmt.Sprintf("%d", chainId)] = map[string]interface{}{
-			"totalTxs":          orchestrator.HyperionState.TxCount,
-			"batches":           orchestrator.HyperionState.BatchCount,
-			"outBridgedTxCount": orchestrator.HyperionState.OutBridgedTxCount,
-			"inBridgedTxCount":  orchestrator.HyperionState.InBridgedTxCount,
-			"height":            orchestrator.GetHeight(),
-			"targetHeight":      orchestrator.GetTargetHeight(),
-			"hyperionState":     orchestrator.HyperionState,
+			"totalTxs":             orchestrator.HyperionState.TxCount,
+			"batches":              orchestrator.HyperionState.BatchCount,
+			"outBridgedTxCount":    orchestrator.HyperionState.OutBridgedTxCount,
+			"inBridgedTxCount":     orchestrator.HyperionState.InBridgedTxCount,
+			"valsetUpdateCount":    orchestrator.HyperionState.ValsetUpdateCount,
+			"erc20DeploymentCount": orchestrator.HyperionState.ERC20DeploymentCount,
+			"skippedRetriedCount":  orchestrator.HyperionState.SkippedRetriedCount,
+			"height":               orchestrator.GetHeight(),
+			"targetHeight":         orchestrator.GetTargetHeight(),
+			"hyperionState":        orchestrator.HyperionState,
 		}
 	}
 

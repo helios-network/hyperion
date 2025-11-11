@@ -1432,7 +1432,9 @@
                         chain.batches = chainStats.batches || 0;
                         chain.outBridgedTxCount = chainStats.outBridgedTxCount || 0;
                         chain.inBridgedTxCount = chainStats.inBridgedTxCount || 0;
-                        
+                        chain.valsetUpdateCount = chainStats.valsetUpdateCount || 0;
+                        chain.erc20DeploymentCount = chainStats.erc20DeploymentCount || 0;
+                        chain.skippedRetriedCount = chainStats.skippedRetriedCount || 0;
                         // Update states
                         chain.states = [];
                         Object.keys(chainStats.hyperionState ?? {}).forEach(key => {

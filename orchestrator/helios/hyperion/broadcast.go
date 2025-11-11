@@ -78,6 +78,8 @@ type BroadcastClient interface {
 	AddWhitelistedAddressMsg(ctx context.Context, chainId uint64, address string) (sdk.Msg, error)
 
 	PauseOrUnpauseHyperionWithdrawalMsg(ctx context.Context, chainId uint64, pause bool) (sdk.Msg, error)
+
+	MintTokensMsg(ctx context.Context, chainId uint64, tokenAddress string, amount sdkmath.Int, receiverAddress string) (sdk.Msg, error)
 }
 
 type broadcastClient struct {
@@ -1359,4 +1361,17 @@ func (c *broadcastClient) PauseOrUnpauseHyperionWithdrawalMsg(ctx context.Contex
 	} else {
 		return c.UnpauseHyperionWithdrawalMsg(ctx, chainId)
 	}
+}
+
+func (c *broadcastClient) MintTokensMsg(ctx context.Context, chainId uint64, tokenAddress string, amount sdkmath.Int, receiverAddress string) (sdk.Msg, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+	msg := &hyperiontypes.MsgMintToken{
+		ChainId:         chainId,
+		TokenAddress:    gethcommon.HexToAddress(tokenAddress).Hex(),
+		Amount:          amount,
+		ReceiverAddress: gethcommon.HexToAddress(receiverAddress).Hex(),
+	}
+	return msg, nil
 }
