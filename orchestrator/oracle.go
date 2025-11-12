@@ -55,11 +55,6 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 	ticker := time.NewTicker(defaultLoopDur)
 	defer ticker.Stop()
 
-	// Run first iteration immediately
-	// if err := oracle.observeEthEvents(ctx); err != nil {
-	// 	s.logger.WithError(err).Errorln("oracle function returned an error")
-	// }
-
 	for {
 		select {
 		case <-ticker.C:
@@ -79,13 +74,6 @@ func (s *Orchestrator) runOracle(ctx context.Context, lastObservedBlock uint64) 
 			return nil
 		}
 	}
-
-	// return loops.RunLoop(ctx, s.ethereum, defaultLoopDur, func() error {
-	// 	s.HyperionState.OracleStatus = "running"
-	// 	err := oracle.observeEthEvents(ctx)
-	// 	s.HyperionState.OracleStatus = "idle"
-	// 	return err
-	// })
 }
 
 type oracle struct {
