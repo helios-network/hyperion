@@ -559,6 +559,8 @@ func (l *oracle) sendNewEventClaims(ctx context.Context, events []event, maxClai
 				VerifyTxError(ctx, err.Error(), l.Orchestrator)
 				l.Log().WithError(err).Warningln("failed to simulate bulk of claims messages")
 				return err
+			} else {
+				l.Orchestrator.HyperionState.ErrorStatus = "okay"
 			}
 			resp, err := l.global.SyncBroadcastMsgs(ctx, msgs)
 			if err != nil {
