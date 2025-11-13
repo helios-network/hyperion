@@ -77,14 +77,6 @@ func (l *relayer) relay(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	// Sélectionner le meilleur RPC basé sur la réputation
-	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	// if bestRpcURL != "" {
-	// 	l.Log().WithField("selected_rpc", bestRpcURL).Debug("Selected best rated RPC for relay")
-	// 	// Ajouter le meilleur RPC au contexte
-	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	// }
-
 	var pg loops.ParanoidGroup
 
 	if l.logEnabled {
