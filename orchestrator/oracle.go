@@ -246,6 +246,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
 	}
 
+	// TODO delete normaly useless
 	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
 		if err := l.autoResync(ctx); err != nil {
 			return err
@@ -625,25 +626,6 @@ func (l *oracle) prepareSendEthEventClaim(ctx context.Context, ev event) (cosmos
 		panic(errors.Errorf("unknown ev type %T", e))
 	}
 }
-
-// func (l *oracle) sendEthEventClaim(ctx context.Context, ev event) (*cosmostypes.TxResponse, error) {
-// 	switch e := ev.(type) {
-// 	case *deposit:
-// 		ev := hyperionevents.HyperionSendToHeliosEvent(*e)
-// 		return l.helios.SendDepositClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-// 	case *valsetUpdate:
-// 		ev := hyperionevents.HyperionValsetUpdatedEvent(*e)
-// 		return l.helios.SendValsetClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-// 	case *withdrawal:
-// 		ev := hyperionevents.HyperionTransactionBatchExecutedEvent(*e)
-// 		return l.helios.SendWithdrawalClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-// 	case *erc20Deployment:
-// 		ev := hyperionevents.HyperionERC20DeployedEvent(*e)
-// 		return l.helios.SendERC20DeployedClaim(ctx, l.cfg.HyperionId, &ev, l.ethereum.GetLastUsedRpc())
-// 	default:
-// 		panic(errors.Errorf("unknown ev type %T", e))
-// 	}
-// }
 
 type (
 	deposit         hyperionevents.HyperionSendToHeliosEvent
