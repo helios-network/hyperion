@@ -319,13 +319,6 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 			storage.UpdateFeesFile(totalFees.BigInt(), batchAndSig.Batch.TokenContract, cost, txHash.Hex(), latestEthHeight.Number.Uint64(), l.cfg.ChainId, "BATCH")
 			///////
 
-			usedRpc := l.ethereum.GetRpc().Url
-			// Féliciter le RPC utilisé pour ce succès
-			if usedRpc != "" {
-				// l.ethereum.PraiseRpc(usedRpc, 3) // Récompense de 3 points
-				l.Log().WithField("rpc", usedRpc).Debug("Praised RPC for successful transaction")
-			}
-
 			l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent outgoing tx batch to " + l.cfg.ChainName)
 		}
 

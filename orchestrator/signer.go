@@ -199,14 +199,6 @@ func (l *signer) signNewBatch(ctx context.Context, noncesPushed []uint64) (bool,
 		return false, 0, errors.Wrap(err, "failed to broadcast batch confirm message")
 	}
 
-	// err := l.helios.SendBatchConfirmSync(ctx,
-	// 	l.cfg.HyperionId,
-	// 	l.cfg.EthereumAddr,
-	// 	l.hyperionID,
-	// 	l.ethereum.GetPersonalSignFn(),
-	// 	oldestUnsignedBatch,
-	// )
-
 	if err != nil {
 		l.Orchestrator.HyperionState.SignerStatus = "error signing batch " + strconv.Itoa(int(oldestUnsignedBatch.BatchNonce)) + " " + symbol
 		return false, 0, err
