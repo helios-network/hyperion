@@ -309,11 +309,6 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
 				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
-				usedRpc := l.ethereum.GetRpc().Url
-				if usedRpc != "" {
-					// l.ethereum.PenalizeRpc(usedRpc, 2) // Pénalité de 2 points
-					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed transaction")
-				}
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -323,18 +318,11 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error waiting for transaction " + symbol
 				l.Log().WithError(err).Warningln("failed to wait for transaction")
-				usedRpc := l.ethereum.GetRpc().Url
-				// Pénaliser le RPC utilisé pour cet échec
-				if usedRpc != "" {
-					// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
-					l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for transaction not found")
-				}
 				time.Sleep(2 * time.Second)
 				continue
 			}
 			l.Orchestrator.HyperionState.RelayerStatus = "batch sent " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol + " - block number: " + strconv.Itoa(int(blockNumber))
 			l.HyperionState.OutBridgedTxCount += len(batchAndSig.Batch.Transactions)
-			// feesTaken := batchAndSig.Batch.GetFees().BigInt()
 
 			totalFees := sdkmath.NewInt(0)
 			for _, tx := range batchAndSig.Batch.Transactions {
