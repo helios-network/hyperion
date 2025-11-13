@@ -322,6 +322,11 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 		return nil, errors.Wrap(err, "failed to get last valset updated event")
 	}
 
+	if l.ethValset != nil && l.ethValset.Nonce == lastValsetUpdatedEventHeight.Uint64() {
+		// permit to earn some money by not calling the ethereum rpc
+		return l.ethValset, nil
+	}
+
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
