@@ -143,12 +143,6 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 		return nil, err
 	}
 
-	// tokenDecimals, err := l.ethereum.TokenDecimals(ctx, tokenAddress)
-	// if err != nil {
-	// 	l.Log().WithError(err).Warningln("is token address valid?")
-	// 	return nil, err
-	// }
-
 	if _, ok := l.CacheSymbol[tokenAddress]; !ok {
 		tokenSymbol, err := l.ethereum.TokenSymbol(ctx, tokenAddress)
 		if err == nil {
@@ -160,10 +154,6 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 	} else {
 		l.Orchestrator.HyperionState.BatchCreatorStatus = "batching " + l.CacheSymbol[tokenAddress]
 	}
-
-	// if !l.checkMinBatchFee(fee, tokenAddress, tokenDecimals) {
-	// 	return nil, err
-	// }
 
 	if fee.TotalFees.LT(minimumBatchFee) {
 		return nil, errors.New("total fees less than minimum batch fee")
