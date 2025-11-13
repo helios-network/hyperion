@@ -142,11 +142,6 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 	latestEthHeight, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 	if err != nil {
 		l.Log().Info("failed to get latest "+l.cfg.ChainName+" height", err)
-		usedRpc := l.ethereum.GetRpc().Url
-		if usedRpc != "" {
-			// l.ethereum.PenalizeRpc(usedRpc, 1) // Pénalité de 1 point
-			l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for failed to get latest " + l.cfg.ChainName + " height")
-		}
 		return false, err
 	}
 
