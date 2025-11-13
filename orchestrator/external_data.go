@@ -144,10 +144,6 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 		}
 	}
 
-	// TODO: get external data batch from helios (maybe edit batch_creator for build special batch who contains only external data)
-	// TODO: format abi from tx information then call external data on ethereum
-	// TODO: send special claimData to helios
-
 	return nil
 }
 
