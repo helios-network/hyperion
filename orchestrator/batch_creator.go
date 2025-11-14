@@ -34,7 +34,6 @@ func (s *Orchestrator) runBatchCreator(ctx context.Context) (err error) {
 		err := bc.requestTokenBatches(ctx)
 		s.HyperionState.BatchCreatorStatus = "idle"
 		s.HyperionState.BatchCreatorLastExecutionFinishedTimestamp = uint64(time.Now().Unix())
-		// elapsed := time.Since(start)
 		s.HyperionState.BatchCreatorNextExecutionTimestamp = uint64(start.Add(defaultLoopDur).Unix())
 		return err
 	})
@@ -177,36 +176,3 @@ func (l *batchCreator) requestTokenBatch(ctx context.Context, fee *hyperiontypes
 	}
 	return msg, nil
 }
-
-// func (l *batchCreator) getTokenDenom(hyperionId uint64, tokenAddr gethcommon.Address) string {
-// 	l.helios.QueryTokenAddressToDenom(ctx, hyperionId, tokenAddr)
-// 	return hyperiontypes.HyperionDenomString(hyperionId, tokenAddr)
-// }
-
-// func (l *batchCreator) checkMinBatchFee(fee *hyperiontypes.BatchFees, tokenAddress gethcommon.Address, tokenDecimals uint8) bool {
-// 	if l.cfg.MinBatchFeeUSD == 0 {
-// 		return true
-// 	}
-
-// 	tokenPriceUSDFloat, err := l.priceFeed.QueryUSDPrice(tokenAddress)
-// 	if err != nil {
-// 		l.Log().WithError(err).Warningln("failed to query price feed", "token_addr", tokenAddress.String())
-// 		return true
-// 	}
-
-// 	var (
-// 		minFeeUSD     = decimal.NewFromFloat(l.cfg.MinBatchFeeUSD)
-// 		tokenPriceUSD = decimal.NewFromFloat(tokenPriceUSDFloat)
-// 		totalFeeUSD   = decimal.NewFromBigInt(fee.TotalFees.BigInt(), -1*int32(tokenDecimals)).Mul(tokenPriceUSD)
-// 	)
-
-// 	if l.logEnabled {
-// 		l.Log().WithFields(log.Fields{
-// 			"token_addr": fee.Token,
-// 			"total_fee":  totalFeeUSD.String() + "USD",
-// 			"min_fee":    minFeeUSD.String() + "USD",
-// 		}).Debugln("checking total batch fees")
-// 	}
-
-// 	return !totalFeeUSD.LessThan(minFeeUSD)
-// }
