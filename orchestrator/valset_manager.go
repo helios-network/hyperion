@@ -81,11 +81,6 @@ func (l *valsetManager) Process(ctx context.Context) error {
 	doneFn := metrics.ReportFuncTiming(l.svcTags)
 	defer doneFn()
 
-	// bestRpcURL := l.ethereum.SelectBestRatedRpcInRpcPool()
-	// if bestRpcURL != "" {
-	// 	ctx = provider.WithRPCURL(ctx, bestRpcURL)
-	// }
-
 	ethValset, err := l.getLatestEthValset(ctx)
 	if err != nil {
 		return err
