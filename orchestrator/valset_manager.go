@@ -330,11 +330,7 @@ func (l *valsetManager) findLatestValsetOnEth(ctx context.Context) (*hyperiontyp
 	latestEthereumValsetNonce, err := l.ethereum.GetValsetNonce(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "attempting to unmarshall") { // if error is about unmarshalling, remove last used rpc
-			usedRpc := l.ethereum.GetRpc().Url
-			if usedRpc != "" {
-				// l.ethereum.PenalizeRpc(usedRpc, 1)
-				l.Log().WithField("rpc", usedRpc).Debug("Penalized RPC for valset manager")
-			}
+			l.Orchestrator.RotateRpc()
 		}
 		return nil, errors.Wrap(err, "failed to get latest valset nonce")
 	}
