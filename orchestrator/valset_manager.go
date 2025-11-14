@@ -128,12 +128,6 @@ func (l *valsetManager) Process(ctx context.Context) error {
 		l.ethValset = ethValset
 	}
 
-	// write valset to file
-	// json, err := json.Marshal(ethValset)
-	// if err == nil {
-	// 	os.WriteFile("valset.json", json, 0644)
-	// }
-
 	var pg loops.ParanoidGroup
 
 	pg.Go(func() error {
@@ -198,6 +192,8 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 		confirmations         []*hyperiontypes.MsgValsetConfirm
 	)
 
+	// todo maybe add sort to get valset with lowest nonce but not inferior to latestEthValset.Nonce
+
 	for _, set := range latestHeliosValsets {
 		sigs, err := l.GetHelios().AllValsetConfirms(ctx, l.cfg.HyperionId, set.Nonce)
 		if err != nil {
@@ -216,7 +212,7 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 		return nil
 	}
 
-	shouldRelay := l.shouldRelayValset(ctx, latestConfirmedValset)
+	shouldRelay := l.shouldRelayValset(ctx, latestConfirmedValset, latestEthValset)
 
 	if l.logEnabled {
 		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "hls_nonce": latestConfirmedValset.Nonce, "sigs": len(confirmations), "should_relay": shouldRelay, "synched": latestEthValset.Nonce == latestConfirmedValset.Nonce}).Infoln("relayer try relay Valset")
@@ -246,31 +242,11 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 	return nil
 }
 
-func (l *valsetManager) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset) bool {
-
-	var latestEthereumValsetNonce *big.Int
-
-	fn := func() error {
-		nonce, err := l.ethereum.GetValsetNonce(ctx)
-		if err != nil {
-			return err
-		}
-		latestEthereumValsetNonce = nonce
-		return nil
-	}
-	if err := l.retry(ctx, fn); err != nil {
-		l.Log().WithError(err).Warningln("failed to get latest valset nonce from " + l.cfg.ChainName)
-		return false
-	}
-
-	if latestEthereumValsetNonce == nil {
-		l.Log().Warningln("failed to get latest valset nonce from " + l.cfg.ChainName)
-		return false
-	}
+func (l *valsetManager) shouldRelayValset(ctx context.Context, vs *hyperiontypes.Valset, latestEthValset *hyperiontypes.Valset) bool {
 
 	// Check if other validators already updated the valset
-	if vs.Nonce <= latestEthereumValsetNonce.Uint64() {
-		l.Log().WithFields(log.Fields{"eth_nonce": latestEthereumValsetNonce, "helios_nonce": vs.Nonce}).Infoln("validator set already updated on " + l.cfg.ChainName)
+	if vs.Nonce <= latestEthValset.Nonce {
+		l.Log().WithFields(log.Fields{"eth_nonce": latestEthValset.Nonce, "helios_nonce": vs.Nonce}).Infoln("validator set already updated on " + l.cfg.ChainName)
 		l.consideredSynced = true
 		return false
 	}
@@ -289,7 +265,7 @@ func (l *valsetManager) shouldRelayValset(ctx context.Context, vs *hyperiontypes
 			return false
 		}
 		if block != nil && latestBlockHeight > int64(vs.Height)+1000 { // should be sufficient to avoid race condition
-			l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
+			l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthValset.Nonce}).Debugln("new valset update")
 			return true
 		}
 		l.Log().WithError(err).Warningln("unable to get latest block of valset from Helios")
@@ -302,10 +278,8 @@ func (l *valsetManager) shouldRelayValset(ctx context.Context, vs *hyperiontypes
 		l.consideredSynced = true
 		return false
 	}
-
 	l.consideredSynced = false
-
-	l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthereumValsetNonce.Uint64()}).Debugln("new valset update")
+	l.Log().WithFields(log.Fields{"helios_nonce": vs.Nonce, "eth_nonce": latestEthValset.Nonce}).Debugln("new valset update")
 
 	return true
 }
