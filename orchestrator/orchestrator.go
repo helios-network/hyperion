@@ -79,6 +79,7 @@ type HyperionState struct {
 	ValsetUpdateCount    int
 	ERC20DeploymentCount int
 	SkippedRetriedCount  int
+	ExternalDataCount    int
 
 	BatchCreatorStatus  string
 	ExternalDataStatus  string
@@ -173,6 +174,7 @@ func NewOrchestrator(
 			ValsetUpdateCount:    0,
 			ERC20DeploymentCount: 0,
 			SkippedRetriedCount:  0,
+			ExternalDataCount:    0,
 
 			BatchCreatorStatus:  "idle",
 			ExternalDataStatus:  "idle",

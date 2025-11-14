@@ -92,6 +92,9 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 		return err
 	}
 
+	msgsToBroadcast := make([]sdk.Msg, 0)
+	maxBulkSize := 10 // todo: make it configurable
+
 	for _, tx := range txs {
 		l.Log().Info("tx details: ", tx)
 
@@ -137,11 +140,24 @@ func (l *externalData) relayExternalData(ctx context.Context) error {
 			l.Log().Info("failed to simulate external data claim message", err)
 		}
 
-		_, err = l.global.SyncBroadcastMsgs(ctx, []sdk.Msg{msg})
-		if err != nil {
-			l.Log().Info("failed to broadcast external data claim message", err)
-			continue
+		if len(msgsToBroadcast) >= maxBulkSize {
+			_, err = l.global.SyncBroadcastMsgs(ctx, msgsToBroadcast)
+			if err != nil {
+				l.Log().Info("failed to broadcast external data claim messages", err)
+			}
+			l.Orchestrator.HyperionState.ExternalDataCount += len(msgsToBroadcast)
+			msgsToBroadcast = make([]sdk.Msg, 0)
 		}
+
+		msgsToBroadcast = append(msgsToBroadcast, msg)
+	}
+
+	if len(msgsToBroadcast) > 0 {
+		_, err = l.global.SyncBroadcastMsgs(ctx, msgsToBroadcast)
+		if err != nil {
+			l.Log().Info("failed to broadcast external data claim messages", err)
+		}
+		l.Orchestrator.HyperionState.ExternalDataCount += len(msgsToBroadcast)
 	}
 
 	return nil
