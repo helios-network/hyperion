@@ -19,9 +19,12 @@ func GetStats(ctx context.Context, global *global.Global) (map[string]interface{
 			"valsetUpdateCount":    orchestrator.HyperionState.ValsetUpdateCount,
 			"erc20DeploymentCount": orchestrator.HyperionState.ERC20DeploymentCount,
 			"skippedRetriedCount":  orchestrator.HyperionState.SkippedRetriedCount,
+			"externalDataCount":    orchestrator.HyperionState.ExternalDataCount,
 			"height":               orchestrator.GetHeight(),
 			"targetHeight":         orchestrator.GetTargetHeight(),
 			"hyperionState":        orchestrator.HyperionState,
+			"depositPaused":        orchestrator.HyperionState.IsDepositPaused,
+			"withdrawalPaused":     orchestrator.HyperionState.IsWithdrawalPaused,
 		}
 	}
 

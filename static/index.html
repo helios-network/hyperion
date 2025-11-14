@@ -129,10 +129,10 @@
                                                                     color="warning"
                                                                     small
                                                                 >
-                                                                    Paused
+                                                                    Deposit Paused
                                                                 </v-chip>
                                                                 <v-chip
-                                                                    :color="!chain.paused && chain.isSynced ? 'success' : 'error'"
+                                                                    :color="chain.isSynced ? 'success' : 'error'"
                                                                     small
                                                                 >
                                                                     {{ chain.isSynced ? 'Synced' : 'Out of Sync' }}
@@ -175,6 +175,15 @@
                                                                 </v-chip>
                                                                 <v-chip color="primary" small>
                                                                     Skipped Retried Count: {{ chain.skippedRetriedCount }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    External Data Count: {{ chain.externalDataCount }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    Deposit Paused: {{ chain.depositPaused ? 'Yes' : 'No' }}
+                                                                </v-chip>
+                                                                <v-chip color="primary" small>
+                                                                    Withdrawal Paused: {{ chain.withdrawalPaused ? 'Yes' : 'No' }}
                                                                 </v-chip>
                                                             </v-list-item-subtitle>
                                                             <v-list-item-title>States</v-list-item-title>
@@ -1508,6 +1517,9 @@
                                 valsetUpdateCount: chainStats.valsetUpdateCount || 0,
                                 erc20DeploymentCount: chainStats.erc20DeploymentCount || 0,
                                 skippedRetriedCount: chainStats.skippedRetriedCount || 0,
+                                externalDataCount: chainStats.externalDataCount || 0,
+                                depositPaused: chainStats.depositPaused || false,
+                                withdrawalPaused: chainStats.withdrawalPaused || false,
                             });
                         });
 
@@ -1555,6 +1567,9 @@
                         chain.valsetUpdateCount = chainStats.valsetUpdateCount || 0;
                         chain.erc20DeploymentCount = chainStats.erc20DeploymentCount || 0;
                         chain.skippedRetriedCount = chainStats.skippedRetriedCount || 0;
+                        chain.externalDataCount = chainStats.externalDataCount || 0;
+                        chain.depositPaused = chainStats.depositPaused || false;
+                        chain.withdrawalPaused = chainStats.withdrawalPaused || false;
                         // Update states
                         chain.states = [];
                         Object.keys(chainStats.hyperionState ?? {}).forEach(key => {
