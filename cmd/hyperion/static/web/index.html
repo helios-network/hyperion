@@ -191,6 +191,7 @@
                                                                 <v-chip
                                                                     v-for="state in chain.states"
                                                                     :key="state.name"
+                                                                    v-if="state.value !== 'okay'"
                                                                     :color="state.value !== 'idle' ? 'success' : 'error'"
                                                                     small
                                                                 >
