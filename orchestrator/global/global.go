@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"sync"
 	"time"
 
 	"cosmossdk.io/math"
@@ -65,10 +66,12 @@ type Global struct {
 	heliosBroadcastManager    *HeliosBroadcastManager
 
 	LastTryAuthTime time.Time
+
+	mu sync.Mutex
 }
 
 func NewGlobal(cfg *Config) *Global {
-	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelCauseFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now(), LastTryAuthTime: time.Now()}
+	return &Global{cfg: cfg, runners: make(map[uint64]context.CancelCauseFunc, 0), orchestrators: make(map[uint64]*orchestrator.Orchestrator, 0), lastTimeResetHeliosClient: time.Now(), LastTryAuthTime: time.Now(), mu: sync.Mutex{}}
 }
 
 func (g *Global) GetConfig() *Config {
@@ -172,20 +175,15 @@ func (c *HeliosBroadcastManager) processBatch(g *Global, batch []queuedMessage) 
 }
 
 func (g *Global) ResetHeliosClient() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if g.heliosNetwork != nil {
-		// if time.Since(g.lastTimeResetHeliosClient) < 1*time.Minute {
-		// 	fmt.Println("Helios client already reset in the last 1 minute")
-		// 	return
-		// }
+		if time.Since(g.lastTimeResetHeliosClient) < 30*time.Second {
+			fmt.Println("Helios client already reset in the last 30 seconds")
+			return
+		}
 		g.heliosNetwork.Reconnect()
-		// oldHeliosNetwork := *g.heliosNetwork
-		// g.heliosNetwork = nil
-		// oldHeliosNetwork.Close()
-		// _, err := g.InitHeliosNetwork()
-		// if err != nil {
-		// 	fmt.Println("Error resetting helios client:", err)
-		// }
-		// g.lastTimeResetHeliosClient = time.Now()
+		g.lastTimeResetHeliosClient = time.Now()
 	}
 }
 

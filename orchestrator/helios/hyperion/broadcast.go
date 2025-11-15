@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -830,18 +829,6 @@ func (c *broadcastClient) SendValsetClaim(ctx context.Context, hyperionId uint64
 		"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
 	}).Infoln(hyperionId, " - sent MsgValsetUpdatedClaim")
 
-	// // Attendre que l'attestation soit observée avec un timeout de 5 minutes
-	// if err := c.WaitForAttestation(ctx, msg.EventNonce, msg.ClaimHash(), 5*time.Minute); err != nil {
-	// 	return errors.Wrap(err, "waiting for attestation to be observed")
-	// }
-
-	// log.WithFields(log.Fields{
-	// 	"event_nonce":  msg.EventNonce,
-	// 	"event_height": msg.BlockHeight,
-	// 	"tx_hash":      resp.TxResponse.TxHash,
-	// 	"claim_hash":   gethcommon.Bytes2Hex(msg.ClaimHash()),
-	// }).Infoln("Oracle Comfirmed MsgValsetUpdatedClaim")
-
 	return resp.TxResponse, nil
 }
 
@@ -968,39 +955,6 @@ func (c *broadcastClient) SendCancelPendingOutTxs(ctx context.Context, chainId u
 	}).Infoln("Oracle sent MsgCancelAllPendingOutTx")
 
 	return nil
-}
-
-// / Potential use for wait observed state of specifical claim
-func (c *broadcastClient) WaitForAttestation(ctx context.Context, eventNonce uint64, claimHash []byte, timeout time.Duration) error {
-	ticker := time.NewTicker(20 * time.Second)
-	defer ticker.Stop()
-
-	deadline := time.Now().Add(timeout)
-
-	for {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for attestation to be observed (nonce: %d)", eventNonce)
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			// Vérifier le statut de l'attestation
-			att, err := c.ChainClient.GetAttestation(ctx, eventNonce, claimHash)
-			if err != nil {
-				log.WithError(err).Debugf("failed to get attestation status for nonce %d", eventNonce)
-				continue
-			}
-
-			if att.Attestation.Observed {
-				log.WithFields(log.Fields{
-					"event_nonce": eventNonce,
-				}).Infoln("Attestation has been observed")
-				return nil
-			}
-		}
-	}
 }
 
 func (c *broadcastClient) SendDepositClaimMsg(ctx context.Context, hyperionId uint64, deposit *hyperionevents.HyperionSendToHeliosEvent, rpcUsedForObservation string) (sdk.Msg, error) {

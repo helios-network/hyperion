@@ -21,6 +21,7 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -35,7 +36,7 @@ type NetworkConfig struct {
 	Gas string
 }
 
-type NetworkWithoutBroadcast struct {
+type Network struct {
 	chainClient chain.ChainClient
 	cfg         NetworkConfig
 	hyperion.QueryClient
@@ -43,67 +44,10 @@ type NetworkWithoutBroadcast struct {
 	tendermint.Client
 	staking.StakingQueryClient
 	logos.QLogosClient
-}
-
-type Network struct {
-	NetworkWithoutBroadcast
 	hyperion.BroadcastClient
 	gov.BClient
 	slashing.SlashingBroadcastClient
 	logos.BLogosClient
-}
-
-func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (*NetworkWithoutBroadcast, error) {
-	logger := log.WithField("svc", "MAIN PROCESS")
-	clientCfg := cfg.loadClientConfig()
-
-	logger.Infoln("New Client Context with chain", clientCfg.ChainId, " and Validator", cfg.ValidatorAddress)
-
-	clientCtx, err := chain.NewClientContext(clientCfg.ChainId, cfg.ValidatorAddress, k)
-	if err != nil {
-		return nil, err
-	}
-
-	logger.Infoln("Context OK")
-
-	logger.Infoln("NodeURI", clientCfg.TmEndpoint)
-
-	clientCtx.WithNodeURI(clientCfg.TmEndpoint)
-
-	logger.Infoln("Node URI OK")
-
-	tmRPC, err := comethttp.New(clientCfg.TmEndpoint, "/websocket")
-	if err != nil {
-		return nil, err
-	}
-
-	logger.Infoln("RPC OK")
-
-	clientCtx = clientCtx.WithClient(tmRPC)
-
-	logger.Infoln("WithClient OK")
-
-	logger.Infoln(fmt.Sprintf("GasPrice CONFIG %s", cfg.GasPrice))
-	logger.Infoln(fmt.Sprintf("GAS CONFIG %s", cfg.Gas))
-
-	chainClient, err := chain.NewChainClient(clientCtx, clientCfg, clientcommon.OptionGasPrices(cfg.GasPrice), clientcommon.OptionGas(cfg.Gas))
-	if err != nil {
-		return nil, err
-	}
-
-	time.Sleep(1 * time.Second)
-
-	conn := awaitConnection(chainClient, 1*time.Minute)
-
-	return &NetworkWithoutBroadcast{
-		chainClient:        chainClient,
-		cfg:                cfg,
-		QueryClient:        hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
-		QClient:            gov.NewQueryClient(govtypes.NewQueryClient(conn)),
-		Client:             tendermint.NewRPCClient(clientCfg.TmEndpoint),
-		StakingQueryClient: staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
-		QLogosClient:       logos.NewQueryClient(logostypes.NewQueryClient(conn)),
-	}, nil
 }
 
 func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (*Network, error) {
@@ -149,23 +93,24 @@ func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (*Network, er
 	time.Sleep(1 * time.Second)
 
 	conn := awaitConnection(chainClient, 1*time.Minute)
+	if conn == nil {
+		return nil, errors.New("failed to connect to chain")
+	}
 
 	logger.Infoln("CON OK")
 
 	return &Network{
-		NetworkWithoutBroadcast{
-			chainClient:        chainClient,
-			cfg:                cfg,
-			QueryClient:        hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
-			QClient:            gov.NewQueryClient(govtypes.NewQueryClient(conn)),
-			Client:             tendermint.NewRPCClient(clientCfg.TmEndpoint),
-			StakingQueryClient: staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
-			QLogosClient:       logos.NewQueryClient(logostypes.NewQueryClient(conn)),
-		},
-		hyperion.NewBroadcastClient(chainClient, cfg.GasPrice, cfg.Gas),
-		gov.NewBroadcastClient(chainClient),
-		slashing.NewBroadcastClient(chainClient),
-		logos.NewBroadcastClient(chainClient),
+		chainClient:             chainClient,
+		cfg:                     cfg,
+		QueryClient:             hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+		QClient:                 gov.NewQueryClient(govtypes.NewQueryClient(conn)),
+		Client:                  tendermint.NewRPCClient(clientCfg.TmEndpoint), // websocket on rpc node
+		StakingQueryClient:      staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
+		QLogosClient:            logos.NewQueryClient(logostypes.NewQueryClient(conn)),
+		BroadcastClient:         hyperion.NewBroadcastClient(chainClient, cfg.GasPrice, cfg.Gas),
+		BClient:                 gov.NewBroadcastClient(chainClient),
+		SlashingBroadcastClient: slashing.NewBroadcastClient(chainClient),
+		BLogosClient:            logos.NewBroadcastClient(chainClient),
 	}, nil
 }
 
@@ -196,6 +141,7 @@ func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.Clie
 		select {
 		case <-ctx.Done():
 			logger.Fatalln("GRPC service wait timed out")
+			return nil
 		default:
 			grpcConn := client.QueryClient()
 			state := grpcConn.GetState()
