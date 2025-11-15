@@ -10,7 +10,6 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 
-	clientcommon "github.com/Helios-Chain-Labs/sdk-go/client/common"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -32,8 +31,6 @@ type queuedMessage struct {
 }
 
 type BroadcastClient interface {
-	Close()
-	Reconnect()
 	GetTxCost(ctx context.Context, txHash string) (*big.Int, error)
 	SendValsetConfirm(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) error
 	SendValsetConfirmMsg(ctx context.Context, hyperionId uint64, ethFrom gethcommon.Address, hyperionID gethcommon.Hash, signFn keystore.PersonalSignFn, valset *hyperiontypes.Valset) (sdk.Msg, error)
@@ -108,24 +105,12 @@ func NewBroadcastClient(client chain.ChainClient, gasPrice string, gas string) B
 	return broadcastClient
 }
 
-func (c *broadcastClient) Reconnect() {
-	err := c.ChainClient.Reconnect(clientcommon.OptionGasPrices(c.gasPrice), clientcommon.OptionGas(c.gas))
-	if err != nil {
-		log.WithError(err).Errorln("Reconnect failed")
-	}
-}
-
-func (c *broadcastClient) Close() {
-	c.ChainClient.Close()
-	// c.ticker.Stop()
-	// close(c.messageQueue)
-	// // close all channels in the messageQueue
-	// for qMsg := range c.messageQueue {
-	// 	qMsg.errChan <- errors.New("broadcastClient closed")
-	// 	close(qMsg.respChan)
-	// 	close(qMsg.errChan)
-	// }
-}
+// func (c *broadcastClient) Reconnect() {
+// 	err := c.ChainClient.Reconnect(clientcommon.OptionGasPrices(c.gasPrice), clientcommon.OptionGas(c.gas))
+// 	if err != nil {
+// 		log.WithError(err).Errorln("Reconnect failed")
+// 	}
+// }
 
 // func (c *broadcastClient) runBroadcastLoop() {
 // 	c.ticker = time.NewTicker(15 * time.Second)

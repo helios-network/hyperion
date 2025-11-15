@@ -77,6 +77,10 @@ func NewQueryClient(client hyperiontypes.QueryClient) QueryClient {
 	}
 }
 
+func (c queryClient) UpdateQueryClient(client hyperiontypes.QueryClient) {
+	c.QueryClient = client
+}
+
 func (c queryClient) ValsetAt(ctx context.Context, hyperionId uint64, nonce uint64) (*hyperiontypes.Valset, error) {
 	metrics.ReportFuncCall(c.svcTags)
 	doneFn := metrics.ReportFuncTiming(c.svcTags)

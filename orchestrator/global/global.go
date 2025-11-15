@@ -138,18 +138,18 @@ func (c *HeliosBroadcastManager) processBatch(g *Global, batch []queuedMessage) 
 
 	start := time.Now()
 
-	if (*g.heliosNetwork) == nil {
+	if g.heliosNetwork == nil {
 		fmt.Println("processBatch: helios network not initialized")
 		// wait for 1 second and try again
 		time.Sleep(1 * time.Second)
-		if (*g.heliosNetwork) == nil {
+		if g.heliosNetwork == nil {
 			fmt.Println("processBatch: helios network not initialized after 1 second")
 			return
 		}
 	}
 
 	// Broadcast the collected messages
-	resp, err := (*g.heliosNetwork).SyncBroadcastMsg(allMsgs...)
+	resp, err := g.heliosNetwork.SyncBroadcastMsg(allMsgs...)
 
 	// Send responses back to all waiting callers
 	for i := 0; i < len(allRespChans); i++ {
@@ -177,7 +177,7 @@ func (g *Global) ResetHeliosClient() {
 		// 	fmt.Println("Helios client already reset in the last 1 minute")
 		// 	return
 		// }
-		(*g.heliosNetwork).Reconnect()
+		g.heliosNetwork.Reconnect()
 		// oldHeliosNetwork := *g.heliosNetwork
 		// g.heliosNetwork = nil
 		// oldHeliosNetwork.Close()
@@ -317,9 +317,9 @@ func (g *Global) InitHeliosNetwork() (*helios.Network, error) {
 	}
 
 	g.ethKeyFromAddress = ethKeyFromAddress
-	g.heliosNetwork = &heliosNetwork
+	g.heliosNetwork = heliosNetwork
 
-	return &heliosNetwork, nil
+	return heliosNetwork, nil
 }
 
 func (g *Global) GetAnonymousEVMNetwork(chainId uint64, rpc *rpcs.Rpc, options ...committer.EVMCommitterOption) (*ethereum.Network, error) {

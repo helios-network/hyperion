@@ -35,7 +35,9 @@ type NetworkConfig struct {
 	Gas string
 }
 
-type NetworkWithoutBroadcast interface {
+type NetworkWithoutBroadcast struct {
+	chainClient chain.ChainClient
+	cfg         NetworkConfig
 	hyperion.QueryClient
 	gov.QClient
 	tendermint.Client
@@ -43,19 +45,15 @@ type NetworkWithoutBroadcast interface {
 	logos.QLogosClient
 }
 
-type Network interface {
-	hyperion.QueryClient
+type Network struct {
+	NetworkWithoutBroadcast
 	hyperion.BroadcastClient
-	gov.QClient
 	gov.BClient
-	tendermint.Client
-	staking.StakingQueryClient
 	slashing.SlashingBroadcastClient
-	logos.QLogosClient
 	logos.BLogosClient
 }
 
-func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWithoutBroadcast, error) {
+func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (*NetworkWithoutBroadcast, error) {
 	logger := log.WithField("svc", "MAIN PROCESS")
 	clientCfg := cfg.loadClientConfig()
 
@@ -93,34 +91,22 @@ func NewNetworkWithoutBroadcast(k keyring.Keyring, cfg NetworkConfig) (NetworkWi
 		return nil, err
 	}
 
-	logger.Infoln("NewChainClient OK")
-
 	time.Sleep(1 * time.Second)
 
 	conn := awaitConnection(chainClient, 1*time.Minute)
 
-	logger.Infoln("CON OK")
-
-	net := struct {
-		hyperion.QueryClient
-		gov.QClient
-		tendermint.Client
-		staking.StakingQueryClient
-		logos.QLogosClient
-	}{
-		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
-		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
-		tendermint.NewRPCClient(clientCfg.TmEndpoint),
-		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
-		logos.NewQueryClient(logostypes.NewQueryClient(conn)),
-	}
-
-	logger.Infoln("NET LOADED")
-
-	return net, nil
+	return &NetworkWithoutBroadcast{
+		chainClient:        chainClient,
+		cfg:                cfg,
+		QueryClient:        hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+		QClient:            gov.NewQueryClient(govtypes.NewQueryClient(conn)),
+		Client:             tendermint.NewRPCClient(clientCfg.TmEndpoint),
+		StakingQueryClient: staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
+		QLogosClient:       logos.NewQueryClient(logostypes.NewQueryClient(conn)),
+	}, nil
 }
 
-func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (Network, error) {
+func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (*Network, error) {
 	clientCfg := cfg.loadClientConfig()
 	logger := log.WithField("svc", "MAIN PROCESS")
 
@@ -166,31 +152,39 @@ func NewNetworkWithBroadcast(k keyring.Keyring, cfg NetworkConfig) (Network, err
 
 	logger.Infoln("CON OK")
 
-	net := struct {
-		hyperion.QueryClient
-		hyperion.BroadcastClient
-		tendermint.Client
-		gov.QClient
-		gov.BClient
-		staking.StakingQueryClient
-		slashing.SlashingBroadcastClient
-		logos.QLogosClient
-		logos.BLogosClient
-	}{
-		hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+	return &Network{
+		NetworkWithoutBroadcast{
+			chainClient:        chainClient,
+			cfg:                cfg,
+			QueryClient:        hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn)),
+			QClient:            gov.NewQueryClient(govtypes.NewQueryClient(conn)),
+			Client:             tendermint.NewRPCClient(clientCfg.TmEndpoint),
+			StakingQueryClient: staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
+			QLogosClient:       logos.NewQueryClient(logostypes.NewQueryClient(conn)),
+		},
 		hyperion.NewBroadcastClient(chainClient, cfg.GasPrice, cfg.Gas),
-		tendermint.NewRPCClient(clientCfg.TmEndpoint),
-		gov.NewQueryClient(govtypes.NewQueryClient(conn)),
 		gov.NewBroadcastClient(chainClient),
-		staking.NewQueryClient(stakingtypes.NewQueryClient(conn)),
 		slashing.NewBroadcastClient(chainClient),
-		logos.NewQueryClient(logostypes.NewQueryClient(conn)),
 		logos.NewBroadcastClient(chainClient),
+	}, nil
+}
+
+func (n *Network) Reconnect() {
+	err := n.chainClient.Reconnect(
+		clientcommon.OptionGasPrices(n.cfg.GasPrice),
+		clientcommon.OptionGas(n.cfg.Gas),
+	)
+	if err != nil {
+		log.WithError(err).Errorln("Reconnect failed")
+		return
 	}
 
-	logger.Infoln("NET LOADED")
+	conn := n.chainClient.QueryClient()
 
-	return net, nil
+	n.QueryClient = hyperion.NewQueryClient(hyperiontypes.NewQueryClient(conn))
+	n.QClient = gov.NewQueryClient(govtypes.NewQueryClient(conn))
+	n.StakingQueryClient = staking.NewQueryClient(stakingtypes.NewQueryClient(conn))
+	n.QLogosClient = logos.NewQueryClient(logostypes.NewQueryClient(conn))
 }
 
 func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.ClientConn {
@@ -198,13 +192,12 @@ func awaitConnection(client chain.ChainClient, timeout time.Duration) *grpc.Clie
 	ctx, cancelWait := context.WithTimeout(context.Background(), timeout)
 	defer cancelWait()
 
-	grpcConn := client.QueryClient()
-
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Fatalln("GRPC service wait timed out")
 		default:
+			grpcConn := client.QueryClient()
 			state := grpcConn.GetState()
 			if state != connectivity.Ready {
 				logger.WithField("state", state.String()).Warningln("state of GRPC connection not ready")
