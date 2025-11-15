@@ -1343,7 +1343,7 @@
                                     origin_chain_id: originChainId,
                                 }
                         });
-                            this.totalItems = data.data.total;
+                            this.totalItems = data.data.total < data.data.tokens.length ? data.data.tokens.length : data.data.total;
                         }
                     } catch (error) {
                         console.error('Error fetching tokens:', error);
