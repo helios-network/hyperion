@@ -116,7 +116,7 @@ func (s *hyperionContract) SendEthValsetUpdate(
 		return nil, big.NewInt(0), errors.New("Transaction with same valset input data is already present in mempool")
 	}
 
-	txHash, cost, err := s.SendTx(ctx, s.hyperionAddress, txData)
+	txHash, cost, err := s.SendTxSync(ctx, s.hyperionAddress, txData)
 	if err != nil {
 		metrics.ReportFuncError(s.svcTags)
 		log.WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to sign and submit (Hyperion updateValset) to EVM")

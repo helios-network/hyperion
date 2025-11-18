@@ -225,7 +225,10 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 
 	fmt.Println("Sending valset update to Ethereum", latestEthValset, latestConfirmedValset, confirmations)
 
-	txHash, cost, err := l.ethereum.SendEthValsetUpdate(ctx, latestEthValset, latestConfirmedValset, confirmations)
+	l.Orchestrator.HyperionState.ValsetManagerStatus = "sending valset update to " + l.cfg.ChainName
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	txHash, cost, err := l.ethereum.SendEthValsetUpdate(ctxWithTimeout, latestEthValset, latestConfirmedValset, confirmations)
 	if err != nil {
 
 		if strings.Contains(err.Error(), "insuffficient funds for gas") {
@@ -235,6 +238,20 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 		return err
 	}
 
+	ctxWithTimeout2, cancel2 := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel2()
+	l.Orchestrator.HyperionState.ValsetManagerStatus = "waiting for transaction to be mined"
+	_, _, err = l.ethereum.WaitForTransaction(ctxWithTimeout2, *txHash)
+	if err != nil {
+		l.Orchestrator.HyperionState.ErrorStatus = "error waiting for transaction (Hyperion updateValset)"
+		l.Orchestrator.RotateRpc()
+		l.Log().WithError(err).WithField("tx_hash", txHash.Hex()).Errorln("Failed to wait for transaction (Hyperion updateValset)")
+		return err
+	}
+	if l.Orchestrator.HyperionState.ErrorStatus == "error waiting for transaction (Hyperion updateValset)" {
+		l.Orchestrator.HyperionState.ErrorStatus = "okay"
+	}
+	l.Orchestrator.HyperionState.ValsetManagerStatus = "valset update sent to " + l.cfg.ChainName
 	storage.UpdateFeesFile(latestEthValset.RewardAmount.BigInt(), latestEthValset.RewardToken, cost, txHash.Hex(), latestEthValset.Height, l.cfg.ChainId, "VALSET")
 
 	l.Log().WithField("tx_hash", txHash.Hex()).Infoln("sent validator set update to Ethereum")

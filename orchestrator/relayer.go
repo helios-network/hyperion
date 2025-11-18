@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -261,6 +262,7 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				continue
 			}
 			batchAndSig := batchAndSigs[0]
+
 			sigs, err := l.GetHelios().TransactionBatchSignatures(ctx, l.cfg.HyperionId, batchAndSig.Batch.BatchNonce, gethcommon.HexToAddress(batchAndSig.Batch.TokenContract))
 			if err != nil {
 				l.Log().WithError(err).Warningln("failed to get transaction batch signatures")
@@ -283,28 +285,38 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 			}
 
 			l.Orchestrator.HyperionState.RelayerStatus = "sending batch " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol
+			fmt.Println("sending batch ", batchAndSig.Batch.BatchNonce, " - ", symbol)
 			txData, err := l.ethereum.PrepareTransactionBatch(ctx, latestEthValset, batchAndSig.Batch, batchAndSig.Sigs)
 			if err != nil {
+				fmt.Println("error preparing batch ", err)
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error preparing batch " + symbol
 				l.Log().WithError(err).Warningln("failed to prepare outgoing tx batch")
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			txHash, cost, err := l.ethereum.SendPreparedTx(ctx, txData)
+			ctxWithTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			txHash, cost, err := l.ethereum.SendPreparedTx(ctxWithTimeout, txData)
+			fmt.Println("txHash: ", txHash.Hex())
 			if err != nil {
+				fmt.Println("error sending batch ", err)
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
 				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
 				time.Sleep(2 * time.Second)
 				continue
 			}
+			l.Orchestrator.HyperionState.RelayerStatus = "waiting batch " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol + " for transaction to be mined"
 			time.Sleep(5 * time.Second) // wait for transaction to in pool on multiple nodes
-			_, blockNumber, err := l.ethereum.WaitForTransaction(ctx, *txHash)
+			ctxWithTimeout2, cancel2 := context.WithTimeout(ctx, 5*time.Minute)
+			defer cancel2()
+			_, blockNumber, err := l.ethereum.WaitForTransaction(ctxWithTimeout2, *txHash)
 			if err != nil {
 				stopGrp[batchAndSig.Batch.TokenContract] = true
 				l.Orchestrator.HyperionState.RelayerStatus = "error waiting for transaction " + symbol
 				l.Log().WithError(err).Warningln("failed to wait for transaction")
+				l.Orchestrator.RotateRpc()
 				time.Sleep(2 * time.Second)
 				continue
 			}
