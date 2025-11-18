@@ -106,6 +106,13 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("oracle_eth_default_blocks_to_search found in chain settings, using value", defaultBlocksToSearch)
 	}
 
+	if defaultBlocksToSearch < 10 {
+		l.Orchestrator.HyperionState.ErrorStatus = "oracle_eth_default_blocks_to_search is less than 10, please increase the value"
+		return errors.New("oracle_eth_default_blocks_to_search is less than 10, please increase the value")
+	} else if defaultBlocksToSearch >= 10 && l.Orchestrator.HyperionState.ErrorStatus == "oracle_eth_default_blocks_to_search is less than 10, please increase the value" {
+		l.Orchestrator.HyperionState.ErrorStatus = "okay"
+	}
+
 	ethBlockConfirmationDelay, ok := settings["oracle_block_confirmation_delay"].(float64)
 	if !ok {
 		l.Log().Infoln("oracle_block_confirmation_delay not found in chain settings, using default value 4")
@@ -241,6 +248,21 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			targetHeightForSync = l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
 		}
 		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk)); err != nil {
+
+			if strings.Contains(err.Error(), "limit exceeded") { // if limit exceeded, divide the defaultBlocksToSearch by 2 and try again after delay
+				// divise by 2 the defaultBlocksToSearch in storage
+				settings, err := storage.GetChainSettings(l.cfg.ChainId)
+				if err != nil {
+					return errors.Wrap(err, "failed to get chain settings")
+				}
+				settings["oracle_eth_default_blocks_to_search"] = float64(defaultBlocksToSearch / 2)
+				if err := storage.SetChainSettings(l.cfg.ChainId, settings); err != nil {
+					return errors.Wrap(err, "failed to set chain settings")
+				}
+				l.Log().Infoln("defaultBlocksToSearch divided by 2, new value: ", defaultBlocksToSearch)
+				return nil
+			}
+
 			return err
 		}
 		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
@@ -396,6 +418,9 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, 
 
 		depositEvents, err := l.ethereum.GetSendToHeliosEvents(startBlock, endBlock)
 		if err != nil {
+			if strings.Contains(err.Error(), "limit exceeded") {
+				return errors.Wrap(err, "failed to get SendToHelios events - limit exceeded")
+			}
 			return errors.Wrap(err, "failed to get SendToHelios events")
 		}
 
