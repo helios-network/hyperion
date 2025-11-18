@@ -125,13 +125,6 @@
                                                                     {{ chain.registered ? 'Registered' : 'Unregistered' }}
                                                                 </v-chip>
                                                                 <v-chip
-                                                                    v-if="chain.paused"
-                                                                    color="warning"
-                                                                    small
-                                                                >
-                                                                    Deposit Paused
-                                                                </v-chip>
-                                                                <v-chip
                                                                     :color="chain.isSynced ? 'success' : 'error'"
                                                                     small
                                                                 >
