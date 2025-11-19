@@ -235,7 +235,11 @@ func (l *valsetManager) relayValset(ctx context.Context, latestEthValset *hyperi
 			l.Orchestrator.HyperionState.ValsetManagerStatus = "insufficient funds for gas"
 			return err
 		}
+		l.Orchestrator.HyperionState.ErrorStatus = "error sending valset update"
 		return err
+	}
+	if l.Orchestrator.HyperionState.ErrorStatus == "error sending valset update" {
+		l.Orchestrator.HyperionState.ErrorStatus = "okay"
 	}
 
 	ctxWithTimeout2, cancel2 := context.WithTimeout(ctx, 5*time.Minute)
