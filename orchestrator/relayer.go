@@ -298,7 +298,6 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 			ctxWithTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 			txHash, cost, err := l.ethereum.SendPreparedTx(ctxWithTimeout, txData)
-			fmt.Println("txHash: ", txHash.Hex())
 			if err != nil {
 				fmt.Println("error sending batch ", err)
 				stopGrp[batchAndSig.Batch.TokenContract] = true
@@ -307,6 +306,7 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				time.Sleep(2 * time.Second)
 				continue
 			}
+			fmt.Println("txHash: ", txHash.Hex())
 			l.Orchestrator.HyperionState.RelayerStatus = "waiting batch " + strconv.Itoa(int(batchAndSig.Batch.BatchNonce)) + " - " + symbol + " for transaction to be mined"
 			time.Sleep(5 * time.Second) // wait for transaction to in pool on multiple nodes
 			ctxWithTimeout2, cancel2 := context.WithTimeout(ctx, 5*time.Minute)
