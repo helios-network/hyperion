@@ -53,6 +53,8 @@ type QueryClient interface {
 	QueryGetAllPendingSendToChain(ctx context.Context, chainId uint64) ([]*hyperiontypes.OutgoingTransferTx, []*hyperiontypes.OutgoingTransferTx, error)
 
 	QueryGetAllSkippedTxs(ctx context.Context, chainId uint64) ([]*hyperiontypes.SkippedNonceFullInfo, error)
+
+	GetValidatorHyperionData(ctx context.Context, ethAddr gethcommon.Address) (*hyperiontypes.OrchestratorData, error)
 }
 
 type cacheEntry struct {
@@ -684,4 +686,27 @@ func (c queryClient) QueryGetAllSkippedTxs(ctx context.Context, chainId uint64) 
 	}
 
 	return resp.SkippedNonces, nil
+}
+
+func (c queryClient) GetValidatorHyperionData(ctx context.Context, ethAddr gethcommon.Address) (*hyperiontypes.OrchestratorData, error) {
+	metrics.ReportFuncCall(c.svcTags)
+	doneFn := metrics.ReportFuncTiming(c.svcTags)
+	defer doneFn()
+
+	req := &hyperiontypes.QueryGetOrchestratorDataRequest{
+		OrchestratorAddress: ethAddr.Hex(),
+	}
+
+	resp, err := c.QueryClient.QueryGetOrchestratorData(ctx, req)
+	if err != nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, errors.Wrap(err, "failed to query QueryGetOrchestratorData from client")
+	}
+
+	if resp == nil {
+		metrics.ReportFuncError(c.svcTags)
+		return nil, ErrNotFound
+	}
+
+	return resp.OrchestratorData, nil
 }
