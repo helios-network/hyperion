@@ -25,6 +25,7 @@ func GetStats(ctx context.Context, global *global.Global) (map[string]interface{
 			"hyperionState":        orchestrator.HyperionState,
 			"depositPaused":        orchestrator.HyperionState.IsDepositPaused,
 			"withdrawalPaused":     orchestrator.HyperionState.IsWithdrawalPaused,
+			"gasPrice":             orchestrator.HyperionState.GasPrice,
 		}
 	}
 

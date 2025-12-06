@@ -6,9 +6,9 @@ import (
 	"slices"
 
 	sdkmath "cosmossdk.io/math"
-	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries/utils"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/utils"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 

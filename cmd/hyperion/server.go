@@ -334,6 +334,19 @@ func handleQueryGet(w http.ResponseWriter, r *http.Request) {
 		}
 		sendSuccess(w, validator, nil)
 		return
+	case "get-network-gas-price":
+		chainId, err := strconv.ParseUint(query.Get("chain_id"), 10, 64)
+		if err != nil {
+			sendError(w, "Invalid chain_id", http.StatusBadRequest)
+			return
+		}
+		gasPrice, err := queries.GetNetworkGasPrice(r.Context(), global, chainId)
+		if err != nil {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendSuccess(w, gasPrice, nil)
+		return
 	case "get-stats":
 		stats, err := queries.GetStats(r.Context(), global)
 		if err != nil {

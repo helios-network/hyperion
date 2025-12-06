@@ -71,6 +71,7 @@ type HyperionState struct {
 	LastEventNonce         uint64
 	LastClaimBlockHeight   uint64
 	LastClaimEventNonce    uint64
+	GasPrice               string
 
 	BatchCount           int
 	TxCount              int
@@ -167,6 +168,7 @@ func NewOrchestrator(
 			LastEventNonce:         0,
 			LastClaimBlockHeight:   0,
 			LastClaimEventNonce:    0,
+			GasPrice:               "0.0",
 
 			BatchCount:           0,
 			OutBridgedTxCount:    0,

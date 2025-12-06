@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/utils"
 	"github.com/pkg/errors"
 )
 
@@ -68,6 +69,13 @@ func (l *updater) Update(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "unable to update native balance")
 	}
+
+	l.HyperionState.UpdaterStatus = "updating gas price"
+	gasPrice, err := l.ethereum.GetGasPrice(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to get gas price")
+	}
+	l.HyperionState.GasPrice = utils.FormatBigStringToFloat64(gasPrice.String(), 18)
 	l.HyperionState.UpdaterStatus = "idle"
 
 	l.logger.Info("Updater updated")

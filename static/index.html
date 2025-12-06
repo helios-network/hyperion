@@ -137,6 +137,9 @@
                                                                 >
                                                                     Native Balance: {{ stats[chain.chainId]?.hyperionState?.NativeBalance }}
                                                                 </v-chip>
+                                                                <v-chip v-if="chain.gasPrice !== '0'" color="primary" small>
+                                                                    Gas Price: {{ chain.gasPrice }}
+                                                                </v-chip>
                                                             </v-list-item-subtitle>
                                                         </v-list-item-content>
                                                     </v-list-item>
@@ -1513,6 +1516,7 @@
                                 externalDataCount: chainStats.externalDataCount || 0,
                                 depositPaused: chainStats.depositPaused || false,
                                 withdrawalPaused: chainStats.withdrawalPaused || false,
+                                gasPrice: chainStats.gasPrice || '0',
                             });
                         });
 
@@ -1563,6 +1567,7 @@
                         chain.externalDataCount = chainStats.externalDataCount || 0;
                         chain.depositPaused = chainStats.depositPaused || false;
                         chain.withdrawalPaused = chainStats.withdrawalPaused || false;
+                        chain.gasPrice = chainStats.gasPrice || '0';
                         // Update states
                         chain.states = [];
                         Object.keys(chainStats.hyperionState ?? {}).forEach(key => {

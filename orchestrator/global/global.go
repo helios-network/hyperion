@@ -431,6 +431,28 @@ func (g *Global) GetGasPrice(chainId uint64) string {
 	return gasPrice.String()
 }
 
+func (g *Global) GetGasPriceBigInt(chainId uint64) *big.Int {
+	rpcs, _, err := storage.GetRpcsFromStorge(chainId)
+	if err != nil {
+		return nil
+	}
+
+	if len(rpcs) == 0 {
+		return nil
+	}
+
+	ethNetwork, err := g.GetAnonymousEVMNetwork(chainId, rpcs[0])
+	if err != nil {
+		return nil
+	}
+
+	gasPrice, err := (*ethNetwork).GetGasPrice(context.Background())
+	if err != nil {
+		return nil
+	}
+	return gasPrice
+}
+
 func (g *Global) TestChainListRpcsAndSaveForChain(chainId uint64) ([]*rpcs.Rpc, error) {
 	rpcChainListFeed := rpcs.NewRpcChainListFeed()
 	rpcsFromChainListStrings, err := rpcChainListFeed.QueryRpcs(chainId)

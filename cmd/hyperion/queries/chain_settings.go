@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Helios-Chain-Labs/hyperion/cmd/hyperion/queries/utils"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/global"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/utils"
 )
 
 func UpdateChainSettings(ctx context.Context, global *global.Global, chainId uint64, settings map[string]interface{}) error {
