@@ -75,7 +75,7 @@ func (l *updater) Update(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "unable to get gas price")
 	}
-	l.HyperionState.GasPrice = utils.FormatBigStringToFloat64(gasPrice.String(), 18)
+	l.HyperionState.GasPrice = utils.FormatBigStringToFloat64(gasPrice.String(), 9) + " gwei"
 	l.HyperionState.UpdaterStatus = "idle"
 
 	l.logger.Info("Updater updated")
