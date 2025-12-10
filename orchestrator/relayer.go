@@ -10,6 +10,7 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/util"
@@ -304,6 +305,10 @@ func (l *relayer) relayBatchsOptimised(ctx context.Context, latestEthValset *hyp
 				l.Orchestrator.HyperionState.RelayerStatus = "error sending batch " + symbol
 				l.Log().WithError(err).Warningln("failed to send outgoing tx batch")
 				time.Sleep(2 * time.Second)
+				if strings.Contains(err.Error(), "invalid nonce") {
+					l.Orchestrator.ResetEthereum()
+					return false, errors.Wrap(err, "invalid nonce")
+				}
 				continue
 			}
 			fmt.Println("txHash: ", txHash.Hex())

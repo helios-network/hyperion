@@ -433,3 +433,18 @@ func (s *Orchestrator) ResetHeliosClient() {
 	fmt.Println("ResetHeliosClient called")
 	s.global.ResetHeliosClient()
 }
+
+func (s *Orchestrator) ResetEthereum() {
+	targetNetworks, err := s.global.InitTargetNetworks(s.cfg.ChainParams)
+	if err != nil {
+		s.logger.Error("Error resetting ethereum", "error", err)
+		return
+	}
+	if len(targetNetworks) == 0 {
+		s.logger.Error("No target networks found for chain", "chain", s.cfg.ChainName)
+		return
+	}
+	s.logger.Info("Reset ethereum", "chain", s.cfg.ChainName, "new ethereum", (*targetNetworks[0]).GetRpc().Url)
+	s.ethereums = targetNetworks
+	s.ethereum = *targetNetworks[0]
+}
