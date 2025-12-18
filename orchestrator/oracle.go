@@ -217,6 +217,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
+	l.HyperionState.OracleStatus = "getting latest ethereum height"
 	latestHeight, err := l.getLatestEthHeight(ctx)
 	if err != nil {
 		l.Log().WithError(err).Errorln("failed to get latest " + l.cfg.ChainName + " height")
