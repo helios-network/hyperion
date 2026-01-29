@@ -21,20 +21,21 @@ import (
 )
 
 const (
-	// Minimum number of confirmations for an Ethereum block to be considered valid
-	// ethBlockConfirmationDelay uint64 = 4
+// Minimum number of confirmations for an Ethereum block to be considered valid
+// ethBlockConfirmationDelay uint64 = 4
 
-	// Maximum block range for Ethereum event query. If the orchestrator has been offline for a long time,
-	// the oracle loop can potentially run longer than defaultLoopDur due to a surge of events. This usually happens
-	// when there are more than ~50 events to claim in a single run.
-	// defaultBlocksToSearch uint64 = 2000
+// Maximum block range for Ethereum event query. If the orchestrator has been offline for a long time,
+// the oracle loop can potentially run longer than defaultLoopDur due to a surge of events. This usually happens
+// when there are more than ~50 events to claim in a single run.
+// defaultBlocksToSearch uint64 = 2000
 
-	// Auto re-sync to catch up the validator's last observed event nonce. Reasons why event nonce fall behind:
-	// 1. It takes some time for events to be indexed on Ethereum. So if hyperion queried events immediately as block produced, there is a chance the event is missed.
-	//  We need to re-scan this block to ensure events are not missed due to indexing delay.
-	// 2. if validator was in UnBonding state, the claims broadcasted in last iteration are failed.
-	// 3. if infura call failed while filtering events, the hyperion missed to broadcast claim events occured in last iteration.
-	resyncInterval = 24 * time.Hour
+// Auto re-sync to catch up the validator's last observed event nonce. Reasons why event nonce fall behind:
+//  1. It takes some time for events to be indexed on Ethereum. So if hyperion queried events immediately as block produced, there is a chance the event is missed.
+//     We need to re-scan this block to ensure events are not missed due to indexing delay.
+//  2. if validator was in UnBonding state, the claims broadcasted in last iteration are failed.
+//  3. if infura call failed while filtering events, the hyperion missed to broadcast claim events occured in last iteration.
+//
+// resyncInterval = 24 * time.Hour
 )
 
 // runOracle is responsible for making sure that Ethereum events are retrieved from the Ethereum blockchain
@@ -270,11 +271,11 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	}
 
 	// TODO delete normaly useless
-	if time.Since(l.lastResyncWithHelios) >= resyncInterval {
-		if err := l.autoResync(ctx); err != nil {
-			return err
-		}
-	}
+	// if time.Since(l.lastResyncWithHelios) >= resyncInterval {
+	// 	if err := l.autoResync(ctx); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }
