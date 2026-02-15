@@ -338,6 +338,15 @@
                                     <v-col cols="12">
                                         <v-btn
                                             color="info"
+                                            @click="openProposeUpdateAvgCounterpartyBlockTimeDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Propose Update Avg Block Time
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
                                             @click="openUpdateChainLogoDialog(selectedChainId); showOthersModal = false;"
                                             block
                                         >
@@ -707,6 +716,51 @@
                             <v-spacer></v-spacer>
                             <v-btn color="error" text @click="showProposeAddWhitelistedAddressDialog = false">Cancel</v-btn>
                             <v-btn color="primary" @click="proposeAddWhitelistedAddress" :loading="isProposingAddWhitelistedAddress">
+                                Propose
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Propose Update Average Counterparty Block Time Dialog -->
+                <v-dialog v-model="showProposeUpdateAvgCounterpartyBlockTimeDialog" max-width="600px">
+                    <v-card>
+                        <v-card-title>Propose Update Average Block Time</v-card-title>
+                        <v-card-text>
+                            <v-form ref="proposeUpdateAvgCounterpartyBlockTimeForm">
+                                <v-text-field
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.title"
+                                    label="Title"
+                                    required
+                                    :rules="[v => !!v || 'Title is required']"
+                                ></v-text-field>
+                                <v-textarea
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.description"
+                                    label="Description"
+                                    required
+                                    :rules="[v => !!v || 'Description is required']"
+                                ></v-textarea>
+                                <v-text-field
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.chain_id"
+                                    label="Chain ID"
+                                    type="number"
+                                    disabled
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.average_counterparty_block_time"
+                                    label="Average Counterparty Block Time (ms)"
+                                    type="number"
+                                    required
+                                    :rules="[v => !!v || 'Average block time is required', v => v > 0 || 'Must be greater than 0']"
+                                    hint="Current value is pre-filled from chain parameters"
+                                    persistent-hint
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showProposeUpdateAvgCounterpartyBlockTimeDialog = false">Cancel</v-btn>
+                            <v-btn color="primary" @click="proposeUpdateAvgCounterpartyBlockTime" :loading="isProposingUpdateAvgCounterpartyBlockTime">
                                 Propose
                             </v-btn>
                         </v-card-actions>
@@ -1239,6 +1293,14 @@
                     description: '',
                     chain_id: null,
                     address: '',
+                },
+                showProposeUpdateAvgCounterpartyBlockTimeDialog: false,
+                isProposingUpdateAvgCounterpartyBlockTime: false,
+                proposeUpdateAvgCounterpartyBlockTimeForm: {
+                    title: '',
+                    description: '',
+                    chain_id: null,
+                    average_counterparty_block_time: '',
                 },
                 showUpdateChainLogoDialog: false,
                 showAddWhitelistedAddressDialog: false,
@@ -2264,6 +2326,48 @@
                         this.showNotification(`Failed to propose add whitelisted address: ${error.message}`, 'error');
                     } finally {
                         this.isProposingAddWhitelistedAddress = false;
+                    }
+                },
+                openProposeUpdateAvgCounterpartyBlockTimeDialog(chainId) {
+                    const chain = this.chains.find(c => c.chainId === chainId);
+                    this.proposeUpdateAvgCounterpartyBlockTimeForm = {
+                        title: '',
+                        description: '',
+                        chain_id: chainId,
+                        average_counterparty_block_time: chain ? chain.averageCounterpartyBlockTime : '',
+                    };
+                    this.showProposeUpdateAvgCounterpartyBlockTimeDialog = true;
+                },
+                async proposeUpdateAvgCounterpartyBlockTime() {
+                    if (!this.$refs.proposeUpdateAvgCounterpartyBlockTimeForm.validate()) {
+                        return;
+                    }
+
+                    this.isProposingUpdateAvgCounterpartyBlockTime = true;
+                    try {
+                        const response = await fetch('/api/query?type=propose-update-average-counterparty-block-time', {
+                            method: 'POST',
+                            headers: this.getAuthHeaders(),
+                            body: JSON.stringify({
+                                title: this.proposeUpdateAvgCounterpartyBlockTimeForm.title,
+                                description: this.proposeUpdateAvgCounterpartyBlockTimeForm.description,
+                                chain_id: Number(this.proposeUpdateAvgCounterpartyBlockTimeForm.chain_id),
+                                average_counterparty_block_time: Number(this.proposeUpdateAvgCounterpartyBlockTimeForm.average_counterparty_block_time),
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to propose update average counterparty block time');
+                        }
+
+                        this.showProposeUpdateAvgCounterpartyBlockTimeDialog = false;
+                        this.showNotification('Average counterparty block time update proposed successfully');
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error proposing update average counterparty block time:', error);
+                        this.showNotification(`Failed to propose update average counterparty block time: ${error.message}`, 'error');
+                    } finally {
+                        this.isProposingUpdateAvgCounterpartyBlockTime = false;
                     }
                 },
                 openUpdateChainLogoDialog(chainId) {

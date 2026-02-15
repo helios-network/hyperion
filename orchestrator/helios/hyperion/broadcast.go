@@ -20,6 +20,7 @@ import (
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/hyperion"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/keystore"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/utils"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 )
 
@@ -849,14 +850,16 @@ func (c *broadcastClient) SendERC20DeployedClaim(_ context.Context, hyperionId u
 	// was deployed on the source blockchain and will be linked
 	// as ERC20 to cosmosDenom in hyperion Module on HyperionId
 	// ----------
+	// Sanitize UTF-8 strings from Ethereum events - Ethereum allows arbitrary bytes
+	// in strings which may contain invalid UTF-8, but protobuf requires valid UTF-8.
 	msg := &hyperiontypes.MsgERC20DeployedClaim{
 		HyperionId:    hyperionId,
 		EventNonce:    erc20.EventNonce.Uint64(),
 		BlockHeight:   erc20.Raw.BlockNumber,
-		CosmosDenom:   erc20.HeliosDenom,
+		CosmosDenom:   utils.SanitizeUTF8(erc20.HeliosDenom),
 		TokenContract: erc20.TokenContract.Hex(),
-		Name:          erc20.Name,
-		Symbol:        erc20.Symbol,
+		Name:          utils.SanitizeUTF8(erc20.Name),
+		Symbol:        utils.SanitizeUTF8(erc20.Symbol),
 		Decimals:      uint64(erc20.Decimals),
 		Orchestrator:  c.FromAddress().String(),
 		RpcUsed:       rpcUsedForObservation,
@@ -1108,14 +1111,16 @@ func (c *broadcastClient) SendERC20DeployedClaimMsg(_ context.Context, hyperionI
 	// was deployed on the source blockchain and will be linked
 	// as ERC20 to cosmosDenom in hyperion Module on HyperionId
 	// ----------
+	// Sanitize UTF-8 strings from Ethereum events - Ethereum allows arbitrary bytes
+	// in strings which may contain invalid UTF-8, but protobuf requires valid UTF-8.
 	msg := &hyperiontypes.MsgERC20DeployedClaim{
 		HyperionId:    hyperionId,
 		EventNonce:    erc20.EventNonce.Uint64(),
 		BlockHeight:   erc20.Raw.BlockNumber,
-		CosmosDenom:   erc20.HeliosDenom,
+		CosmosDenom:   utils.SanitizeUTF8(erc20.HeliosDenom),
 		TokenContract: erc20.TokenContract.Hex(),
-		Name:          erc20.Name,
-		Symbol:        erc20.Symbol,
+		Name:          utils.SanitizeUTF8(erc20.Name),
+		Symbol:        utils.SanitizeUTF8(erc20.Symbol),
 		Decimals:      uint64(erc20.Decimals),
 		Orchestrator:  c.FromAddress().String(),
 		RpcUsed:       rpcUsedForObservation,

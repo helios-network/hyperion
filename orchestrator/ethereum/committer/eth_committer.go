@@ -224,6 +224,14 @@ func (e *ethCommitter) SendTxWith(
 			txHash = signedTx.Hash()
 			cost = signedTx.Cost()
 
+			// Validate total transaction cost (gasPrice * gasLimit) to prevent exceeding node limits
+			// Polygon and some other networks have a default tx fee cap of 1 ether
+			oneEther := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil) // 1 ether = 10^18 wei
+			if cost.Cmp(oneEther) > 0 {
+				costInEther := new(big.Float).Quo(new(big.Float).SetInt(cost), new(big.Float).SetInt(oneEther))
+				return errors.Errorf("tx fee (%s ether) exceeds the configured cap (1.00 ether). Gas price: %s, Gas limit: %d. Consider reducing gas limit or gas price.", costInEther.Text('f', 2), opts.GasPrice.String(), opts.GasLimit)
+			}
+
 			var txHashRet common.Hash
 			if sync {
 				txHashRet, err = e.evmProvider.SendTransactionWithRetSync(opts.Context, signedTx)

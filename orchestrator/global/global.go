@@ -705,6 +705,26 @@ func (g *Global) ProposeMsgAddOneWhitelistedAddress(title string, description st
 	return proposalId, nil
 }
 
+func (g *Global) ProposeUpdateAverageCounterpartyBlockTime(title string, description string, chainId uint64, averageCounterpartyBlockTime uint64) (uint64, error) {
+	heliosNetwork := g.GetHeliosNetwork()
+
+	if heliosNetwork == nil {
+		return 0, fmt.Errorf("helios network not initialized")
+	}
+
+	contentI := map[string]interface{}{
+		"@type":                           "/helios.hyperion.v1.MsgUpdateAverageCounterpartyBlockTime",
+		"chain_id":                        chainId,
+		"average_counterparty_block_time": averageCounterpartyBlockTime,
+	}
+	content, _ := json.Marshal(contentI)
+	proposalId, err := (*g.heliosNetwork).SendProposal(context.Background(), title, description, string(content), g.accAddress, math.NewInt(1000000000000000000))
+	if err != nil {
+		return 0, err
+	}
+	return proposalId, nil
+}
+
 func (g *Global) CreateNewBlockchainProposal(title string, description string, counterpartyChainParams *hyperiontypes.CounterpartyChainParams) (uint64, error) {
 	heliosNetwork := g.GetHeliosNetwork()
 

@@ -3,9 +3,21 @@ package utils
 import (
 	"fmt"
 	"math/big"
+	"unicode/utf8"
 
 	sdkmath "cosmossdk.io/math"
 )
+
+// SanitizeUTF8 ensures the string contains only valid UTF-8 characters.
+// Invalid bytes are replaced with the Unicode replacement character (U+FFFD).
+// This is needed for data coming from Ethereum events which can contain arbitrary bytes.
+func SanitizeUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	// Replace invalid UTF-8 sequences with replacement character
+	return string([]rune(s))
+}
 
 func FormatBigStringToFloat64(cost string, decimals int64) string {
 	// convertir la string en big.Int
