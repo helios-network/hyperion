@@ -329,10 +329,28 @@
                                     <v-col cols="12">
                                         <v-btn
                                             color="info"
+                                            @click="openChainParamsDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Chain Params
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
                                             @click="openProposeAddWhitelistedAddressDialog(selectedChainId); showOthersModal = false;"
                                             block
                                         >
                                             Propose Add Whitelisted Address
+                                        </v-btn>
+                                    </v-col>
+                                    <v-col cols="12">
+                                        <v-btn
+                                            color="info"
+                                            @click="openProposeUpdateAvgCounterpartyBlockTimeDialog(selectedChainId); showOthersModal = false;"
+                                            block
+                                        >
+                                            Propose Update Avg Block Time
                                         </v-btn>
                                     </v-col>
                                     <v-col cols="12">
@@ -709,6 +727,82 @@
                             <v-btn color="primary" @click="proposeAddWhitelistedAddress" :loading="isProposingAddWhitelistedAddress">
                                 Propose
                             </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Propose Update Average Counterparty Block Time Dialog -->
+                <v-dialog v-model="showProposeUpdateAvgCounterpartyBlockTimeDialog" max-width="600px">
+                    <v-card>
+                        <v-card-title>Propose Update Average Block Time</v-card-title>
+                        <v-card-text>
+                            <v-form ref="proposeUpdateAvgCounterpartyBlockTimeForm">
+                                <v-text-field
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.title"
+                                    label="Title"
+                                    required
+                                    :rules="[v => !!v || 'Title is required']"
+                                ></v-text-field>
+                                <v-textarea
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.description"
+                                    label="Description"
+                                    required
+                                    :rules="[v => !!v || 'Description is required']"
+                                ></v-textarea>
+                                <v-text-field
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.chain_id"
+                                    label="Chain ID"
+                                    type="number"
+                                    disabled
+                                ></v-text-field>
+                                <v-text-field
+                                    v-model="proposeUpdateAvgCounterpartyBlockTimeForm.average_counterparty_block_time"
+                                    label="Average Counterparty Block Time (ms)"
+                                    type="number"
+                                    required
+                                    :rules="[v => !!v || 'Average block time is required', v => v > 0 || 'Must be greater than 0']"
+                                    hint="Current value is pre-filled from chain parameters"
+                                    persistent-hint
+                                ></v-text-field>
+                            </v-form>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showProposeUpdateAvgCounterpartyBlockTimeDialog = false">Cancel</v-btn>
+                            <v-btn color="primary" @click="proposeUpdateAvgCounterpartyBlockTime" :loading="isProposingUpdateAvgCounterpartyBlockTime">
+                                Propose
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Chain Params Dialog -->
+                <v-dialog v-model="showChainParamsDialog" max-width="800px">
+                    <v-card>
+                        <v-card-title>
+                            Chain {{ chainParamsData.chainId }} - Counterparty Chain Parameters
+                        </v-card-title>
+                        <v-card-text>
+                            <v-simple-table dense>
+                                <template v-slot:default>
+                                    <thead>
+                                        <tr>
+                                            <th class="text-left">Parameter</th>
+                                            <th class="text-left">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(value, key) in chainParamsData.params" :key="key">
+                                            <td><strong>{{ key }}</strong></td>
+                                            <td>{{ value }}</td>
+                                        </tr>
+                                    </tbody>
+                                </template>
+                            </v-simple-table>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="error" text @click="showChainParamsDialog = false">Close</v-btn>
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
@@ -1240,6 +1334,16 @@
                     chain_id: null,
                     address: '',
                 },
+                showProposeUpdateAvgCounterpartyBlockTimeDialog: false,
+                isProposingUpdateAvgCounterpartyBlockTime: false,
+                proposeUpdateAvgCounterpartyBlockTimeForm: {
+                    title: '',
+                    description: '',
+                    chain_id: null,
+                    average_counterparty_block_time: '',
+                },
+                showChainParamsDialog: false,
+                chainParamsData: { chainId: null, params: {} },
                 showUpdateChainLogoDialog: false,
                 showAddWhitelistedAddressDialog: false,
                 updateChainLogoHash: '',
@@ -2265,6 +2369,80 @@
                     } finally {
                         this.isProposingAddWhitelistedAddress = false;
                     }
+                },
+                openProposeUpdateAvgCounterpartyBlockTimeDialog(chainId) {
+                    const chain = this.chains.find(c => c.chainId === chainId);
+                    this.proposeUpdateAvgCounterpartyBlockTimeForm = {
+                        title: '',
+                        description: '',
+                        chain_id: chainId,
+                        average_counterparty_block_time: chain ? chain.averageCounterpartyBlockTime : '',
+                    };
+                    this.showProposeUpdateAvgCounterpartyBlockTimeDialog = true;
+                },
+                async proposeUpdateAvgCounterpartyBlockTime() {
+                    if (!this.$refs.proposeUpdateAvgCounterpartyBlockTimeForm.validate()) {
+                        return;
+                    }
+
+                    this.isProposingUpdateAvgCounterpartyBlockTime = true;
+                    try {
+                        const response = await fetch('/api/query?type=propose-update-average-counterparty-block-time', {
+                            method: 'POST',
+                            headers: this.getAuthHeaders(),
+                            body: JSON.stringify({
+                                title: this.proposeUpdateAvgCounterpartyBlockTimeForm.title,
+                                description: this.proposeUpdateAvgCounterpartyBlockTimeForm.description,
+                                chain_id: Number(this.proposeUpdateAvgCounterpartyBlockTimeForm.chain_id),
+                                average_counterparty_block_time: Number(this.proposeUpdateAvgCounterpartyBlockTimeForm.average_counterparty_block_time),
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to propose update average counterparty block time');
+                        }
+
+                        this.showProposeUpdateAvgCounterpartyBlockTimeDialog = false;
+                        this.showNotification('Average counterparty block time update proposed successfully');
+                        await this.fetchChains();
+                    } catch (error) {
+                        console.error('Error proposing update average counterparty block time:', error);
+                        this.showNotification(`Failed to propose update average counterparty block time: ${error.message}`, 'error');
+                    } finally {
+                        this.isProposingUpdateAvgCounterpartyBlockTime = false;
+                    }
+                },
+                openChainParamsDialog(chainId) {
+                    const chain = this.chains.find(c => c.chainId === chainId);
+                    if (!chain) return;
+                    this.chainParamsData = {
+                        chainId: chainId,
+                        params: {
+                            'Bridge Chain Type': chain.bridgeChainType || 'N/A',
+                            'Contract Source Hash': chain.contractSourceHash || 'N/A',
+                            'Bridge Contract Address': chain.address || 'N/A',
+                            'Bridge Contract Start Height': chain.bridgeContractStartHeight || 'N/A',
+                            'Initializer': chain.initializer || 'N/A',
+                            'Signed Valsets Window': chain.signedValsetsWindow || 'N/A',
+                            'Signed Batches Window': chain.signedBatchesWindow || 'N/A',
+                            'Signed Claims Window': chain.signedClaimsWindow || 'N/A',
+                            'Target Batch Timeout': chain.targetBatchTimeout || 'N/A',
+                            'Target Outgoing Tx Timeout': chain.targetOutgoingTxTimeout || 'N/A',
+                            'Average Block Time (ms)': chain.averageBlockTime || 'N/A',
+                            'Average Counterparty Block Time (ms)': chain.averageCounterpartyBlockTime || 'N/A',
+                            'Unbond Slashing Valsets Window': chain.unbondSlashingValsetsWindow || 'N/A',
+                            'Offset Valset Nonce': chain.offsetValsetNonce || 'N/A',
+                            'Min Call External Data Gas': chain.minCallExternalDataGas || 'N/A',
+                            'Slash Fraction Valset': chain.slashFractionValset || 'N/A',
+                            'Slash Fraction Batch': chain.slashFractionBatch || 'N/A',
+                            'Slash Fraction Claim': chain.slashFractionClaim || 'N/A',
+                            'Slash Fraction Conflicting Claim': chain.slashFractionConflictingClaim || 'N/A',
+                            'Slash Fraction Bad Eth Signature': chain.slashFractionBadEthSignature || 'N/A',
+                            'Valset Reward': chain.valsetReward || 'N/A',
+                            'Paused': chain.paused ? 'Yes' : 'No',
+                        },
+                    };
+                    this.showChainParamsDialog = true;
                 },
                 openUpdateChainLogoDialog(chainId) {
                     this.selectedChainId = chainId;
