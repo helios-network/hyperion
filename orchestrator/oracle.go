@@ -14,10 +14,30 @@ import (
 
 	cosmostypes "github.com/cosmos/cosmos-sdk/types"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/rpcerrors"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	"github.com/Helios-Chain-Labs/metrics"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
+)
+
+const (
+	// minBlocksToSearch is the smallest window we'll ever ask a provider to
+	// scan. Going below this buys nothing and usually means the provider is
+	// misbehaving, not the window.
+	minBlocksToSearch float64 = 50
+
+	// defaultMaxBlocksToSearch caps how far we'll re-grow the scan window
+	// after consecutive successes. Providers that handled larger ranges in
+	// the past can still bite us under load.
+	defaultMaxBlocksToSearch float64 = 10000
+
+	// blocksGrowAfterSuccesses controls how many successful chunks we must
+	// accumulate before widening the scan window again.
+	blocksGrowAfterSuccesses = 10
+
+	// blocksGrowFactor is how aggressively the scan window grows back.
+	blocksGrowFactor = 1.5
 )
 
 const (
@@ -83,6 +103,7 @@ type oracle struct {
 	lastObservedEthHeight   uint64
 	logEnabled              bool
 	missedEventsBlockHeight uint64
+	consecutiveSuccesses    int
 }
 
 func (l *oracle) Log() log.Logger {
@@ -107,12 +128,29 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		l.Log().Infoln("oracle_eth_default_blocks_to_search found in chain settings, using value", defaultBlocksToSearch)
 	}
 
-	if defaultBlocksToSearch < 10 {
-		l.Orchestrator.HyperionState.ErrorStatus = "oracle_eth_default_blocks_to_search is less than 10, please increase the value"
-		return errors.New("oracle_eth_default_blocks_to_search is less than 10, please increase the value")
-	} else if defaultBlocksToSearch >= 10 && l.Orchestrator.HyperionState.ErrorStatus == "oracle_eth_default_blocks_to_search is less than 10, please increase the value" {
+	// Self-heal when a past rate-limit incident shrank the window below the
+	// usable floor. Previously this required manual intervention.
+	if defaultBlocksToSearch < minBlocksToSearch {
+		l.Log().Warningln("oracle_eth_default_blocks_to_search below floor, resetting to", minBlocksToSearch)
+		defaultBlocksToSearch = minBlocksToSearch
+		settings["oracle_eth_default_blocks_to_search"] = defaultBlocksToSearch
+		_ = storage.SetChainSettings(l.cfg.ChainId, settings)
+	}
+	if l.Orchestrator.HyperionState.ErrorStatus == "oracle_eth_default_blocks_to_search is less than 10, please increase the value" {
 		l.Orchestrator.HyperionState.ErrorStatus = "okay"
 	}
+
+	maxBlocksToSearch, ok := settings["oracle_eth_max_blocks_to_search"].(float64)
+	if !ok || maxBlocksToSearch < defaultBlocksToSearch {
+		maxBlocksToSearch = defaultMaxBlocksToSearch
+	}
+
+	// oracle_skip_pruned_history: when every configured RPC rejects a chunk
+	// with a "history pruned / archive required" error, there is no way to
+	// scan those blocks — any events in them are permanently unreachable.
+	// With this flag the oracle advances past the unreadable range instead
+	// of looping forever. Default false: data-safety over liveness.
+	skipPrunedHistory, _ := settings["oracle_skip_pruned_history"].(bool)
 
 	ethBlockConfirmationDelay, ok := settings["oracle_block_confirmation_delay"].(float64)
 	if !ok {
@@ -244,30 +282,119 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
-	targetHeightForSync := targetHeight
-	for i := 0; i < 100 && latestHeight > targetHeightForSync; i++ {
-		if targetHeightForSync > l.lastObservedEthHeight+uint64(defaultBlocksToSearch) {
-			targetHeightForSync = l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
+	// Catch-up loop. We iterate up to 100 chunks per tick. Previously a single
+	// failing chunk tore down the whole loop; now we classify the failure and
+	// respond in kind so that transient RPC issues don't stall the sync.
+	for i := 0; i < 100; i++ {
+		if l.lastObservedEthHeight >= targetHeight {
+			break
 		}
-		if err := l.syncToTargetHeight(ctx, latestHeight, targetHeightForSync, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk)); err != nil {
 
-			if strings.Contains(err.Error(), "limit exceeded") { // if limit exceeded, divide the defaultBlocksToSearch by 2 and try again after delay
-				// divise by 2 the defaultBlocksToSearch in storage
-				settings, err := storage.GetChainSettings(l.cfg.ChainId)
-				if err != nil {
-					return errors.Wrap(err, "failed to get chain settings")
+		chunkEnd := l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
+		if chunkEnd > targetHeight {
+			chunkEnd = targetHeight
+		}
+
+		l.HyperionState.OracleStatus = "scanning " + strconv.FormatUint(l.lastObservedEthHeight, 10) +
+			" -> " + strconv.FormatUint(chunkEnd, 10) +
+			" (" + strconv.FormatUint(targetHeight-l.lastObservedEthHeight, 10) + " left)"
+
+		err := l.syncToTargetHeight(ctx, latestHeight, chunkEnd, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk))
+		if err == nil {
+			l.consecutiveSuccesses++
+			// After a streak of clean chunks, tentatively widen the window.
+			// Providers recover; we shouldn't stay shrunk forever.
+			if l.consecutiveSuccesses >= blocksGrowAfterSuccesses && defaultBlocksToSearch < maxBlocksToSearch {
+				newSize := defaultBlocksToSearch * blocksGrowFactor
+				if newSize > maxBlocksToSearch {
+					newSize = maxBlocksToSearch
 				}
-				settings["oracle_eth_default_blocks_to_search"] = float64(defaultBlocksToSearch / 2)
-				if err := storage.SetChainSettings(l.cfg.ChainId, settings); err != nil {
-					return errors.Wrap(err, "failed to set chain settings")
+				defaultBlocksToSearch = newSize
+				l.consecutiveSuccesses = 0
+				if s, sErr := storage.GetChainSettings(l.cfg.ChainId); sErr == nil {
+					s["oracle_eth_default_blocks_to_search"] = defaultBlocksToSearch
+					_ = storage.SetChainSettings(l.cfg.ChainId, s)
 				}
-				l.Log().Infoln("defaultBlocksToSearch divided by 2, new value: ", defaultBlocksToSearch)
+				l.Log().Infoln("scan window widened to", defaultBlocksToSearch)
+			}
+			continue
+		}
+
+		kind := rpcerrors.Classify(err)
+		l.consecutiveSuccesses = 0
+
+		switch kind {
+		case rpcerrors.RangeTooLarge:
+			// The provider rejected the range size itself; shrink and retry
+			// the same chunk. This is the one case where the retry layer
+			// can't help us — only a smaller window can.
+			newSize := defaultBlocksToSearch / 2
+			if newSize < minBlocksToSearch {
+				newSize = minBlocksToSearch
+			}
+			if newSize == defaultBlocksToSearch {
+				// Already at floor; rotating is the only remaining lever.
+				l.Log().Warningln("range error at minimum window, rotating rpc")
+				l.Orchestrator.RotateRpc()
 				return nil
 			}
+			defaultBlocksToSearch = newSize
+			if s, sErr := storage.GetChainSettings(l.cfg.ChainId); sErr == nil {
+				s["oracle_eth_default_blocks_to_search"] = defaultBlocksToSearch
+				_ = storage.SetChainSettings(l.cfg.ChainId, s)
+			}
+			l.Log().Infoln("scan window halved to", defaultBlocksToSearch, "(range_too_large)")
+			// Retry the same chunk on the next loop iteration.
+			continue
 
+		case rpcerrors.RateLimit, rpcerrors.Timeout, rpcerrors.Network, rpcerrors.NodeIssue:
+			// retry() already exhausted its attempts across multiple RPCs;
+			// continuing would just burn through the remaining iterations
+			// pointlessly. Bail out and let the next tick pick up where we
+			// left off.
+			l.Log().WithError(err).
+				WithField("kind", kind.String()).
+				Warningln("transient RPC error, deferring remaining chunks to next tick")
+			return nil
+
+		case rpcerrors.HistoryPruned:
+			// All configured RPCs reject this block range as pruned. Two
+			// paths: (a) user has opted into skipping — we advance past the
+			// range and flag the gap in state; (b) default — bail with a
+			// clear actionable message. Retrying the same chunk indefinitely
+			// is never the right answer.
+			if skipPrunedHistory {
+				l.Log().WithField("from", l.lastObservedEthHeight).
+					WithField("to", chunkEnd).
+					Warningln("history pruned on all rpcs, skipping unreachable range (oracle_skip_pruned_history=true)")
+				l.Orchestrator.HyperionState.ErrorStatus = "skipped pruned range " +
+					strconv.FormatUint(l.lastObservedEthHeight, 10) + "-" +
+					strconv.FormatUint(chunkEnd, 10)
+				l.lastObservedEthHeight = chunkEnd
+				continue
+			}
+			l.Orchestrator.HyperionState.ErrorStatus = "history pruned on all rpcs at block " +
+				strconv.FormatUint(l.lastObservedEthHeight, 10) +
+				" — add an archive rpc or set oracle_skip_pruned_history=true"
+			l.Log().WithError(err).
+				WithField("block", l.lastObservedEthHeight).
+				Errorln("history pruned on all rpcs; add archive rpc or enable oracle_skip_pruned_history")
+			return nil
+
+		case rpcerrors.UnknownBlock:
+			// Reorg or a node lagging behind; skip this chunk's scan and
+			// advance — the target window will shift next tick anyway.
+			l.Log().WithError(err).Warningln("unknown block, advancing past chunk")
+			if chunkEnd > l.lastObservedEthHeight {
+				l.lastObservedEthHeight = chunkEnd
+			}
+			continue
+
+		default:
+			// Missed-event or genuinely unknown — propagate so the outer loop
+			// logs and the runOracle tick ends cleanly.
 			return err
 		}
-		targetHeightForSync = targetHeightForSync + uint64(defaultBlocksToSearch)
 	}
 
 	// TODO delete normaly useless
@@ -298,10 +425,13 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 
 	lastEventNonce, err := l.Orchestrator.ethereum.GetLastEventNonce(ctx)
 	if err != nil {
-		if strings.Contains(err.Error(), "no contract code at given address") {
+		kind := rpcerrors.Classify(err)
+		if rpcerrors.ShouldRotate(kind) || strings.Contains(err.Error(), "no contract code at given address") {
 			l.Orchestrator.RotateRpc()
 		}
-		l.Log().WithError(err).Errorln("failed to get last event nonce on " + l.cfg.ChainName)
+		l.Log().WithError(err).
+			WithField("kind", kind.String()).
+			Errorln("failed to get last event nonce on " + l.cfg.ChainName)
 		return err
 	}
 
@@ -315,14 +445,24 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 			// blockTimeOnTheChain is in milliseconds
 			blockTimeOnTheChain := l.cfg.ChainParams.AverageCounterpartyBlockTime // 12000ms (12s)
 
-			// compute number of blocks in 2 minutes
-			const twoMinutesMs = 2 * 60 * 1000 // 300000 ms
+			// Guard against misconfigured chain params: a zero block time
+			// would panic on division below.
+			if blockTimeOnTheChain == 0 {
+				l.Log().Warningln("AverageCounterpartyBlockTime is 0, skipping rewind")
+			} else {
+				// compute number of blocks in 2 minutes
+				const twoMinutesMs = 2 * 60 * 1000 // 120000 ms
 
-			nbBlocksToRewind := twoMinutesMs / blockTimeOnTheChain
+				nbBlocksToRewind := twoMinutesMs / blockTimeOnTheChain
 
-			l.Log().Infoln("rewinding the last observed height by ", nbBlocksToRewind, " blocks")
-			// rewind the last observed height
-			l.lastObservedEthHeight = l.lastObservedEthHeight - nbBlocksToRewind
+				l.Log().Infoln("rewinding the last observed height by ", nbBlocksToRewind, " blocks")
+				// rewind the last observed height (clamped to 0)
+				if nbBlocksToRewind > l.lastObservedEthHeight {
+					l.lastObservedEthHeight = 0
+				} else {
+					l.lastObservedEthHeight = l.lastObservedEthHeight - nbBlocksToRewind
+				}
+			}
 		}
 	}
 
@@ -384,12 +524,20 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 			// blockTimeOnTheChain is in milliseconds
 			blockTimeOnTheChain := l.cfg.ChainParams.AverageCounterpartyBlockTime // 12000ms (12s)
 
-			// compute number of blocks in 5 minutes
-			const fiveMinutesMs = 5 * 60 * 1000 // 300000 ms
+			if blockTimeOnTheChain == 0 {
+				l.Log().Warningln("AverageCounterpartyBlockTime is 0, skipping missed-event rewind")
+			} else {
+				// compute number of blocks in 5 minutes
+				const fiveMinutesMs = 5 * 60 * 1000 // 300000 ms
 
-			nbBlocksToRewind := fiveMinutesMs / blockTimeOnTheChain
+				nbBlocksToRewind := fiveMinutesMs / blockTimeOnTheChain
 
-			l.missedEventsBlockHeight = l.missedEventsBlockHeight - nbBlocksToRewind
+				if nbBlocksToRewind > l.missedEventsBlockHeight {
+					l.missedEventsBlockHeight = 0
+				} else {
+					l.missedEventsBlockHeight = l.missedEventsBlockHeight - nbBlocksToRewind
+				}
+			}
 		}
 		l.lastObservedEthHeight = l.missedEventsBlockHeight
 		// move back to the last observed event height
@@ -500,7 +648,16 @@ func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, 
 
 func (l *oracle) getLatestEthHeight(ctx context.Context) (uint64, error) {
 	latestHeight := uint64(0)
+	attempt := 0
 	fn := func() error {
+		attempt++
+		// Keep the UI status in sync while retries are in flight. Previously
+		// this stayed stuck on "getting latest ethereum height" for the whole
+		// retry budget, which made it look like the orchestrator was frozen.
+		if attempt > 1 {
+			l.HyperionState.OracleStatus = "getting latest height (retry #" +
+				strconv.Itoa(attempt) + " on " + l.ethereum.GetRpc().Url + ")"
+		}
 		h, err := l.ethereum.GetHeaderByNumber(ctx, nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to get latest ethereum header")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"cosmossdk.io/errors"
@@ -16,8 +15,10 @@ import (
 	log "github.com/xlab/suplog"
 
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum/rpcerrors"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/helios"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/loops"
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/rpcs"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/storage"
 	"github.com/Helios-Chain-Labs/hyperion/orchestrator/utils"
 	"github.com/Helios-Chain-Labs/metrics"
@@ -25,6 +26,17 @@ import (
 
 const (
 	defaultLoopDur = 30 * time.Second
+
+	// rpcCooldownDuration is how long a failing RPC is skipped during rotation
+	// before being eligible again.
+	rpcCooldownDuration = 60 * time.Second
+
+	// rpcFailureThreshold is the number of recent failures that put an RPC
+	// into cooldown.
+	rpcFailureThreshold = 3
+
+	// rpcUsageWindow is the time window for counting recent RPC failures.
+	rpcUsageWindow = 2 * time.Minute
 )
 
 // PriceFeed provides token price for a given contract address
@@ -377,17 +389,53 @@ func (s *Orchestrator) getLastClaimBlockHeight(ctx context.Context, helios helio
 	return claim.EthereumEventHeight, nil
 }
 
+// retryBudget bounds the work we're willing to spend on a single call before
+// giving up and letting the caller's outer loop retry. Rate-limit walls won't
+// come down by staying on them — better to back off and try again next tick.
+const (
+	retryMaxAttempts     = 12
+	retryRateLimitBudget = 5
+	retryBaseDelay       = 200 * time.Millisecond
+	retryMaxDelay        = 2 * time.Second
+)
+
 func (s *Orchestrator) retry(ctx context.Context, fn func() error) error {
+	rateLimitHits := 0
 	return retry.Do(fn,
 		retry.Context(ctx),
-		retry.Delay(200*time.Millisecond),
-		retry.Attempts(s.maxAttempts),
-		retry.OnRetry(func(n uint, err error) {
-			if strings.Contains(err.Error(), "no RPC clients available") {
-				s.logger.Warningf("no RPC clients available, refreshing rpcs... (#%d)", n+1)
-				return
+		retry.Delay(retryBaseDelay),
+		retry.MaxDelay(retryMaxDelay),
+		retry.DelayType(retry.CombineDelay(retry.BackOffDelay, retry.RandomDelay)),
+		retry.MaxJitter(150*time.Millisecond),
+		retry.Attempts(retryMaxAttempts),
+		retry.LastErrorOnly(true),
+		retry.RetryIf(func(err error) bool {
+			kind := rpcerrors.Classify(err)
+			// Range errors are the caller's fault (window too big) — don't
+			// penalize the RPC's reputation for them.
+			if kind != rpcerrors.RangeTooLarge && kind != rpcerrors.UnknownBlock {
+				s.ReportRpcUsage(false, err)
 			}
-			s.logger.WithError(err).Warningf("loop error, retrying... (#%d)", n+1)
+			if rpcerrors.ShouldRotate(kind) {
+				s.RotateRpc()
+			}
+			// Rate limits are a capacity problem, not a flake. After a small
+			// number of rotations, all providers in the pool are likely hot —
+			// bail so the outer 30s ticker provides real recovery time.
+			if kind == rpcerrors.RateLimit || kind == rpcerrors.HistoryPruned {
+				rateLimitHits++
+				if rateLimitHits >= retryRateLimitBudget {
+					return false
+				}
+			}
+			return rpcerrors.IsRetryable(kind)
+		}),
+		retry.OnRetry(func(n uint, err error) {
+			kind := rpcerrors.Classify(err)
+			s.logger.WithError(err).
+				WithField("kind", kind.String()).
+				WithField("rpc", s.ethereum.GetRpc().Url).
+				Warningf("loop error, retrying... (#%d)", n+1)
 		}))
 }
 
@@ -402,22 +450,103 @@ func (s *Orchestrator) IsStaticRpcAnonymous() bool {
 	return settings["static_rpc_anonymous"].(bool)
 }
 
+// rpcIsHealthy reports whether an RPC has fewer than rpcFailureThreshold
+// failures within rpcUsageWindow. Older usages are ignored so that a
+// temporarily-broken RPC can come back into rotation.
+func rpcIsHealthy(r *rpcs.Rpc) bool {
+	if r == nil {
+		return true
+	}
+	cutoff := time.Now().Add(-rpcUsageWindow)
+	fails := 0
+	for _, u := range r.Usages {
+		if u.Time.Before(cutoff) {
+			continue
+		}
+		if !u.Success {
+			fails++
+			if fails >= rpcFailureThreshold {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// pruneRpcUsages drops entries older than rpcUsageWindow so the slice doesn't
+// grow unbounded for long-running orchestrators.
+func pruneRpcUsages(r *rpcs.Rpc) {
+	if r == nil {
+		return
+	}
+	cutoff := time.Now().Add(-rpcUsageWindow)
+	kept := r.Usages[:0]
+	for _, u := range r.Usages {
+		if u.Time.After(cutoff) {
+			kept = append(kept, u)
+		}
+	}
+	r.Usages = kept
+}
+
+// ReportRpcUsage records the outcome of the most recent RPC call on the
+// currently-selected endpoint. Used by RotateRpc to avoid recently-failing
+// endpoints.
+func (s *Orchestrator) ReportRpcUsage(success bool, err error) {
+	rpc := s.ethereum.GetRpc()
+	if rpc == nil {
+		return
+	}
+	pruneRpcUsages(rpc)
+	usage := rpcs.RpcUsage{Success: success, Time: time.Now()}
+	if err != nil {
+		usage.Error = err.Error()
+	}
+	rpc.Usages = append(rpc.Usages, usage)
+}
+
 func (s *Orchestrator) RotateRpc() {
 	usedRpc := s.ethereum.GetRpc().Url
 
-	lstOfclients := make([]*ethereum.Network, 0)
+	candidates := make([]*ethereum.Network, 0)
+	allOthers := make([]*ethereum.Network, 0)
 
+	now := time.Now()
 	for _, eth := range s.ethereums {
-		if (*eth).GetRpc().Url != usedRpc {
-			lstOfclients = append(lstOfclients, eth)
+		if (*eth).GetRpc().Url == usedRpc {
+			continue
 		}
+		allOthers = append(allOthers, eth)
+		rpc := (*eth).GetRpc()
+		// Skip RPCs still in cooldown after a recent failure burst.
+		inCooldown := false
+		if rpc != nil && len(rpc.Usages) > 0 {
+			last := rpc.Usages[len(rpc.Usages)-1]
+			if !last.Success && now.Sub(last.Time) < rpcCooldownDuration {
+				inCooldown = true
+			}
+		}
+		if inCooldown {
+			continue
+		}
+		if !rpcIsHealthy(rpc) {
+			continue
+		}
+		candidates = append(candidates, eth)
 	}
-	if len(lstOfclients) == 0 {
+
+	// Fall back to any other RPC if every candidate is currently unhealthy —
+	// better to try a flaky one than to stay on the one we just failed on.
+	pool := candidates
+	if len(pool) == 0 {
+		pool = allOthers
+	}
+	if len(pool) == 0 {
 		s.logger.Warning("No other rpcs available, using the same rpc")
 		return
 	}
-	s.ethereum = *lstOfclients[rand.Intn(len(lstOfclients))]
-	s.logger.Info("Rotated rpc to rpc ", s.ethereum.GetRpc().Url, " / total rpcs ", len(lstOfclients))
+	s.ethereum = *pool[rand.Intn(len(pool))]
+	s.logger.Info("Rotated rpc to rpc ", s.ethereum.GetRpc().Url, " / healthy ", len(candidates), " / total ", len(allOthers)+1)
 }
 
 func (s *Orchestrator) UpdateNativeBalance(ctx context.Context) error {
