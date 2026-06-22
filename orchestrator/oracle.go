@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"math/big"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -282,6 +281,44 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 		return nil
 	}
 
+	// One-shot nonce snapshot for this tick. The contract's state_lastEventNonce
+	// is a global, monotonically increasing counter (incremented on every bridge
+	// event); lastObservedEventNonce is what Helios has already processed.
+	// Fetching them once here instead of once per chunk in syncToTargetHeight
+	// removes ~2 RPC calls per 2000-block chunk.
+	lastObservedEventNonce, err := l.GetHelios().QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
+	if err != nil {
+		l.Log().WithError(err).Errorln("failed to get last observed event nonce on " + l.cfg.ChainName)
+		return err
+	}
+
+	lastEventNonceBig, err := l.ethereum.GetLastEventNonce(ctx)
+	if err != nil {
+		kind := rpcerrors.Classify(err)
+		if rpcerrors.ShouldRotate(kind) || strings.Contains(err.Error(), "no contract code at given address") {
+			l.Orchestrator.RotateRpc()
+		}
+		l.Log().WithError(err).WithField("kind", kind.String()).Errorln("failed to get last event nonce on " + l.cfg.ChainName)
+		return err
+	}
+	lastEventNonce := lastEventNonceBig.Uint64()
+
+	// Fast-path: Helios has already observed every event the contract ever
+	// emitted, so there is provably nothing to claim between here and the target.
+	// Advance the height pointer in a single jump instead of grinding chunk by
+	// chunk — which previously cost ~2 RPC calls per 2000 blocks for nothing.
+	if l.missedEventsBlockHeight == 0 && lastObservedEventNonce == lastEventNonce {
+		l.lastObservedEthHeight = targetHeight
+		// Keep the UI/state in sync. The chunk loop used to publish these every
+		// iteration via syncToTargetHeight; since we skip the loop entirely we
+		// must publish them here, otherwise GetHeight() freezes and the UI shows
+		// a stale "out of sync" height even though scanning is fully caught up.
+		l.Orchestrator.SetHeight(l.lastObservedEthHeight)
+		l.Orchestrator.SetTargetHeight(latestHeight - uint64(ethBlockConfirmationDelay))
+		l.Log().Infoln("nonces in sync (", lastObservedEventNonce, "), fast-forwarded observed height to", targetHeight)
+		return nil
+	}
+
 	// Catch-up loop. We iterate up to 100 chunks per tick. Previously a single
 	// failing chunk tore down the whole loop; now we classify the failure and
 	// respond in kind so that transient RPC issues don't stall the sync.
@@ -299,8 +336,19 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			" -> " + strconv.FormatUint(chunkEnd, 10) +
 			" (" + strconv.FormatUint(targetHeight-l.lastObservedEthHeight, 10) + " left)"
 
-		err := l.syncToTargetHeight(ctx, latestHeight, chunkEnd, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk))
+		sentClaims, err := l.syncToTargetHeight(ctx, latestHeight, chunkEnd, uint64(ethBlockConfirmationDelay), int(maxClaimsMsgPerBulk), lastObservedEventNonce, lastEventNonce)
 		if err == nil {
+			if sentClaims {
+				// Claims advanced Helios's observed nonce (and new events may have
+				// landed on-chain meanwhile); refresh the snapshot so the next
+				// chunk evaluates against current state, not stale nonces.
+				if n, e := l.GetHelios().QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId); e == nil {
+					lastObservedEventNonce = n
+				}
+				if n, e := l.ethereum.GetLastEventNonce(ctx); e == nil {
+					lastEventNonce = n.Uint64()
+				}
+			}
 			l.consecutiveSuccesses++
 			// After a streak of clean chunks, tentatively widen the window.
 			// Providers recover; we shouldn't stay shrunk forever.
@@ -407,40 +455,27 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	return nil
 }
 
-func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64, ethBlockConfirmationDelay uint64, maxClaimsMsgPerBulk int) error {
+// syncToTargetHeight scans one chunk and broadcasts any new claims. The nonce
+// pair (lastObservedEventNonce / lastEventNonce) is captured once per tick by
+// the caller and threaded in, so this no longer issues its own nonce RPC calls.
+// It returns true when it actually broadcast claims, so the caller knows to
+// refresh the snapshot.
+func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, targetHeight uint64, ethBlockConfirmationDelay uint64, maxClaimsMsgPerBulk int, lastObservedEventNonce uint64, lastEventNonce uint64) (bool, error) {
 
 	l.Orchestrator.SetHeight(l.lastObservedEthHeight)
 	l.Orchestrator.SetTargetHeight(latestHeight - uint64(ethBlockConfirmationDelay))
 
 	if targetHeight-l.lastObservedEthHeight == 0 {
 		l.Log().Infoln("No blocks to sync", "last_observed_eth_height", l.lastObservedEthHeight, "latest_height", latestHeight, "target_height", targetHeight)
-		return nil
-	}
-
-	lastObservedEventNonce, err := l.Orchestrator.GetHelios().QueryGetLastObservedEventNonce(ctx, l.cfg.HyperionId)
-	if err != nil {
-		l.Log().WithError(err).Errorln("failed to get last observed event nonce for " + l.cfg.ChainName + " on helios network")
-		return err
-	}
-
-	lastEventNonce, err := l.Orchestrator.ethereum.GetLastEventNonce(ctx)
-	if err != nil {
-		kind := rpcerrors.Classify(err)
-		if rpcerrors.ShouldRotate(kind) || strings.Contains(err.Error(), "no contract code at given address") {
-			l.Orchestrator.RotateRpc()
-		}
-		l.Log().WithError(err).
-			WithField("kind", kind.String()).
-			Errorln("failed to get last event nonce on " + l.cfg.ChainName)
-		return err
+		return false, nil
 	}
 
 	if l.missedEventsBlockHeight == 0 {
-		if lastObservedEventNonce == lastEventNonce.Uint64() {
+		if lastObservedEventNonce == lastEventNonce {
 			l.Log().Infoln("lastObservedEventNonce is equal to lastEventNonce, no new events to process")
 			l.lastObservedEthHeight = targetHeight
 			// permit to reduce the number of calls to the ethereum rpc
-			return nil
+			return false, nil
 		} else { // special case to reduce the number of calls to the ethereum rpc cause we can miss events if we don't rewind few minutes
 			// blockTimeOnTheChain is in milliseconds
 			blockTimeOnTheChain := l.cfg.ChainParams.AverageCounterpartyBlockTime // 12000ms (12s)
@@ -466,18 +501,10 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		}
 	}
 
-	// get all nonces between lastObservedEventNonce and lastEventNonce to optimize the number of calls to the ethereum rpc
-	noncesResearched := []uint64{}
-	for i := lastObservedEventNonce + 1; i <= lastEventNonce.Uint64(); i++ {
-		noncesResearched = append(noncesResearched, i)
-	}
-
-	l.Log().Infoln("noncesResearched: ", noncesResearched)
-
-	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight, noncesResearched)
+	events, err := l.getEthEvents(ctx, l.lastObservedEthHeight, targetHeight)
 	if err != nil {
 		l.Log().WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
-		return err
+		return false, err
 	}
 
 	if l.logEnabled {
@@ -499,7 +526,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 			l.Log().WithFields(log.Fields{"last_observed_event_nonce": lastObservedEventNonce, "eth_block_start": l.lastObservedEthHeight, "eth_block_end": targetHeight}).Infoln("oracle no new events on " + l.cfg.ChainName)
 		}
 		l.lastObservedEthHeight = targetHeight
-		return nil
+		return false, nil
 	}
 
 	if len(newEvents) > 0 {
@@ -514,7 +541,7 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		// we missed an event
 		lastObservedHeight, err := l.GetHelios().QueryGetLastObservedEthereumBlockHeight(ctx, l.cfg.HyperionId)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		// if we missed an event, we need to rewind the last observed height by 5 minutes and continue from there
@@ -542,14 +569,14 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 		l.lastObservedEthHeight = l.missedEventsBlockHeight
 		// move back to the last observed event height
 		l.Log().WithFields(log.Fields{"current_helios_nonce": lastObservedEventNonce, "wanted_nonce": lastObservedEventNonce + 1, "actual_ethereum_nonce": newEvents[0].Nonce()}).Infoln("orchestrator missed an " + l.cfg.ChainName + " event. Restarting block search from last observed claim...")
-		return errors.New("missed an event")
+		return false, errors.New("missed an event")
 	}
 
 	l.missedEventsBlockHeight = 0
 
 	if err := l.sendNewEventClaims(ctx, newEvents, maxClaimsMsgPerBulk); err != nil {
 		log.Info("err: ", err)
-		return err
+		return false, err
 	}
 
 	if l.logEnabled {
@@ -557,81 +584,37 @@ func (l *oracle) syncToTargetHeight(ctx context.Context, latestHeight uint64, ta
 	}
 	l.lastObservedEthHeight = targetHeight
 
-	return nil
+	return true, nil
 }
 
-func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64, noncesResearched []uint64) ([]event, error) {
+func (l *oracle) getEthEvents(ctx context.Context, startBlock, endBlock uint64) ([]event, error) {
 	var events []event
 	scanEthEventsFn := func() error {
 		events = nil // clear previous result in case a retry occurred
-		noncesFound := []uint64{}
 
-		depositEvents, err := l.ethereum.GetSendToHeliosEvents(startBlock, endBlock)
+		// Single eth_getLogs round-trip for all four event types instead of one
+		// call per type (see network.GetAllHyperionEvents).
+		bundle, err := l.ethereum.GetAllHyperionEvents(startBlock, endBlock)
 		if err != nil {
 			if strings.Contains(err.Error(), "limit exceeded") {
-				return errors.Wrap(err, "failed to get SendToHelios events - limit exceeded")
+				return errors.Wrap(err, "failed to get Hyperion events - limit exceeded")
 			}
-			return errors.Wrap(err, "failed to get SendToHelios events")
+			return errors.Wrap(err, "failed to get Hyperion events")
 		}
 
-		for _, e := range depositEvents {
+		for _, e := range bundle.Deposits {
 			ev := deposit(*e)
 			events = append(events, &ev)
-
-			if slices.Contains(noncesResearched, ev.Nonce()) {
-				noncesFound = append(noncesFound, ev.Nonce())
-			}
 		}
-
-		if len(noncesFound) == len(noncesResearched) { // all nonces have been found
-			l.Log().Infoln("all nonces have been found for events - gain of 3 calls eth_logs to the ethereum rpc")
-			return nil
-		}
-
-		withdrawalEvents, err := l.ethereum.GetTransactionBatchExecutedEvents(startBlock, endBlock)
-		if err != nil {
-			return errors.Wrap(err, "failed to get TransactionBatchExecuted events")
-		}
-
-		for _, e := range withdrawalEvents {
+		for _, e := range bundle.Withdrawals {
 			ev := withdrawal(*e)
 			events = append(events, &ev)
-
-			if slices.Contains(noncesResearched, ev.Nonce()) {
-				noncesFound = append(noncesFound, ev.Nonce())
-			}
 		}
-
-		if len(noncesFound) == len(noncesResearched) { // all nonces have been found
-			l.Log().Infoln("all nonces have been found for events - gain of 2 calls eth_logs to the ethereum rpc")
-			return nil
-		}
-
-		valsetUpdateEvents, err := l.ethereum.GetValsetUpdatedEvents(startBlock, endBlock)
-		if err != nil {
-			return errors.Wrap(err, "failed to get ValsetUpdated events")
-		}
-
-		for _, e := range valsetUpdateEvents {
+		for _, e := range bundle.ValsetUpdates {
 			ev := valsetUpdate(*e)
 			events = append(events, &ev)
-
-			if slices.Contains(noncesResearched, ev.Nonce()) {
-				noncesFound = append(noncesFound, ev.Nonce())
-			}
 		}
-
-		if len(noncesFound) == len(noncesResearched) { // all nonces have been found
-			l.Log().Infoln("all nonces have been found for events - gain of 1 call eth_logs to the ethereum rpc")
-			return nil
-		}
-
-		erc20DeploymentEvents, err := l.ethereum.GetHyperionERC20DeployedEvents(startBlock, endBlock)
-		if err != nil {
-			return errors.Wrap(err, "failed to get ERC20Deployed events")
-		}
-
-		for _, e := range erc20DeploymentEvents {
+		for _, e := range bundle.ERC20Deployments {
 			ev := erc20Deployment(*e)
 			events = append(events, &ev)
 		}

@@ -94,7 +94,7 @@ func (l *skipped) Run(ctx context.Context) error {
 
 		l.HyperionState.SkippedStatus = "getting events for nonce " + strconv.FormatUint(skippedNonce.Nonce, 10)
 
-		events, err := l.Orchestrator.Oracle.getEthEvents(ctx, skippedNonce.StartHeight, skippedNonce.EndHeight, []uint64{skippedNonce.Nonce})
+		events, err := l.Orchestrator.Oracle.getEthEvents(ctx, skippedNonce.StartHeight, skippedNonce.EndHeight)
 		if err != nil {
 			log.WithError(err).Errorln("failed to get events on " + l.cfg.ChainName)
 			return err

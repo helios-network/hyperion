@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -45,6 +46,7 @@ type Network interface {
 
 	GetHyperionContractAddress() gethcommon.Address
 
+	GetAllHyperionEvents(startBlock, endBlock uint64) (*HyperionEventBundle, error)
 	GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
 	GetValsetUpdatedEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
@@ -292,6 +294,90 @@ func (n *network) GetLastEventHeight(ctx context.Context) (*big.Int, error) {
 
 func (n *network) GetTxBatchNonce(ctx context.Context, erc20ContractAddress gethcommon.Address) (*big.Int, error) {
 	return n.HyperionContract.GetTxBatchNonce(ctx, erc20ContractAddress, n.FromAddr)
+}
+
+// HyperionEventBundle groups every Hyperion event type found in a single
+// eth_getLogs scan, so the oracle can fetch all of them in one RPC round-trip
+// instead of one call per event type.
+type HyperionEventBundle struct {
+	Deposits         []*hyperionevents.HyperionSendToHeliosEvent
+	Withdrawals      []*hyperionevents.HyperionTransactionBatchExecutedEvent
+	ValsetUpdates    []*hyperionevents.HyperionValsetUpdatedEvent
+	ERC20Deployments []*hyperionevents.HyperionERC20DeployedEvent
+}
+
+// GetAllHyperionEvents scans [startBlock, endBlock] for every Hyperion event
+// type in a SINGLE eth_getLogs call using a topic0 OR-filter, then decodes each
+// log by its event signature. This replaces up to four separate getLogs
+// round-trips (SendToHelios, TransactionBatchExecuted, ValsetUpdated,
+// ERC20Deployed) with one — the biggest per-chunk RPC saving during sync.
+func (n *network) GetAllHyperionEvents(startBlock, endBlock uint64) (*HyperionEventBundle, error) {
+	parsedABI, err := abi.JSON(strings.NewReader(hyperionevents.HyperionMetaData.ABI))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse Hyperion ABI")
+	}
+
+	sigDeposit := parsedABI.Events["SendToHeliosEvent"].ID
+	sigWithdrawal := parsedABI.Events["TransactionBatchExecutedEvent"].ID
+	sigValset := parsedABI.Events["ValsetUpdatedEvent"].ID
+	sigERC20 := parsedABI.Events["ERC20DeployedEvent"].ID
+
+	query := ethereum.FilterQuery{
+		FromBlock: new(big.Int).SetUint64(startBlock),
+		ToBlock:   new(big.Int).SetUint64(endBlock),
+		Addresses: []common.Address{n.Address()},
+		Topics:    [][]common.Hash{{sigDeposit, sigWithdrawal, sigValset, sigERC20}},
+	}
+
+	logs, err := n.Provider().FilterLogs(context.Background(), query)
+	if err != nil {
+		if !isUnknownBlockErr(err) {
+			return nil, errors.Wrap(err, "failed to scan past Hyperion events from Ethereum")
+		}
+	}
+
+	// A nil-backed bound contract is enough: UnpackLog only touches the ABI to
+	// decode data + indexed topics, it issues no RPC calls.
+	boundContract := bind.NewBoundContract(n.Address(), parsedABI, nil, nil, nil)
+	bundle := &HyperionEventBundle{}
+
+	for _, lg := range logs {
+		if len(lg.Topics) == 0 {
+			continue
+		}
+		switch lg.Topics[0] {
+		case sigDeposit:
+			ev := new(hyperionevents.HyperionSendToHeliosEvent)
+			if err := boundContract.UnpackLog(ev, "SendToHeliosEvent", lg); err != nil {
+				return nil, errors.Wrap(err, "failed to unpack SendToHeliosEvent")
+			}
+			ev.Raw = lg
+			bundle.Deposits = append(bundle.Deposits, ev)
+		case sigWithdrawal:
+			ev := new(hyperionevents.HyperionTransactionBatchExecutedEvent)
+			if err := boundContract.UnpackLog(ev, "TransactionBatchExecutedEvent", lg); err != nil {
+				return nil, errors.Wrap(err, "failed to unpack TransactionBatchExecutedEvent")
+			}
+			ev.Raw = lg
+			bundle.Withdrawals = append(bundle.Withdrawals, ev)
+		case sigValset:
+			ev := new(hyperionevents.HyperionValsetUpdatedEvent)
+			if err := boundContract.UnpackLog(ev, "ValsetUpdatedEvent", lg); err != nil {
+				return nil, errors.Wrap(err, "failed to unpack ValsetUpdatedEvent")
+			}
+			ev.Raw = lg
+			bundle.ValsetUpdates = append(bundle.ValsetUpdates, ev)
+		case sigERC20:
+			ev := new(hyperionevents.HyperionERC20DeployedEvent)
+			if err := boundContract.UnpackLog(ev, "ERC20DeployedEvent", lg); err != nil {
+				return nil, errors.Wrap(err, "failed to unpack ERC20DeployedEvent")
+			}
+			ev.Raw = lg
+			bundle.ERC20Deployments = append(bundle.ERC20Deployments, ev)
+		}
+	}
+
+	return bundle, nil
 }
 
 func (n *network) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {

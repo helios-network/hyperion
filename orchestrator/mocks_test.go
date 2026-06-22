@@ -11,6 +11,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	log "github.com/xlab/suplog"
 
+	"github.com/Helios-Chain-Labs/hyperion/orchestrator/ethereum"
 	hyperionevents "github.com/Helios-Chain-Labs/hyperion/solidity/wrappers/Hyperion.sol"
 	hyperiontypes "github.com/Helios-Chain-Labs/sdk-go/chain/hyperion/types"
 )
@@ -188,6 +189,7 @@ func (n MockCosmosNetwork) GetLastEventHeight(ctx context.Context) (*big.Int, er
 type MockEthereumNetwork struct {
 	GetHeaderByNumberFn                     func(ctx context.Context, number *big.Int) (*gethtypes.Header, error)
 	GetHyperionIDFn                         func(ctx context.Context) (gethcommon.Hash, error)
+	GetAllHyperionEventsFn                  func(startBlock, endBlock uint64) (*ethereum.HyperionEventBundle, error)
 	GetSendToHeliosEventsFn                 func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error)
 	GetHyperionERC20DeployedEventsFn        func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionERC20DeployedEvent, error)
 	GetValsetUpdatedEventsFn                func(startBlock, endBlock uint64) ([]*hyperionevents.HyperionValsetUpdatedEvent, error)
@@ -214,6 +216,10 @@ func (n MockEthereumNetwork) TokenDecimals(ctx context.Context, tokenContract ge
 
 func (n MockEthereumNetwork) GetHyperionID(ctx context.Context) (gethcommon.Hash, error) {
 	return n.GetHyperionIDFn(ctx)
+}
+
+func (n MockEthereumNetwork) GetAllHyperionEvents(startBlock, endBlock uint64) (*ethereum.HyperionEventBundle, error) {
+	return n.GetAllHyperionEventsFn(startBlock, endBlock)
 }
 
 func (n MockEthereumNetwork) GetSendToHeliosEvents(startBlock, endBlock uint64) ([]*hyperionevents.HyperionSendToHeliosEvent, error) {
