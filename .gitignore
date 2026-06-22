@@ -49,3 +49,8 @@ solidity/deployment/build
 solidity/deployment/.env
 
 vendor/
+
+test-prod-cc.sh
+test-prod.sh
+test.sh
+start-ethereum.sh
