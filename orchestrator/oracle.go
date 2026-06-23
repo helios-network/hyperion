@@ -103,6 +103,14 @@ type oracle struct {
 	logEnabled              bool
 	missedEventsBlockHeight uint64
 	consecutiveSuccesses    int
+
+	// Self-tuning scan window, kept in memory for the lifetime of the run.
+	// The stored chain setting is only a seed; the live window converges to
+	// whatever the current RPC can actually serve. Keeping it out of storage
+	// means a transient range/rate error — or rotating onto a stingier RPC —
+	// never corrupts the persisted config.
+	blocksToSearch    float64
+	maxBlocksToSearch float64
 }
 
 func (l *oracle) Log() log.Logger {
@@ -118,30 +126,33 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get chain settings")
 	}
-	defaultBlocksToSearch, ok := settings["oracle_eth_default_blocks_to_search"].(float64)
-
+	// The stored setting is only the seed for the self-tuning window. The live
+	// value lives on the oracle (l.blocksToSearch) and adapts in memory; we
+	// never write the adapted value back, so a transient incident can't freeze
+	// a bad range into the config.
+	seedBlocksToSearch, ok := settings["oracle_eth_default_blocks_to_search"].(float64)
 	if !ok {
-		l.Log().Infoln("oracle_eth_default_blocks_to_search not found in chain settings, using default value 2000")
-		defaultBlocksToSearch = 2000
-	} else {
-		l.Log().Infoln("oracle_eth_default_blocks_to_search found in chain settings, using value", defaultBlocksToSearch)
+		seedBlocksToSearch = 2000
 	}
 
-	// Self-heal when a past rate-limit incident shrank the window below the
-	// usable floor. Previously this required manual intervention.
-	if defaultBlocksToSearch < minBlocksToSearch {
-		l.Log().Warningln("oracle_eth_default_blocks_to_search below floor, resetting to", minBlocksToSearch)
-		defaultBlocksToSearch = minBlocksToSearch
-		settings["oracle_eth_default_blocks_to_search"] = defaultBlocksToSearch
-		_ = storage.SetChainSettings(l.cfg.ChainId, settings)
+	l.maxBlocksToSearch, ok = settings["oracle_eth_max_blocks_to_search"].(float64)
+	if !ok || l.maxBlocksToSearch < seedBlocksToSearch {
+		l.maxBlocksToSearch = defaultMaxBlocksToSearch
+	}
+
+	// Initialise the live window on the first tick, or recover it if a previous
+	// shrink drove it below the usable floor.
+	if l.blocksToSearch < minBlocksToSearch {
+		l.blocksToSearch = seedBlocksToSearch
+	}
+	if l.blocksToSearch < minBlocksToSearch {
+		l.blocksToSearch = minBlocksToSearch
+	}
+	if l.blocksToSearch > l.maxBlocksToSearch {
+		l.blocksToSearch = l.maxBlocksToSearch
 	}
 	if l.Orchestrator.HyperionState.ErrorStatus == "oracle_eth_default_blocks_to_search is less than 10, please increase the value" {
 		l.Orchestrator.HyperionState.ErrorStatus = "okay"
-	}
-
-	maxBlocksToSearch, ok := settings["oracle_eth_max_blocks_to_search"].(float64)
-	if !ok || maxBlocksToSearch < defaultBlocksToSearch {
-		maxBlocksToSearch = defaultMaxBlocksToSearch
 	}
 
 	// oracle_skip_pruned_history: when every configured RPC rejects a chunk
@@ -327,7 +338,7 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			break
 		}
 
-		chunkEnd := l.lastObservedEthHeight + uint64(defaultBlocksToSearch)
+		chunkEnd := l.lastObservedEthHeight + uint64(l.blocksToSearch)
 		if chunkEnd > targetHeight {
 			chunkEnd = targetHeight
 		}
@@ -351,19 +362,16 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			}
 			l.consecutiveSuccesses++
 			// After a streak of clean chunks, tentatively widen the window.
-			// Providers recover; we shouldn't stay shrunk forever.
-			if l.consecutiveSuccesses >= blocksGrowAfterSuccesses && defaultBlocksToSearch < maxBlocksToSearch {
-				newSize := defaultBlocksToSearch * blocksGrowFactor
-				if newSize > maxBlocksToSearch {
-					newSize = maxBlocksToSearch
+			// Providers recover; we shouldn't stay shrunk forever. In-memory
+			// only — no storage write.
+			if l.consecutiveSuccesses >= blocksGrowAfterSuccesses && l.blocksToSearch < l.maxBlocksToSearch {
+				newSize := l.blocksToSearch * blocksGrowFactor
+				if newSize > l.maxBlocksToSearch {
+					newSize = l.maxBlocksToSearch
 				}
-				defaultBlocksToSearch = newSize
+				l.blocksToSearch = newSize
 				l.consecutiveSuccesses = 0
-				if s, sErr := storage.GetChainSettings(l.cfg.ChainId); sErr == nil {
-					s["oracle_eth_default_blocks_to_search"] = defaultBlocksToSearch
-					_ = storage.SetChainSettings(l.cfg.ChainId, s)
-				}
-				l.Log().Infoln("scan window widened to", defaultBlocksToSearch)
+				l.Log().Infoln("scan window widened to", l.blocksToSearch)
 			}
 			continue
 		}
@@ -376,22 +384,18 @@ func (l *oracle) observeEthEvents(ctx context.Context) error {
 			// The provider rejected the range size itself; shrink and retry
 			// the same chunk. This is the one case where the retry layer
 			// can't help us — only a smaller window can.
-			newSize := defaultBlocksToSearch / 2
+			newSize := l.blocksToSearch / 2
 			if newSize < minBlocksToSearch {
 				newSize = minBlocksToSearch
 			}
-			if newSize == defaultBlocksToSearch {
+			if newSize == l.blocksToSearch {
 				// Already at floor; rotating is the only remaining lever.
 				l.Log().Warningln("range error at minimum window, rotating rpc")
 				l.Orchestrator.RotateRpc()
 				return nil
 			}
-			defaultBlocksToSearch = newSize
-			if s, sErr := storage.GetChainSettings(l.cfg.ChainId); sErr == nil {
-				s["oracle_eth_default_blocks_to_search"] = defaultBlocksToSearch
-				_ = storage.SetChainSettings(l.cfg.ChainId, s)
-			}
-			l.Log().Infoln("scan window halved to", defaultBlocksToSearch, "(range_too_large)")
+			l.blocksToSearch = newSize
+			l.Log().Infoln("scan window halved to", l.blocksToSearch, "(range_too_large)")
 			// Retry the same chunk on the next loop iteration.
 			continue
 

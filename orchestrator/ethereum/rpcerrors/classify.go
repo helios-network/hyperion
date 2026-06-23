@@ -164,11 +164,15 @@ func Classify(err error) Kind {
 	if containsAny(msg, unknownBlockMarkers) {
 		return UnknownBlock
 	}
-	if containsAny(msg, rangeMarkers) {
-		return RangeTooLarge
-	}
+	// Rate limit must be checked BEFORE range: providers phrase throttling as
+	// "rate limit exceeded", which contains the range marker "limit exceeded".
+	// A genuine range error ("limit exceeded", "block range", "max results", …)
+	// never contains a rate marker, so this ordering can't misclassify it.
 	if containsAny(msg, rateLimitMarkers) {
 		return RateLimit
+	}
+	if containsAny(msg, rangeMarkers) {
+		return RangeTooLarge
 	}
 	if containsAny(msg, timeoutMarkers) {
 		return Timeout
